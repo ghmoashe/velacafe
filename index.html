@@ -1,0 +1,30 @@
+﻿<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>vela-app</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="klaro"></div>
+
+    <!-- GA4 (заблокировано до согласия Klaro) -->
+    <script type="text/plain" data-type="application/javascript" data-name="ga">
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-XXXXXXXXXX');
+    </script>
+
+    <script
+      type="text/plain"
+      data-type="application/javascript"
+      data-name="ga"
+      data-src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"
+    ></script>
+
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
