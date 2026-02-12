@@ -5299,7 +5299,6 @@ export default function App() {
         backgroundImage: `linear-gradient(135deg, rgba(245, 194, 164, 0.35), rgba(247, 214, 193, 0.3)), url(${profileCoverDisplay})`,
       }
     : undefined;
-  const showBrandUser = Boolean(sessionUser);
   const emptyProfileValue = "-";
   const followerInitials = ["V", "E", "L", "A"];
   const userStats = [
@@ -6373,26 +6372,6 @@ export default function App() {
               <div className="brandTag">{strings.brandTag}</div>
               <div className="brandSub">{strings.brandSub}</div>
             </div>
-            {showBrandUser ? (
-              <button
-                className="brandUserAvatarOnly"
-                type="button"
-                onClick={() => navigate("me")}
-                aria-label={strings.profileHeaderLabel}
-              >
-                {profileHeaderAvatar ? (
-                  <img
-                    className="brandUserAvatar"
-                    src={profileHeaderAvatar}
-                    alt={profileHeaderName}
-                  />
-                ) : (
-                  <span className="brandUserAvatar">
-                    <span className="brandUserInitial">{profileHeaderInitial}</span>
-                  </span>
-                )}
-              </button>
-            ) : null}
           </div>
           <div className="divider" />
           <div className="screen">
@@ -6461,7 +6440,12 @@ export default function App() {
                     }`}
                     style={profileCoverStyle}
                   />
-                  <div className="userAvatarWrap">
+                  <button
+                    className="userAvatarWrap"
+                    type="button"
+                    onClick={() => navigate("me")}
+                    aria-label={strings.userPageTitle}
+                  >
                     {profileHeaderAvatar ? (
                       <img
                         className="userAvatarLarge"
@@ -6473,7 +6457,7 @@ export default function App() {
                         <span>{profileHeaderInitial}</span>
                       </div>
                     )}
-                  </div>
+                  </button>
                   <div className="userFollowers">
                     <div className="avatarStack">
                       {followerInitials.map((initial, index) => (
