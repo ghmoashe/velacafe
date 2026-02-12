@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type PointerEvent,
+} from "react";
 import { openKlaroSettings, setupKlaro } from "./klaro";
 import { getSupabaseClient } from "./supabaseClient";
 
@@ -29,6 +36,12 @@ type Route =
   | "impressum"
   | "terms";
 
+type SessionUser = {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+};
+
 type MessageKey =
   | "brandTag"
   | "brandSub"
@@ -57,6 +70,8 @@ type MessageKey =
   | "partnersTitle"
   | "profileTitle"
   | "profileSubtitle"
+  | "profileHeaderLabel"
+  | "profileHeaderNameFallback"
   | "profileNameLabel"
   | "profileBirthLabel"
   | "profileGenderLabel"
@@ -69,9 +84,16 @@ type MessageKey =
   | "profileLanguagePlaceholder"
   | "profilePhotoLabel"
   | "profilePhotoHint"
+  | "profilePhotoRemove"
+  | "profilePhotoClear"
+  | "profilePhotoRemoveConfirm"
   | "profileSave"
   | "profileSuccess"
   | "profileAuthRequired";
+
+function isSupportedLocale(value: string): value is Locale {
+  return LANGUAGE_LIST.some((lang) => lang.locale === value);
+}
 
 function resolveRoute(slug: string): Route | null {
   if (!slug) return null;
@@ -151,6 +173,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Unsere Partner",
     profileTitle: "Profil vervollständigen",
     profileSubtitle: "Erzählen Sie kurz etwas über sich.",
+    profileHeaderLabel: "Profil",
+    profileHeaderNameFallback: "Konto",
     profileNameLabel: "Name",
     profileBirthLabel: "Geburtsdatum",
     profileGenderLabel: "Geschlecht",
@@ -163,6 +187,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileLanguagePlaceholder: "Sprache auswählen",
     profilePhotoLabel: "Profilfoto",
     profilePhotoHint: "Optional. PNG/JPG bis 5 MB.",
+    profilePhotoRemove: "Foto löschen",
+    profilePhotoClear: "Auswahl zurücksetzen",
+    profilePhotoRemoveConfirm: "Profilfoto wirklich löschen?",
     profileSave: "Profil speichern",
     profileSuccess: "Profil gespeichert.",
     profileAuthRequired: "Bitte anmelden, um das Profil zu speichern.",
@@ -195,6 +222,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Our partners",
     profileTitle: "Complete your profile",
     profileSubtitle: "Tell us a bit about yourself.",
+    profileHeaderLabel: "Profile",
+    profileHeaderNameFallback: "Account",
     profileNameLabel: "Name",
     profileBirthLabel: "Date of birth",
     profileGenderLabel: "Gender",
@@ -207,6 +236,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileLanguagePlaceholder: "Select a language",
     profilePhotoLabel: "Profile photo",
     profilePhotoHint: "Optional. PNG/JPG up to 5 MB.",
+    profilePhotoRemove: "Remove photo",
+    profilePhotoClear: "Clear selection",
+    profilePhotoRemoveConfirm: "Remove profile photo?",
     profileSave: "Save profile",
     profileSuccess: "Profile saved.",
     profileAuthRequired: "Please sign in to save your profile.",
@@ -239,6 +271,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Наши партнеры",
     profileTitle: "Заполните профиль",
     profileSubtitle: "Расскажите немного о себе.",
+    profileHeaderLabel: "Профиль",
+    profileHeaderNameFallback: "Аккаунт",
     profileNameLabel: "Имя",
     profileBirthLabel: "Дата рождения",
     profileGenderLabel: "Пол",
@@ -251,6 +285,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileLanguagePlaceholder: "Выберите язык",
     profilePhotoLabel: "Фото профиля",
     profilePhotoHint: "Необязательно. PNG/JPG до 5 МБ.",
+    profilePhotoRemove: "Удалить фото",
+    profilePhotoClear: "Сбросить выбор",
+    profilePhotoRemoveConfirm: "Удалить фото профиля?",
     profileSave: "Сохранить профиль",
     profileSuccess: "Профиль сохранен.",
     profileAuthRequired: "Войдите, чтобы сохранить профиль.",
@@ -283,6 +320,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Наші партнери",
     profileTitle: "Заповніть профіль",
     profileSubtitle: "Розкажіть трохи про себе.",
+    profileHeaderLabel: "Профіль",
+    profileHeaderNameFallback: "Акаунт",
     profileNameLabel: "Ім’я",
     profileBirthLabel: "Дата народження",
     profileGenderLabel: "Стать",
@@ -295,6 +334,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileLanguagePlaceholder: "Оберіть мову",
     profilePhotoLabel: "Фото профілю",
     profilePhotoHint: "Необов’язково. PNG/JPG до 5 МБ.",
+    profilePhotoRemove: "Видалити фото",
+    profilePhotoClear: "Скинути вибір",
+    profilePhotoRemoveConfirm: "Видалити фото профілю?",
     profileSave: "Зберегти профіль",
     profileSuccess: "Профіль збережено.",
     profileAuthRequired: "Увійдіть, щоб зберегти профіль.",
@@ -327,6 +369,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "شرکای ما",
     profileTitle: "تکمیل پروفایل",
     profileSubtitle: "کمی درباره خودتان بگویید.",
+    profileHeaderLabel: "پروفایل",
+    profileHeaderNameFallback: "حساب",
     profileNameLabel: "نام",
     profileBirthLabel: "تاریخ تولد",
     profileGenderLabel: "جنسیت",
@@ -339,6 +383,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileLanguagePlaceholder: "انتخاب زبان",
     profilePhotoLabel: "عکس پروفایل",
     profilePhotoHint: "اختیاری. PNG/JPG تا ۵ مگابایت.",
+    profilePhotoRemove: "حذف عکس",
+    profilePhotoClear: "لغو انتخاب",
+    profilePhotoRemoveConfirm: "عکس پروفایل حذف شود؟",
     profileSave: "ذخیره پروفایل",
     profileSuccess: "پروفایل ذخیره شد.",
     profileAuthRequired: "برای ذخیره پروفایل وارد شوید.",
@@ -371,6 +418,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "شركاؤنا",
     profileTitle: "أكمل ملفك الشخصي",
     profileSubtitle: "أخبرنا قليلاً عنك.",
+    profileHeaderLabel: "الملف الشخصي",
+    profileHeaderNameFallback: "الحساب",
     profileNameLabel: "الاسم",
     profileBirthLabel: "تاريخ الميلاد",
     profileGenderLabel: "النوع",
@@ -383,6 +432,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileLanguagePlaceholder: "اختر اللغة",
     profilePhotoLabel: "صورة الملف الشخصي",
     profilePhotoHint: "اختياري. PNG/JPG حتى 5 ميغابايت.",
+    profilePhotoRemove: "حذف الصورة",
+    profilePhotoClear: "إلغاء الاختيار",
+    profilePhotoRemoveConfirm: "حذف صورة الملف الشخصي؟",
     profileSave: "حفظ الملف الشخصي",
     profileSuccess: "تم حفظ الملف الشخصي.",
     profileAuthRequired: "يرجى تسجيل الدخول لحفظ الملف الشخصي.",
@@ -415,6 +467,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Partnerët tanë",
     profileTitle: "Plotëso profilin",
     profileSubtitle: "Na trego pak për veten.",
+    profileHeaderLabel: "Profili",
+    profileHeaderNameFallback: "Llogaria",
     profileNameLabel: "Emri",
     profileBirthLabel: "Data e lindjes",
     profileGenderLabel: "Gjinia",
@@ -427,6 +481,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileLanguagePlaceholder: "Zgjidh gjuhën",
     profilePhotoLabel: "Foto profili",
     profilePhotoHint: "Opsionale. PNG/JPG deri në 5 MB.",
+    profilePhotoRemove: "Hiq foton",
+    profilePhotoClear: "Pastro përzgjedhjen",
+    profilePhotoRemoveConfirm: "Të fshihet fotoja e profilit?",
     profileSave: "Ruaj profilin",
     profileSuccess: "Profili u ruajt.",
     profileAuthRequired: "Ju lutemi hyni për të ruajtur profilin.",
@@ -459,6 +516,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Ortaklarımız",
     profileTitle: "Profili tamamlayın",
     profileSubtitle: "Kendiniz hakkında biraz bilgi verin.",
+    profileHeaderLabel: "Profil",
+    profileHeaderNameFallback: "Hesap",
     profileNameLabel: "Ad",
     profileBirthLabel: "Doğum tarihi",
     profileGenderLabel: "Cinsiyet",
@@ -471,6 +530,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileLanguagePlaceholder: "Dil seçin",
     profilePhotoLabel: "Profil fotoğrafı",
     profilePhotoHint: "İsteğe bağlı. PNG/JPG 5 MB'a kadar.",
+    profilePhotoRemove: "Fotoğrafı sil",
+    profilePhotoClear: "Seçimi temizle",
+    profilePhotoRemoveConfirm: "Profil fotoğrafı silinsin mi?",
     profileSave: "Profili kaydet",
     profileSuccess: "Profil kaydedildi.",
     profileAuthRequired: "Profili kaydetmek için giriş yapın.",
@@ -503,6 +565,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Nos partenaires",
     profileTitle: "Complétez votre profil",
     profileSubtitle: "Parlez-nous un peu de vous.",
+    profileHeaderLabel: "Profil",
+    profileHeaderNameFallback: "Compte",
     profileNameLabel: "Nom",
     profileBirthLabel: "Date de naissance",
     profileGenderLabel: "Genre",
@@ -515,6 +579,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileLanguagePlaceholder: "Choisir une langue",
     profilePhotoLabel: "Photo de profil",
     profilePhotoHint: "Optionnel. PNG/JPG jusqu’à 5 Mo.",
+    profilePhotoRemove: "Supprimer la photo",
+    profilePhotoClear: "Annuler la sélection",
+    profilePhotoRemoveConfirm: "Supprimer la photo de profil ?",
     profileSave: "Enregistrer le profil",
     profileSuccess: "Profil enregistré.",
     profileAuthRequired: "Connectez-vous pour enregistrer le profil.",
@@ -547,6 +614,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Nuestros socios",
     profileTitle: "Completa tu perfil",
     profileSubtitle: "Cuéntanos un poco sobre ti.",
+    profileHeaderLabel: "Perfil",
+    profileHeaderNameFallback: "Cuenta",
     profileNameLabel: "Nombre",
     profileBirthLabel: "Fecha de nacimiento",
     profileGenderLabel: "Género",
@@ -559,6 +628,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileLanguagePlaceholder: "Selecciona un idioma",
     profilePhotoLabel: "Foto de perfil",
     profilePhotoHint: "Opcional. PNG/JPG hasta 5 MB.",
+    profilePhotoRemove: "Eliminar foto",
+    profilePhotoClear: "Quitar selección",
+    profilePhotoRemoveConfirm: "¿Eliminar la foto de perfil?",
     profileSave: "Guardar perfil",
     profileSuccess: "Perfil guardado.",
     profileAuthRequired: "Inicia sesión para guardar el perfil.",
@@ -591,6 +663,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "I nostri partner",
     profileTitle: "Completa il profilo",
     profileSubtitle: "Raccontaci qualcosa su di te.",
+    profileHeaderLabel: "Profilo",
+    profileHeaderNameFallback: "Account",
     profileNameLabel: "Nome",
     profileBirthLabel: "Data di nascita",
     profileGenderLabel: "Genere",
@@ -603,6 +677,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileLanguagePlaceholder: "Seleziona una lingua",
     profilePhotoLabel: "Foto profilo",
     profilePhotoHint: "Opzionale. PNG/JPG fino a 5 MB.",
+    profilePhotoRemove: "Rimuovi foto",
+    profilePhotoClear: "Annulla selezione",
+    profilePhotoRemoveConfirm: "Rimuovere la foto profilo?",
     profileSave: "Salva profilo",
     profileSuccess: "Profilo salvato.",
     profileAuthRequired: "Accedi per salvare il profilo.",
@@ -635,6 +712,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Nasi partnerzy",
     profileTitle: "Uzupełnij profil",
     profileSubtitle: "Opowiedz nam krótko o sobie.",
+    profileHeaderLabel: "Profil",
+    profileHeaderNameFallback: "Konto",
     profileNameLabel: "Imię",
     profileBirthLabel: "Data urodzenia",
     profileGenderLabel: "Płeć",
@@ -647,6 +726,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileLanguagePlaceholder: "Wybierz język",
     profilePhotoLabel: "Zdjęcie profilowe",
     profilePhotoHint: "Opcjonalnie. PNG/JPG do 5 MB.",
+    profilePhotoRemove: "Usuń zdjęcie",
+    profilePhotoClear: "Wyczyść wybór",
+    profilePhotoRemoveConfirm: "Usunąć zdjęcie profilowe?",
     profileSave: "Zapisz profil",
     profileSuccess: "Profil zapisany.",
     profileAuthRequired: "Zaloguj się, aby zapisać profil.",
@@ -655,6 +737,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
 
 const FALLBACK_LOCALE: Locale = "en";
 const POST_AUTH_ROUTE_KEY = "vela-post-auth-route";
+const PROFILE_PHOTO_BUCKET = "avatars";
+const AVATAR_CROP_SIZE = 180;
+const AVATAR_OUTPUT_SIZE = 512;
 
 const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   de: {
@@ -4486,6 +4571,7 @@ export default function App() {
   const [partnerOffset, setPartnerOffset] = useState(0);
   const [partnerCycle, setPartnerCycle] = useState(0);
   const [route, setRoute] = useState<Route>(() => getRouteFromLocation());
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -4498,9 +4584,27 @@ export default function App() {
   const [profileCity, setProfileCity] = useState("");
   const [profileLanguage, setProfileLanguage] = useState<Locale | "">(() => locale);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(
     null
   );
+  const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
+  const [cropImageSize, setCropImageSize] = useState<{ w: number; h: number } | null>(
+    null
+  );
+  const [cropScale, setCropScale] = useState(1);
+  const [cropMinScale, setCropMinScale] = useState(1);
+  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
+  const profileLoaded = useRef(false);
+  const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const cropImageRef = useRef<HTMLImageElement | null>(null);
+  const cropDragRef = useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+  }>({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 });
   const klaroAutoOpened = useRef(false);
   const [authState, setAuthState] = useState<{
     type: "idle" | "loading" | "success" | "error";
@@ -4523,6 +4627,35 @@ export default function App() {
     termsContent.sections.find((section) => section.afterList?.length)
       ?.afterList?.[0] ?? "";
   const legalDir = isRtlLocale(locale) ? "rtl" : "ltr";
+  const sessionMetadata = sessionUser?.user_metadata;
+  const sessionName =
+    typeof sessionMetadata?.full_name === "string"
+      ? sessionMetadata.full_name
+      : typeof sessionMetadata?.name === "string"
+        ? sessionMetadata.name
+        : "";
+  const sessionAvatar =
+    typeof sessionMetadata?.avatar_url === "string"
+      ? sessionMetadata.avatar_url
+      : null;
+  const profileHeaderName =
+    profileName.trim() ||
+    sessionName ||
+    sessionUser?.email ||
+    strings.profileHeaderNameFallback;
+  const profileHeaderAvatar = profileAvatarUrl ?? sessionAvatar ?? null;
+  const profileHeaderInitial =
+    profileHeaderName.trim().charAt(0).toUpperCase() || "?";
+  const showBrandUser = Boolean(sessionUser);
+  const getSupabaseErrorMessage = useCallback((error: unknown) => {
+    if (error && typeof error === "object" && "message" in error) {
+      const message = (error as { message?: unknown }).message;
+      if (typeof message === "string" && message.trim()) {
+        return message;
+      }
+    }
+    return "Authentication failed. Please try again.";
+  }, []);
   const partnerCount = PARTNER_LOGOS.length;
   const partnerPair =
     partnerCount >= 2
@@ -4559,6 +4692,76 @@ export default function App() {
     },
     [applyRouteChange]
   );
+
+  const clampCropOffset = useCallback(
+    (nextX: number, nextY: number, scale: number) => {
+      if (!cropImageSize) {
+        return { x: 0, y: 0 };
+      }
+      const scaledWidth = cropImageSize.w * scale;
+      const scaledHeight = cropImageSize.h * scale;
+      const maxX = Math.max(0, (scaledWidth - AVATAR_CROP_SIZE) / 2);
+      const maxY = Math.max(0, (scaledHeight - AVATAR_CROP_SIZE) / 2);
+      return {
+        x: Math.min(maxX, Math.max(-maxX, nextX)),
+        y: Math.min(maxY, Math.max(-maxY, nextY)),
+      };
+    },
+    [cropImageSize]
+  );
+
+  const generateCropCanvasBlob = useCallback(
+    (size: number, quality = 0.9) => {
+      if (!profilePhoto || !cropImageSize || !cropImageRef.current) {
+        return null;
+      }
+      const scale = cropScale;
+      const { w, h } = cropImageSize;
+      const scaledWidth = w * scale;
+      const scaledHeight = h * scale;
+      const centerX = AVATAR_CROP_SIZE / 2 + cropOffset.x;
+      const centerY = AVATAR_CROP_SIZE / 2 + cropOffset.y;
+      const x0 = centerX - scaledWidth / 2;
+      const y0 = centerY - scaledHeight / 2;
+      const sourceSize = AVATAR_CROP_SIZE / scale;
+      let sx = (0 - x0) / scale;
+      let sy = (0 - y0) / scale;
+      sx = Math.max(0, Math.min(w - sourceSize, sx));
+      sy = Math.max(0, Math.min(h - sourceSize, sy));
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(
+        cropImageRef.current,
+        sx,
+        sy,
+        sourceSize,
+        sourceSize,
+        0,
+        0,
+        size,
+        size
+      );
+      return new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, "image/jpeg", quality);
+      });
+    },
+    [cropImageSize, cropOffset.x, cropOffset.y, cropScale, profilePhoto]
+  );
+
+  const updateCropPreview = useCallback(async () => {
+    const blob = await generateCropCanvasBlob(AVATAR_CROP_SIZE, 0.85);
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    setProfilePhotoPreview((prev) => {
+      if (prev && prev.startsWith("blob:") && prev !== cropImageUrl) {
+        URL.revokeObjectURL(prev);
+      }
+      return url;
+    });
+  }, [cropImageUrl, generateCropCanvasBlob]);
 
   useEffect(() => {
     if (partnerCount <= 2) return undefined;
@@ -4608,6 +4811,44 @@ export default function App() {
   }, [route, locale, profileLanguage]);
 
   useEffect(() => {
+    if (!profilePhotoPreview?.startsWith("blob:")) return undefined;
+    return () => {
+      URL.revokeObjectURL(profilePhotoPreview);
+    };
+  }, [profilePhotoPreview]);
+
+  useEffect(() => {
+    if (!cropImageUrl) {
+      setCropImageSize(null);
+      cropImageRef.current = null;
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      setCropImageSize({ w: img.naturalWidth, h: img.naturalHeight });
+      const minScale = Math.max(
+        AVATAR_CROP_SIZE / img.naturalWidth,
+        AVATAR_CROP_SIZE / img.naturalHeight
+      );
+      setCropMinScale(minScale);
+      setCropScale(minScale);
+      setCropOffset({ x: 0, y: 0 });
+      cropImageRef.current = img;
+    };
+    img.src = cropImageUrl;
+  }, [cropImageUrl]);
+
+  useEffect(() => {
+    if (!cropImageSize) return;
+    setCropOffset((prev) => clampCropOffset(prev.x, prev.y, cropScale));
+  }, [clampCropOffset, cropImageSize, cropScale]);
+
+  useEffect(() => {
+    if (!profilePhoto || !cropImageSize) return;
+    void updateCropPreview();
+  }, [cropImageSize, cropOffset, cropScale, profilePhoto, updateCropPreview]);
+
+  useEffect(() => {
     if (route !== "profile") return;
     const supabase = getSupabaseClient();
     if (!supabase) return;
@@ -4625,6 +4866,73 @@ export default function App() {
       active = false;
     };
   }, [navigate, route]);
+
+  useEffect(() => {
+    if (route !== "profile") {
+      profileLoaded.current = false;
+      return;
+    }
+    if (profileLoaded.current) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    let active = true;
+    (async () => {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (!active) return;
+      if (sessionError) {
+        setProfileStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(sessionError),
+        });
+        return;
+      }
+      const user = sessionData.session?.user;
+      if (!user) return;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(
+          "full_name,birth_date,gender,country,city,language,avatar_url"
+        )
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!active) return;
+      if (error) {
+        setProfileStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(error),
+        });
+        return;
+      }
+      if (data) {
+        setProfileName(data.full_name ?? "");
+        setProfileBirthDate(data.birth_date ?? "");
+        setProfileGender(
+          data.gender === "female" || data.gender === "male" || data.gender === "other"
+            ? data.gender
+            : ""
+        );
+        setProfileCountry(data.country ?? "");
+        setProfileCity(data.city ?? "");
+        setProfileLanguage(
+          data.language && isSupportedLocale(data.language)
+            ? data.language
+            : locale
+        );
+        setProfileAvatarUrl(data.avatar_url ?? null);
+        setProfilePhotoPreview(data.avatar_url ?? null);
+        setProfilePhoto(null);
+        setCropImageUrl(null);
+        if (profilePhotoInputRef.current) {
+          profilePhotoInputRef.current.value = "";
+        }
+      }
+      profileLoaded.current = true;
+    })();
+    return () => {
+      active = false;
+    };
+  }, [getSupabaseErrorMessage, locale, route]);
 
 
   function handleLocaleSelect(next: Locale) {
@@ -4699,16 +5007,6 @@ export default function App() {
     setAuthState({ type: "error", message });
   }
 
-  function getSupabaseErrorMessage(error: unknown) {
-    if (error && typeof error === "object" && "message" in error) {
-      const message = (error as { message?: unknown }).message;
-      if (typeof message === "string" && message.trim()) {
-        return message;
-      }
-    }
-    return "Authentication failed. Please try again.";
-  }
-
   const upsertProfile = useCallback(
     async (user: { id: string; email?: string | null }) => {
       const supabase = getSupabaseClient();
@@ -4727,7 +5025,14 @@ export default function App() {
   useEffect(() => {
     const supabase = getSupabaseClient();
     if (!supabase) return undefined;
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setSessionUser(data.session?.user ?? null);
+    });
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+      setSessionUser(session?.user ?? null);
       if (!session?.user) return;
       void upsertProfile(session.user);
       setAuthState({ type: "success", message: strings.successLogin });
@@ -4740,6 +5045,7 @@ export default function App() {
       }
     });
     return () => {
+      active = false;
       data.subscription.unsubscribe();
     };
   }, [navigate, strings.successLogin, upsertProfile]);
@@ -4852,20 +5158,139 @@ export default function App() {
     }
   }
 
+  function getAvatarPathFromUrl(url: string) {
+    const cleanUrl = url.split("?")[0];
+    const patterns = [
+      `/storage/v1/object/public/${PROFILE_PHOTO_BUCKET}/`,
+      `/object/public/${PROFILE_PHOTO_BUCKET}/`,
+    ];
+    for (const pattern of patterns) {
+      const index = cleanUrl.indexOf(pattern);
+      if (index !== -1) {
+        return decodeURIComponent(cleanUrl.slice(index + pattern.length));
+      }
+    }
+    return null;
+  }
+
   function handleProfilePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
+    if (cropImageUrl) {
+      URL.revokeObjectURL(cropImageUrl);
+    }
     updateProfilePhoto(file);
     if (!file) {
       setProfilePhotoPreview(null);
+      setCropImageUrl(null);
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setProfilePhotoPreview(reader.result);
-      }
+    const previewUrl = URL.createObjectURL(file);
+    setProfilePhotoPreview(previewUrl);
+    setCropImageUrl(previewUrl);
+    setProfileAvatarUrl(null);
+  }
+
+  function handleCropPointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (!cropImageSize) return;
+    cropDragRef.current = {
+      active: true,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: cropOffset.x,
+      originY: cropOffset.y,
     };
-    reader.readAsDataURL(file);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handleCropPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!cropDragRef.current.active) return;
+    const dx = event.clientX - cropDragRef.current.startX;
+    const dy = event.clientY - cropDragRef.current.startY;
+    const next = clampCropOffset(
+      cropDragRef.current.originX + dx,
+      cropDragRef.current.originY + dy,
+      cropScale
+    );
+    setCropOffset(next);
+  }
+
+  function handleCropPointerEnd(event: PointerEvent<HTMLDivElement>) {
+    if (!cropDragRef.current.active) return;
+    cropDragRef.current.active = false;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+
+  function handleCropScaleChange(event: ChangeEvent<HTMLInputElement>) {
+    const nextScale = Number(event.target.value);
+    setCropScale(nextScale);
+    setCropOffset((prev) => clampCropOffset(prev.x, prev.y, nextScale));
+  }
+
+  async function createCroppedAvatarBlob() {
+    if (!profilePhoto || !cropImageSize || !cropImageRef.current) {
+      return profilePhoto;
+    }
+    const blob = await generateCropCanvasBlob(AVATAR_OUTPUT_SIZE, 0.9);
+    return blob ?? profilePhoto;
+  }
+
+  async function handleRemoveProfilePhoto() {
+    if (profileStatus.type === "loading") return;
+    if (profilePhoto) {
+      setProfilePhoto(null);
+      if (profilePhotoInputRef.current) {
+        profilePhotoInputRef.current.value = "";
+      }
+      if (cropImageUrl) {
+        URL.revokeObjectURL(cropImageUrl);
+      }
+      setProfilePhotoPreview(profileAvatarUrl);
+      setCropImageUrl(null);
+      return;
+    }
+    if (!profileAvatarUrl) return;
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(strings.profilePhotoRemoveConfirm);
+      if (!confirmed) return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setProfileStatus({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
+    setProfileStatus({ type: "loading", message: strings.loadingLabel });
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const user = data.session?.user;
+      if (!user) {
+        setProfileStatus({
+          type: "error",
+          message: strings.profileAuthRequired,
+        });
+        return;
+      }
+      const path = getAvatarPathFromUrl(profileAvatarUrl);
+      if (path) {
+        const { error: removeError } = await supabase.storage
+          .from(PROFILE_PHOTO_BUCKET)
+          .remove([path]);
+        if (removeError) throw removeError;
+      }
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_url: null, updated_at: new Date().toISOString() })
+        .eq("id", user.id);
+      if (error) throw error;
+      setProfileAvatarUrl(null);
+      setProfilePhotoPreview(null);
+      setProfileStatus({ type: "success", message: strings.profileSuccess });
+    } catch (error) {
+      setProfileStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    }
   }
 
   async function handleProfileSave() {
@@ -4887,6 +5312,22 @@ export default function App() {
         });
         return;
       }
+      let avatarUrl: string | null = null;
+      if (profilePhoto) {
+        const croppedBlob = await createCroppedAvatarBlob();
+        const filePath = `${user.id}/avatar.jpg`;
+        const { error: uploadError } = await supabase.storage
+          .from(PROFILE_PHOTO_BUCKET)
+          .upload(filePath, croppedBlob ?? profilePhoto, {
+            upsert: true,
+            contentType: "image/jpeg",
+          });
+        if (uploadError) throw uploadError;
+        const { data: publicData } = supabase.storage
+          .from(PROFILE_PHOTO_BUCKET)
+          .getPublicUrl(filePath);
+        avatarUrl = publicData.publicUrl ?? null;
+      }
       const payload = {
         id: user.id,
         full_name: profileName.trim() || null,
@@ -4895,14 +5336,25 @@ export default function App() {
         country: profileCountry.trim() || null,
         city: profileCity.trim() || null,
         language: profileLanguage || null,
-        avatar_url: profilePhotoPreview || null,
         locale,
         updated_at: new Date().toISOString(),
-      };
+      } as Record<string, unknown>;
+      if (avatarUrl) {
+        payload.avatar_url = avatarUrl;
+      }
       const { error } = await supabase
         .from("profiles")
         .upsert(payload, { onConflict: "id" });
       if (error) throw error;
+      if (avatarUrl) {
+        setProfileAvatarUrl(avatarUrl);
+        setProfilePhotoPreview(avatarUrl);
+        setProfilePhoto(null);
+        setCropImageUrl(null);
+        if (profilePhotoInputRef.current) {
+          profilePhotoInputRef.current.value = "";
+        }
+      }
       setProfileStatus({ type: "success", message: strings.profileSuccess });
     } catch (error) {
       setProfileStatus({
@@ -4953,6 +5405,30 @@ export default function App() {
               <div className="brandTag">{strings.brandTag}</div>
               <div className="brandSub">{strings.brandSub}</div>
             </div>
+            {showBrandUser ? (
+              <button
+                className="brandUser"
+                type="button"
+                onClick={() => navigate("profile")}
+                aria-label={strings.profileHeaderLabel}
+              >
+                {profileHeaderAvatar ? (
+                  <img
+                    className="brandUserAvatar"
+                    src={profileHeaderAvatar}
+                    alt={profileHeaderName}
+                  />
+                ) : (
+                  <span className="brandUserAvatar">
+                    <span className="brandUserInitial">{profileHeaderInitial}</span>
+                  </span>
+                )}
+                <span className="brandUserText">
+                  <span className="brandUserLabel">{strings.profileHeaderLabel}</span>
+                  <span className="brandUserName">{profileHeaderName}</span>
+                </span>
+              </button>
+            ) : null}
           </div>
           <div className="divider" />
           <div className="screen">
@@ -5163,13 +5639,77 @@ export default function App() {
                         id="profilePhoto"
                         type="file"
                         accept="image/*"
+                        ref={profilePhotoInputRef}
                         onChange={handleProfilePhotoChange}
                       />
                       <span className="fileName">
                         {profilePhoto ? profilePhoto.name : strings.profilePhotoHint}
                       </span>
+                      {profilePhoto ? (
+                        <button
+                          className="photoAction"
+                          type="button"
+                          onClick={handleRemoveProfilePhoto}
+                        >
+                          {strings.profilePhotoClear}
+                        </button>
+                      ) : profileAvatarUrl ? (
+                        <button
+                          className="photoAction photoAction--danger"
+                          type="button"
+                          onClick={handleRemoveProfilePhoto}
+                        >
+                          {strings.profilePhotoRemove}
+                        </button>
+                      ) : null}
                     </div>
-                    {profilePhotoPreview ? (
+                    {profilePhoto ? (
+                      <div className="avatarCropper">
+                        <div
+                          className="avatarCropBox"
+                          onPointerDown={handleCropPointerDown}
+                          onPointerMove={handleCropPointerMove}
+                          onPointerUp={handleCropPointerEnd}
+                          onPointerLeave={handleCropPointerEnd}
+                        >
+                          {cropImageUrl ? (
+                            <img
+                              className="avatarCropImage"
+                              src={cropImageUrl}
+                              alt={strings.profilePhotoLabel}
+                              draggable={false}
+                              style={{
+                                width: cropImageSize
+                                  ? `${cropImageSize.w}px`
+                                  : "auto",
+                                height: cropImageSize
+                                  ? `${cropImageSize.h}px`
+                                  : "auto",
+                                transform: `translate(-50%, -50%) translate(${cropOffset.x}px, ${cropOffset.y}px) scale(${cropScale})`,
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                        <div className="avatarCropControls">
+                          <input
+                            className="avatarCropSlider"
+                            type="range"
+                            min={cropMinScale}
+                            max={cropMinScale * 3}
+                            step={0.01}
+                            value={cropScale}
+                            onChange={handleCropScaleChange}
+                          />
+                        </div>
+                        {profilePhotoPreview ? (
+                          <img
+                            className="avatarPreview"
+                            src={profilePhotoPreview}
+                            alt={strings.profilePhotoLabel}
+                          />
+                        ) : null}
+                      </div>
+                    ) : profilePhotoPreview ? (
                       <img
                         className="imagePreview"
                         src={profilePhotoPreview}
