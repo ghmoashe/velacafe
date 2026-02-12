@@ -207,6 +207,36 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+.brandUserAvatarOnly {
+  margin-inline-start: auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.brandUserAvatarOnly:hover {
+  transform: translateY(-1px);
+  border-color: rgba(200, 106, 59, 0.6);
+  box-shadow: 0 10px 20px rgba(31, 27, 22, 0.08);
+}
+
+.brandUserAvatarOnly .brandUserAvatar {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.brandUserAvatarOnly .brandUserInitial {
+  font-size: 14px;
+}
+
 
 .divider {
   height: 1px;

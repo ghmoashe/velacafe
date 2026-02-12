@@ -5684,7 +5684,7 @@ export default function App() {
             </div>
             {showBrandUser ? (
               <button
-                className="brandUser"
+                className="brandUserAvatarOnly"
                 type="button"
                 onClick={() => navigate("me")}
                 aria-label={strings.profileHeaderLabel}
@@ -5700,10 +5700,6 @@ export default function App() {
                     <span className="brandUserInitial">{profileHeaderInitial}</span>
                   </span>
                 )}
-                <span className="brandUserText">
-                  <span className="brandUserLabel">{strings.profileHeaderLabel}</span>
-                  <span className="brandUserName">{profileHeaderName}</span>
-                </span>
               </button>
             ) : null}
           </div>
@@ -5799,15 +5795,9 @@ export default function App() {
 
                 <div className="userPrimary">
                   <div className="userNameLarge">{profileHeaderName}</div>
-                  {sessionUser?.email ? (
-                    <div className="userHandle">{sessionUser.email}</div>
-                  ) : null}
                   <div className="userActionsRow">
                     <button className="userAction userAction--primary" type="button">
                       {strings.userActionFollow}
-                    </button>
-                    <button className="userAction" type="button">
-                      {strings.userActionMessage}
                     </button>
                     <button
                       className="userAction userAction--ghost"
