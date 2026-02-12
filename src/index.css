@@ -2032,6 +2032,19 @@ button:focus-visible {
     height: 88px;
   }
 
+  .brandRow .brandTextStack {
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 240px;
+    width: min(260px, 100%);
+    padding-inline: 8px;
+  }
+
+  [dir="rtl"] .brandRow .brandTextStack {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
   .authBox {
     width: 100%;
     padding: 16px;

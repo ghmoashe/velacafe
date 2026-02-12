@@ -281,6 +281,7 @@ type MessageKey =
   | "userTabVideos"
   | "userTabTagged"
   | "userBioPlaceholder"
+  | "userActionOrganizer"
   | "profileHeaderLabel"
   | "profileHeaderNameFallback"
   | "profileNameLabel"
@@ -451,6 +452,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowing: "Folge ich",
     userActionFollow: "Folgen",
     userActionMessage: "Nachricht",
+    userActionOrganizer: "Organisator werden",
     userTabAbout: "Über",
     userTabPhotos: "Fotos",
     userTabVideos: "Videos",
@@ -529,6 +531,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowing: "Following",
     userActionFollow: "Follow",
     userActionMessage: "Message",
+    userActionOrganizer: "Become organizer",
     userTabAbout: "About",
     userTabPhotos: "Photos",
     userTabVideos: "Videos",
@@ -607,6 +610,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowing: "Подписки",
     userActionFollow: "Подписаться",
     userActionMessage: "Сообщение",
+    userActionOrganizer: "Стать организатором",
     userTabAbout: "Обо мне",
     userTabPhotos: "Фото",
     userTabVideos: "Видео",
@@ -685,6 +689,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowing: "Підписки",
     userActionFollow: "Підписатися",
     userActionMessage: "Повідомлення",
+    userActionOrganizer: "Стати організатором",
     userTabAbout: "Про мене",
     userTabPhotos: "Фото",
     userTabVideos: "Відео",
@@ -763,6 +768,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowing: "دنبال‌می‌کنم",
     userActionFollow: "دنبال کردن",
     userActionMessage: "پیام",
+    userActionOrganizer: "تبدیل به برگزارکننده",
     userTabAbout: "درباره",
     userTabPhotos: "عکس‌ها",
     userTabVideos: "ویدیوها",
@@ -841,6 +847,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowing: "المتابَعون",
     userActionFollow: "متابعة",
     userActionMessage: "رسالة",
+    userActionOrganizer: "كن منظماً",
     userTabAbout: "نبذة",
     userTabPhotos: "الصور",
     userTabVideos: "الفيديو",
@@ -919,6 +926,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowing: "Ndjekje",
     userActionFollow: "Ndiq",
     userActionMessage: "Mesazh",
+    userActionOrganizer: "Bëhu organizator",
     userTabAbout: "Rreth",
     userTabPhotos: "Foto",
     userTabVideos: "Video",
@@ -997,6 +1005,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowing: "Takip",
     userActionFollow: "Takip et",
     userActionMessage: "Mesaj",
+    userActionOrganizer: "Organizatör ol",
     userTabAbout: "Hakkında",
     userTabPhotos: "Fotoğraflar",
     userTabVideos: "Videolar",
@@ -1075,6 +1084,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowing: "Abonnements",
     userActionFollow: "Suivre",
     userActionMessage: "Message",
+    userActionOrganizer: "Devenir organisateur",
     userTabAbout: "À propos",
     userTabPhotos: "Photos",
     userTabVideos: "Vidéos",
@@ -1153,6 +1163,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowing: "Siguiendo",
     userActionFollow: "Seguir",
     userActionMessage: "Mensaje",
+    userActionOrganizer: "Ser organizador",
     userTabAbout: "Acerca de",
     userTabPhotos: "Fotos",
     userTabVideos: "Videos",
@@ -1231,6 +1242,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowing: "Seguiti",
     userActionFollow: "Segui",
     userActionMessage: "Messaggio",
+    userActionOrganizer: "Diventa organizzatore",
     userTabAbout: "Info",
     userTabPhotos: "Foto",
     userTabVideos: "Video",
@@ -1309,6 +1321,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowing: "Obserwowani",
     userActionFollow: "Obserwuj",
     userActionMessage: "Wiadomość",
+    userActionOrganizer: "Zostań organizatorem",
     userTabAbout: "O mnie",
     userTabPhotos: "Zdjęcia",
     userTabVideos: "Wideo",
@@ -6485,6 +6498,9 @@ export default function App() {
                         onClick={() => navigate("profile")}
                       >
                         {strings.profileEditButton}
+                      </button>
+                      <button className="userAction" type="button">
+                        {strings.userActionOrganizer}
                       </button>
                     </div>
                   <div className="userStatsRow">
