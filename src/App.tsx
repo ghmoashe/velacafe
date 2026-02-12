@@ -43,6 +43,8 @@ type SessionUser = {
   user_metadata?: Record<string, unknown>;
 };
 
+type UserTab = "about" | "photos" | "videos" | "tagged";
+
 type ProfileRecord = {
   full_name: string | null;
   birth_date: string | null;
@@ -84,6 +86,16 @@ type MessageKey =
   | "userPageTitle"
   | "userPageSubtitle"
   | "profileEditButton"
+  | "userStatsPosts"
+  | "userStatsFollowers"
+  | "userStatsFollowing"
+  | "userActionFollow"
+  | "userActionMessage"
+  | "userTabAbout"
+  | "userTabPhotos"
+  | "userTabVideos"
+  | "userTabTagged"
+  | "userBioPlaceholder"
   | "profileHeaderLabel"
   | "profileHeaderNameFallback"
   | "profileNameLabel"
@@ -214,6 +226,16 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPageTitle: "Mein Profil",
     userPageSubtitle: "Ihre Angaben im Überblick.",
     profileEditButton: "Profil bearbeiten",
+    userStatsPosts: "Beiträge",
+    userStatsFollowers: "Follower",
+    userStatsFollowing: "Folge ich",
+    userActionFollow: "Folgen",
+    userActionMessage: "Nachricht",
+    userTabAbout: "Über",
+    userTabPhotos: "Fotos",
+    userTabVideos: "Videos",
+    userTabTagged: "Markiert",
+    userBioPlaceholder: "Erzählen Sie kurz etwas über sich und Ihre Sprachen.",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Konto",
     profileNameLabel: "Name",
@@ -266,6 +288,16 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPageTitle: "My profile",
     userPageSubtitle: "Your details at a glance.",
     profileEditButton: "Edit profile",
+    userStatsPosts: "Posts",
+    userStatsFollowers: "Followers",
+    userStatsFollowing: "Following",
+    userActionFollow: "Follow",
+    userActionMessage: "Message",
+    userTabAbout: "About",
+    userTabPhotos: "Photos",
+    userTabVideos: "Videos",
+    userTabTagged: "Tagged",
+    userBioPlaceholder: "Share a short bio about you and your languages.",
     profileHeaderLabel: "Profile",
     profileHeaderNameFallback: "Account",
     profileNameLabel: "Name",
@@ -318,6 +350,16 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPageTitle: "Мой профиль",
     userPageSubtitle: "Ваши данные и настройки.",
     profileEditButton: "Редактировать профиль",
+    userStatsPosts: "Посты",
+    userStatsFollowers: "Подписчики",
+    userStatsFollowing: "Подписки",
+    userActionFollow: "Подписаться",
+    userActionMessage: "Сообщение",
+    userTabAbout: "Обо мне",
+    userTabPhotos: "Фото",
+    userTabVideos: "Видео",
+    userTabTagged: "Отмечено",
+    userBioPlaceholder: "Расскажите о себе и ваших языках.",
     profileHeaderLabel: "Профиль",
     profileHeaderNameFallback: "Аккаунт",
     profileNameLabel: "Имя",
@@ -370,6 +412,16 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPageTitle: "Мій профіль",
     userPageSubtitle: "Ваші дані й налаштування.",
     profileEditButton: "Редагувати профіль",
+    userStatsPosts: "Пости",
+    userStatsFollowers: "Підписники",
+    userStatsFollowing: "Підписки",
+    userActionFollow: "Підписатися",
+    userActionMessage: "Повідомлення",
+    userTabAbout: "Про мене",
+    userTabPhotos: "Фото",
+    userTabVideos: "Відео",
+    userTabTagged: "Позначено",
+    userBioPlaceholder: "Розкажіть про себе та ваші мови.",
     profileHeaderLabel: "Профіль",
     profileHeaderNameFallback: "Акаунт",
     profileNameLabel: "Ім’я",
@@ -422,6 +474,16 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPageTitle: "پروفایل من",
     userPageSubtitle: "جزئیات شما در یک نگاه.",
     profileEditButton: "ویرایش پروفایل",
+    userStatsPosts: "پست‌ها",
+    userStatsFollowers: "دنبال‌کننده‌ها",
+    userStatsFollowing: "دنبال‌می‌کنم",
+    userActionFollow: "دنبال کردن",
+    userActionMessage: "پیام",
+    userTabAbout: "درباره",
+    userTabPhotos: "عکس‌ها",
+    userTabVideos: "ویدیوها",
+    userTabTagged: "برچسب‌شده",
+    userBioPlaceholder: "کمی درباره خود و زبان‌هایتان بنویسید.",
     profileHeaderLabel: "پروفایل",
     profileHeaderNameFallback: "حساب",
     profileNameLabel: "نام",
@@ -474,6 +536,16 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPageTitle: "ملفي الشخصي",
     userPageSubtitle: "تفاصيلك في لمحة.",
     profileEditButton: "تعديل الملف الشخصي",
+    userStatsPosts: "المنشورات",
+    userStatsFollowers: "المتابعون",
+    userStatsFollowing: "المتابَعون",
+    userActionFollow: "متابعة",
+    userActionMessage: "رسالة",
+    userTabAbout: "نبذة",
+    userTabPhotos: "الصور",
+    userTabVideos: "الفيديو",
+    userTabTagged: "المُشار إليه",
+    userBioPlaceholder: "عرّف بنفسك وباللغات التي تتحدثها.",
     profileHeaderLabel: "الملف الشخصي",
     profileHeaderNameFallback: "الحساب",
     profileNameLabel: "الاسم",
@@ -526,6 +598,16 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPageTitle: "Profili im",
     userPageSubtitle: "Të dhënat tuaja në një vështrim.",
     profileEditButton: "Redakto profilin",
+    userStatsPosts: "Postime",
+    userStatsFollowers: "Ndjekës",
+    userStatsFollowing: "Ndjekje",
+    userActionFollow: "Ndiq",
+    userActionMessage: "Mesazh",
+    userTabAbout: "Rreth",
+    userTabPhotos: "Foto",
+    userTabVideos: "Video",
+    userTabTagged: "Etiketuar",
+    userBioPlaceholder: "Trego pak për veten dhe gjuhët e tua.",
     profileHeaderLabel: "Profili",
     profileHeaderNameFallback: "Llogaria",
     profileNameLabel: "Emri",
@@ -578,6 +660,16 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPageTitle: "Profilim",
     userPageSubtitle: "Bilgileriniz burada.",
     profileEditButton: "Profili düzenle",
+    userStatsPosts: "Gönderiler",
+    userStatsFollowers: "Takipçiler",
+    userStatsFollowing: "Takip",
+    userActionFollow: "Takip et",
+    userActionMessage: "Mesaj",
+    userTabAbout: "Hakkında",
+    userTabPhotos: "Fotoğraflar",
+    userTabVideos: "Videolar",
+    userTabTagged: "Etiketlenen",
+    userBioPlaceholder: "Kendiniz ve dilleriniz hakkında kısa bir bilgi yazın.",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Hesap",
     profileNameLabel: "Ad",
@@ -630,6 +722,16 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPageTitle: "Mon profil",
     userPageSubtitle: "Vos informations en un coup d'œil.",
     profileEditButton: "Modifier le profil",
+    userStatsPosts: "Publications",
+    userStatsFollowers: "Abonnés",
+    userStatsFollowing: "Abonnements",
+    userActionFollow: "Suivre",
+    userActionMessage: "Message",
+    userTabAbout: "À propos",
+    userTabPhotos: "Photos",
+    userTabVideos: "Vidéos",
+    userTabTagged: "Identifié",
+    userBioPlaceholder: "Partagez une courte bio sur vous et vos langues.",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Compte",
     profileNameLabel: "Nom",
@@ -682,6 +784,16 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPageTitle: "Mi perfil",
     userPageSubtitle: "Tus datos de un vistazo.",
     profileEditButton: "Editar perfil",
+    userStatsPosts: "Publicaciones",
+    userStatsFollowers: "Seguidores",
+    userStatsFollowing: "Siguiendo",
+    userActionFollow: "Seguir",
+    userActionMessage: "Mensaje",
+    userTabAbout: "Acerca de",
+    userTabPhotos: "Fotos",
+    userTabVideos: "Videos",
+    userTabTagged: "Etiquetado",
+    userBioPlaceholder: "Comparte una breve bio sobre ti y tus idiomas.",
     profileHeaderLabel: "Perfil",
     profileHeaderNameFallback: "Cuenta",
     profileNameLabel: "Nombre",
@@ -734,6 +846,16 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPageTitle: "Il mio profilo",
     userPageSubtitle: "I tuoi dati in breve.",
     profileEditButton: "Modifica profilo",
+    userStatsPosts: "Post",
+    userStatsFollowers: "Follower",
+    userStatsFollowing: "Seguiti",
+    userActionFollow: "Segui",
+    userActionMessage: "Messaggio",
+    userTabAbout: "Info",
+    userTabPhotos: "Foto",
+    userTabVideos: "Video",
+    userTabTagged: "Tag",
+    userBioPlaceholder: "Condividi una breve bio su di te e le tue lingue.",
     profileHeaderLabel: "Profilo",
     profileHeaderNameFallback: "Account",
     profileNameLabel: "Nome",
@@ -786,6 +908,16 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPageTitle: "Mój profil",
     userPageSubtitle: "Twoje dane w skrócie.",
     profileEditButton: "Edytuj profil",
+    userStatsPosts: "Posty",
+    userStatsFollowers: "Obserwujący",
+    userStatsFollowing: "Obserwowani",
+    userActionFollow: "Obserwuj",
+    userActionMessage: "Wiadomość",
+    userTabAbout: "O mnie",
+    userTabPhotos: "Zdjęcia",
+    userTabVideos: "Wideo",
+    userTabTagged: "Oznaczone",
+    userBioPlaceholder: "Napisz krótko o sobie i swoich językach.",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Konto",
     profileNameLabel: "Imię",
@@ -4647,6 +4779,7 @@ export default function App() {
   const [route, setRoute] = useState<Route>(() => getRouteFromLocation());
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const routeRef = useRef<Route>(route);
+  const [userTab, setUserTab] = useState<UserTab>("photos");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -4723,6 +4856,19 @@ export default function App() {
     profileHeaderName.trim().charAt(0).toUpperCase() || "?";
   const showBrandUser = Boolean(sessionUser);
   const emptyProfileValue = "-";
+  const followerInitials = ["V", "E", "L", "A"];
+  const userStats = [
+    { label: strings.userStatsPosts, value: "0" },
+    { label: strings.userStatsFollowers, value: "0" },
+    { label: strings.userStatsFollowing, value: "0" },
+  ];
+  const userTabs = [
+    { id: "about" as const, label: strings.userTabAbout },
+    { id: "photos" as const, label: strings.userTabPhotos },
+    { id: "videos" as const, label: strings.userTabVideos },
+    { id: "tagged" as const, label: strings.userTabTagged },
+  ];
+  const userGridItems = Array.from({ length: 9 }, (_, index) => index);
   const profileGenderLabel =
     profileGender === "female"
       ? strings.profileGenderFemale
@@ -5620,75 +5766,134 @@ export default function App() {
                 {renderLegalContent(termsContent.title, termsContent.sections)}
               </div>
             ) : isUserRoute ? (
-              <div className="profilePage userPage">
-                <div className="profileHeader">
-                  <div className="profileTitle">{strings.userPageTitle}</div>
-                  <div className="profileSubtitle">{strings.userPageSubtitle}</div>
-                </div>
-                <div className="profileCard userCard">
-                  <div className="userHeader">
+              <div className="userPage">
+                <div className="userHero">
+                  <div className="userCover" />
+                  <div className="userAvatarWrap">
                     {profileHeaderAvatar ? (
                       <img
-                        className="userAvatar"
+                        className="userAvatarLarge"
                         src={profileHeaderAvatar}
                         alt={profileHeaderName}
                       />
                     ) : (
-                      <div className="userAvatar">
+                      <div className="userAvatarLarge userAvatarLarge--placeholder">
                         <span>{profileHeaderInitial}</span>
                       </div>
                     )}
-                    <div className="userHeaderText">
-                      <div className="userName">{profileHeaderName}</div>
-                      {sessionUser?.email ? (
-                        <div className="userEmail">{sessionUser.email}</div>
-                      ) : null}
-                    </div>
                   </div>
-                  <div className="formRow">
-                    <div className="field">
-                      <span className="label">{strings.profileBirthLabel}</span>
-                      <div className="input input--static">
-                        {profileBirthDate || emptyProfileValue}
-                      </div>
+                  <div className="userFollowers">
+                    <div className="avatarStack">
+                      {followerInitials.map((initial, index) => (
+                        <div
+                          key={`${initial}-${index}`}
+                          className="avatarMini avatarMini--text"
+                        >
+                          {initial}
+                        </div>
+                      ))}
                     </div>
-                    <div className="field">
-                      <span className="label">{strings.profileGenderLabel}</span>
-                      <div className="input input--static">
-                        {profileGenderLabel || emptyProfileValue}
-                      </div>
-                    </div>
+                    <span className="avatarMore">+23</span>
                   </div>
-                  <div className="formRow">
-                    <div className="field">
-                      <span className="label">{strings.profileCountryLabel}</span>
-                      <div className="input input--static">
-                        {profileCountry || emptyProfileValue}
-                      </div>
-                    </div>
-                    <div className="field">
-                      <span className="label">{strings.profileCityLabel}</span>
-                      <div className="input input--static">
-                        {profileCity || emptyProfileValue}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="field">
-                    <span className="label">{strings.profileLanguageLabel}</span>
-                    <div className="input input--static">
-                      {profileLanguageLabel || emptyProfileValue}
-                    </div>
-                  </div>
-                  <div className="profileActions">
+                </div>
+
+                <div className="userPrimary">
+                  <div className="userNameLarge">{profileHeaderName}</div>
+                  {sessionUser?.email ? (
+                    <div className="userHandle">{sessionUser.email}</div>
+                  ) : null}
+                  <div className="userActionsRow">
+                    <button className="userAction userAction--primary" type="button">
+                      {strings.userActionFollow}
+                    </button>
+                    <button className="userAction" type="button">
+                      {strings.userActionMessage}
+                    </button>
                     <button
-                      className="profileSave"
+                      className="userAction userAction--ghost"
                       type="button"
                       onClick={() => navigate("profile")}
                     >
                       {strings.profileEditButton}
                     </button>
                   </div>
+                  <div className="userStatsRow">
+                    {userStats.map((stat) => (
+                      <div key={stat.label} className="userStat">
+                        <div className="userStatValue">{stat.value}</div>
+                        <div className="userStatLabel">{stat.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="userTabsRow">
+                    {userTabs.map((tab) => (
+                      <button
+                        key={tab.id}
+                        className={`userTab${
+                          userTab === tab.id ? " userTab--active" : ""
+                        }`}
+                        type="button"
+                        onClick={() => setUserTab(tab.id)}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {userTab === "about" ? (
+                  <div className="userAboutCard">
+                    <div className="userBio">{strings.userBioPlaceholder}</div>
+                    <div className="userInfoGrid">
+                      <div className="userInfoItem">
+                        <span className="userInfoLabel">
+                          {strings.profileBirthLabel}
+                        </span>
+                        <span className="userInfoValue">
+                          {profileBirthDate || emptyProfileValue}
+                        </span>
+                      </div>
+                      <div className="userInfoItem">
+                        <span className="userInfoLabel">
+                          {strings.profileGenderLabel}
+                        </span>
+                        <span className="userInfoValue">
+                          {profileGenderLabel || emptyProfileValue}
+                        </span>
+                      </div>
+                      <div className="userInfoItem">
+                        <span className="userInfoLabel">
+                          {strings.profileCountryLabel}
+                        </span>
+                        <span className="userInfoValue">
+                          {profileCountry || emptyProfileValue}
+                        </span>
+                      </div>
+                      <div className="userInfoItem">
+                        <span className="userInfoLabel">
+                          {strings.profileCityLabel}
+                        </span>
+                        <span className="userInfoValue">
+                          {profileCity || emptyProfileValue}
+                        </span>
+                      </div>
+                      <div className="userInfoItem userInfoItem--full">
+                        <span className="userInfoLabel">
+                          {strings.profileLanguageLabel}
+                        </span>
+                        <span className="userInfoValue">
+                          {profileLanguageLabel || emptyProfileValue}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="userGrid">
+                    {userGridItems.map((item) => (
+                      <div key={item} className="userGridItem" />
+                    ))}
+                  </div>
+                )}
               </div>
             ) : isProfileRoute ? (
               <div className="profilePage">

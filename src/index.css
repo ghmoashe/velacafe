@@ -595,49 +595,273 @@ button:focus-visible {
   box-shadow: 0 8px 20px rgba(31, 27, 22, 0.08);
 }
 
-.userCard {
-  gap: 16px;
+.userPage {
+  display: grid;
+  gap: 18px;
 }
 
-.userHeader {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+.userHero {
+  position: relative;
+  border-radius: 22px;
+  overflow: hidden;
+  min-height: 190px;
+  box-shadow: 0 16px 32px rgba(31, 27, 22, 0.16);
 }
 
-.userAvatar {
-  width: 72px;
-  height: 72px;
+.userCover {
+  height: 190px;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.8), transparent 55%),
+    radial-gradient(circle at 70% 40%, rgba(255, 220, 195, 0.8), transparent 55%),
+    linear-gradient(135deg, #f3b89f 0%, #f7d3bf 45%, #f3b18f 100%);
+}
+
+.userAvatarWrap {
+  position: absolute;
+  left: 50%;
+  bottom: -36px;
+  transform: translateX(-50%);
+}
+
+.userAvatarLarge {
+  width: 96px;
+  height: 96px;
   border-radius: 999px;
+  border: 4px solid rgba(255, 255, 255, 0.96);
   object-fit: cover;
-  border: 1px solid var(--line);
   background: #f5ece3;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 22px;
+  font-size: 28px;
+  color: #8e4a2a;
+  box-shadow: 0 12px 24px rgba(31, 27, 22, 0.18);
+}
+
+.userAvatarLarge--placeholder {
+  background: #f7e7da;
+}
+
+.userFollowers {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(234, 222, 211, 0.9);
+}
+
+.avatarMini--text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
   color: #8e4a2a;
 }
 
-.userHeaderText {
+.userPrimary {
+  text-align: center;
+  padding-top: 26px;
   display: grid;
-  gap: 4px;
+  gap: 10px;
 }
 
-.userName {
-  font-size: 18px;
+.userNameLarge {
+  font-size: 22px;
   font-weight: 700;
-  color: var(--ink);
 }
 
-.userEmail {
+.userHandle {
   font-size: 12px;
   color: var(--muted);
 }
 
+.userActionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.userAction {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.userAction:hover {
+  transform: translateY(-1px);
+  border-color: rgba(200, 106, 59, 0.6);
+  box-shadow: 0 10px 18px rgba(31, 27, 22, 0.12);
+}
+
+.userAction--primary {
+  background: #3fb82e;
+  color: #fff;
+  border-color: transparent;
+}
+
+.userAction--ghost {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.userStatsRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(234, 222, 211, 0.9);
+}
+
+.userStatValue {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.userStatLabel {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.userTabsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.userTab {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transition: transform 160ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.userTab--active {
+  background: rgba(200, 106, 59, 0.16);
+  border-color: rgba(200, 106, 59, 0.5);
+  box-shadow: 0 10px 20px rgba(31, 27, 22, 0.1);
+}
+
+.userAboutCard {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(223, 230, 242, 0.9);
+  background: #fff;
+  display: grid;
+  gap: 12px;
+  box-shadow: 0 8px 18px rgba(31, 27, 22, 0.08);
+}
+
+.userBio {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.userInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.userInfoItem {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(248, 244, 238, 0.8);
+  border: 1px solid rgba(234, 222, 211, 0.9);
+}
+
+.userInfoItem--full {
+  grid-column: 1 / -1;
+}
+
+.userInfoLabel {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.userInfoValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.userGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.userGridItem {
+  aspect-ratio: 1 / 1;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f4c7b0, #f1e0d2);
+  border: 1px solid rgba(234, 222, 211, 0.9);
+  box-shadow: 0 8px 16px rgba(31, 27, 22, 0.08);
+}
+
+.userGridItem:nth-child(3n + 2) {
+  background: linear-gradient(135deg, #f3b48f, #f7d8c6);
+}
+
+.userGridItem:nth-child(3n + 3) {
+  background: linear-gradient(135deg, #f1c2a7, #f5e6db);
+}
+
 .input--static {
   background: rgba(248, 244, 238, 0.8);
+}
+
+@media (max-width: 560px) {
+  .userHero {
+    min-height: 170px;
+  }
+
+  .userCover {
+    height: 170px;
+  }
+
+  .userAvatarLarge {
+    width: 84px;
+    height: 84px;
+    font-size: 24px;
+  }
+
+  .userFollowers {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .userStatsRow {
+    grid-template-columns: 1fr;
+  }
+
+  .userGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .genderRow {
