@@ -31,6 +31,7 @@ type Route =
   | "register"
   | "forgot"
   | "profile"
+  | "me"
   | "partners"
   | "privacy"
   | "impressum"
@@ -70,6 +71,9 @@ type MessageKey =
   | "partnersTitle"
   | "profileTitle"
   | "profileSubtitle"
+  | "userPageTitle"
+  | "userPageSubtitle"
+  | "profileEditButton"
   | "profileHeaderLabel"
   | "profileHeaderNameFallback"
   | "profileNameLabel"
@@ -106,6 +110,8 @@ function resolveRoute(slug: string): Route | null {
       return "forgot";
     case "profile":
       return "profile";
+    case "me":
+      return "me";
     case "partners":
       return "partners";
     case "privacy":
@@ -138,6 +144,7 @@ const ROUTE_PATHS: Record<Route, string> = {
   register: "/register",
   forgot: "/forgot",
   profile: "/profile",
+  me: "/me",
   partners: "/partners",
   privacy: "/privacy",
   impressum: "/impressum",
@@ -173,6 +180,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Unsere Partner",
     profileTitle: "Profil vervollständigen",
     profileSubtitle: "Erzählen Sie kurz etwas über sich.",
+    userPageTitle: "Mein Profil",
+    userPageSubtitle: "Ihre Angaben im Überblick.",
+    profileEditButton: "Profil bearbeiten",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Konto",
     profileNameLabel: "Name",
@@ -222,6 +232,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Our partners",
     profileTitle: "Complete your profile",
     profileSubtitle: "Tell us a bit about yourself.",
+    userPageTitle: "My profile",
+    userPageSubtitle: "Your details at a glance.",
+    profileEditButton: "Edit profile",
     profileHeaderLabel: "Profile",
     profileHeaderNameFallback: "Account",
     profileNameLabel: "Name",
@@ -271,6 +284,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Наши партнеры",
     profileTitle: "Заполните профиль",
     profileSubtitle: "Расскажите немного о себе.",
+    userPageTitle: "Мой профиль",
+    userPageSubtitle: "Ваши данные и настройки.",
+    profileEditButton: "Редактировать профиль",
     profileHeaderLabel: "Профиль",
     profileHeaderNameFallback: "Аккаунт",
     profileNameLabel: "Имя",
@@ -320,6 +336,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Наші партнери",
     profileTitle: "Заповніть профіль",
     profileSubtitle: "Розкажіть трохи про себе.",
+    userPageTitle: "Мій профіль",
+    userPageSubtitle: "Ваші дані й налаштування.",
+    profileEditButton: "Редагувати профіль",
     profileHeaderLabel: "Профіль",
     profileHeaderNameFallback: "Акаунт",
     profileNameLabel: "Ім’я",
@@ -369,6 +388,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "شرکای ما",
     profileTitle: "تکمیل پروفایل",
     profileSubtitle: "کمی درباره خودتان بگویید.",
+    userPageTitle: "پروفایل من",
+    userPageSubtitle: "جزئیات شما در یک نگاه.",
+    profileEditButton: "ویرایش پروفایل",
     profileHeaderLabel: "پروفایل",
     profileHeaderNameFallback: "حساب",
     profileNameLabel: "نام",
@@ -418,6 +440,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "شركاؤنا",
     profileTitle: "أكمل ملفك الشخصي",
     profileSubtitle: "أخبرنا قليلاً عنك.",
+    userPageTitle: "ملفي الشخصي",
+    userPageSubtitle: "تفاصيلك في لمحة.",
+    profileEditButton: "تعديل الملف الشخصي",
     profileHeaderLabel: "الملف الشخصي",
     profileHeaderNameFallback: "الحساب",
     profileNameLabel: "الاسم",
@@ -467,6 +492,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Partnerët tanë",
     profileTitle: "Plotëso profilin",
     profileSubtitle: "Na trego pak për veten.",
+    userPageTitle: "Profili im",
+    userPageSubtitle: "Të dhënat tuaja në një vështrim.",
+    profileEditButton: "Redakto profilin",
     profileHeaderLabel: "Profili",
     profileHeaderNameFallback: "Llogaria",
     profileNameLabel: "Emri",
@@ -516,6 +544,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Ortaklarımız",
     profileTitle: "Profili tamamlayın",
     profileSubtitle: "Kendiniz hakkında biraz bilgi verin.",
+    userPageTitle: "Profilim",
+    userPageSubtitle: "Bilgileriniz burada.",
+    profileEditButton: "Profili düzenle",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Hesap",
     profileNameLabel: "Ad",
@@ -565,6 +596,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Nos partenaires",
     profileTitle: "Complétez votre profil",
     profileSubtitle: "Parlez-nous un peu de vous.",
+    userPageTitle: "Mon profil",
+    userPageSubtitle: "Vos informations en un coup d'œil.",
+    profileEditButton: "Modifier le profil",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Compte",
     profileNameLabel: "Nom",
@@ -614,6 +648,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Nuestros socios",
     profileTitle: "Completa tu perfil",
     profileSubtitle: "Cuéntanos un poco sobre ti.",
+    userPageTitle: "Mi perfil",
+    userPageSubtitle: "Tus datos de un vistazo.",
+    profileEditButton: "Editar perfil",
     profileHeaderLabel: "Perfil",
     profileHeaderNameFallback: "Cuenta",
     profileNameLabel: "Nombre",
@@ -663,6 +700,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "I nostri partner",
     profileTitle: "Completa il profilo",
     profileSubtitle: "Raccontaci qualcosa su di te.",
+    userPageTitle: "Il mio profilo",
+    userPageSubtitle: "I tuoi dati in breve.",
+    profileEditButton: "Modifica profilo",
     profileHeaderLabel: "Profilo",
     profileHeaderNameFallback: "Account",
     profileNameLabel: "Nome",
@@ -712,6 +752,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     partnersTitle: "Nasi partnerzy",
     profileTitle: "Uzupełnij profil",
     profileSubtitle: "Opowiedz nam krótko o sobie.",
+    userPageTitle: "Mój profil",
+    userPageSubtitle: "Twoje dane w skrócie.",
+    profileEditButton: "Edytuj profil",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Konto",
     profileNameLabel: "Imię",
@@ -4647,6 +4690,20 @@ export default function App() {
   const profileHeaderInitial =
     profileHeaderName.trim().charAt(0).toUpperCase() || "?";
   const showBrandUser = Boolean(sessionUser);
+  const emptyProfileValue = "-";
+  const profileGenderLabel =
+    profileGender === "female"
+      ? strings.profileGenderFemale
+      : profileGender === "male"
+        ? strings.profileGenderMale
+        : profileGender === "other"
+          ? strings.profileGenderOther
+          : "";
+  const profileLanguageLabel =
+    profileLanguage &&
+    (languageLabels[profileLanguage] ??
+      LANGUAGE_LIST.find((lang) => lang.locale === profileLanguage)?.label ??
+      profileLanguage);
   const getSupabaseErrorMessage = useCallback((error: unknown) => {
     if (error && typeof error === "object" && "message" in error) {
       const message = (error as { message?: unknown }).message;
@@ -4849,7 +4906,7 @@ export default function App() {
   }, [cropImageSize, cropOffset, cropScale, profilePhoto, updateCropPreview]);
 
   useEffect(() => {
-    if (route !== "profile") return;
+    if (route !== "profile" && route !== "me") return;
     const supabase = getSupabaseClient();
     if (!supabase) return;
     let active = true;
@@ -4857,7 +4914,7 @@ export default function App() {
       if (!active) return;
       if (!data.session?.user) {
         if (typeof window !== "undefined") {
-          window.localStorage.setItem(POST_AUTH_ROUTE_KEY, "profile");
+          window.localStorage.setItem(POST_AUTH_ROUTE_KEY, route);
         }
         navigate("login");
       }
@@ -4868,7 +4925,7 @@ export default function App() {
   }, [navigate, route]);
 
   useEffect(() => {
-    if (route !== "profile") {
+    if (route !== "profile" && route !== "me") {
       profileLoaded.current = false;
       return;
     }
@@ -5038,9 +5095,12 @@ export default function App() {
       setAuthState({ type: "success", message: strings.successLogin });
       if (typeof window !== "undefined") {
         const postAuthRoute = window.localStorage.getItem(POST_AUTH_ROUTE_KEY);
-        if (postAuthRoute === "profile") {
+        const resolvedPostAuth = postAuthRoute
+          ? resolveRoute(postAuthRoute.toLowerCase())
+          : null;
+        if (resolvedPostAuth) {
           window.localStorage.removeItem(POST_AUTH_ROUTE_KEY);
-          navigate("profile");
+          navigate(resolvedPostAuth);
         }
       }
     });
@@ -5285,6 +5345,7 @@ export default function App() {
       setProfileAvatarUrl(null);
       setProfilePhotoPreview(null);
       setProfileStatus({ type: "success", message: strings.profileSuccess });
+      navigate("me");
     } catch (error) {
       setProfileStatus({
         type: "error",
@@ -5369,6 +5430,7 @@ export default function App() {
   const isImpressumRoute = route === "impressum";
   const isTermsRoute = route === "terms";
   const isProfileRoute = route === "profile";
+  const isUserRoute = route === "me";
   const isAuthRoute = route === "login" || route === "register" || route === "forgot";
   const showPassword = isAuthRoute && route !== "forgot";
   const showConfirm = isAuthRoute && route === "register";
@@ -5409,7 +5471,7 @@ export default function App() {
               <button
                 className="brandUser"
                 type="button"
-                onClick={() => navigate("profile")}
+                onClick={() => navigate("me")}
                 aria-label={strings.profileHeaderLabel}
               >
                 {profileHeaderAvatar ? (
@@ -5487,6 +5549,77 @@ export default function App() {
                   {strings.backToLogin}
                 </button>
                 {renderLegalContent(termsContent.title, termsContent.sections)}
+              </div>
+            ) : isUserRoute ? (
+              <div className="profilePage userPage">
+                <div className="profileHeader">
+                  <div className="profileTitle">{strings.userPageTitle}</div>
+                  <div className="profileSubtitle">{strings.userPageSubtitle}</div>
+                </div>
+                <div className="profileCard userCard">
+                  <div className="userHeader">
+                    {profileHeaderAvatar ? (
+                      <img
+                        className="userAvatar"
+                        src={profileHeaderAvatar}
+                        alt={profileHeaderName}
+                      />
+                    ) : (
+                      <div className="userAvatar">
+                        <span>{profileHeaderInitial}</span>
+                      </div>
+                    )}
+                    <div className="userHeaderText">
+                      <div className="userName">{profileHeaderName}</div>
+                      {sessionUser?.email ? (
+                        <div className="userEmail">{sessionUser.email}</div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="formRow">
+                    <div className="field">
+                      <span className="label">{strings.profileBirthLabel}</span>
+                      <div className="input input--static">
+                        {profileBirthDate || emptyProfileValue}
+                      </div>
+                    </div>
+                    <div className="field">
+                      <span className="label">{strings.profileGenderLabel}</span>
+                      <div className="input input--static">
+                        {profileGenderLabel || emptyProfileValue}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="formRow">
+                    <div className="field">
+                      <span className="label">{strings.profileCountryLabel}</span>
+                      <div className="input input--static">
+                        {profileCountry || emptyProfileValue}
+                      </div>
+                    </div>
+                    <div className="field">
+                      <span className="label">{strings.profileCityLabel}</span>
+                      <div className="input input--static">
+                        {profileCity || emptyProfileValue}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="field">
+                    <span className="label">{strings.profileLanguageLabel}</span>
+                    <div className="input input--static">
+                      {profileLanguageLabel || emptyProfileValue}
+                    </div>
+                  </div>
+                  <div className="profileActions">
+                    <button
+                      className="profileSave"
+                      type="button"
+                      onClick={() => navigate("profile")}
+                    >
+                      {strings.profileEditButton}
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : isProfileRoute ? (
               <div className="profilePage">
