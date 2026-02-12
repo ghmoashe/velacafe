@@ -297,6 +297,8 @@ type MessageKey =
   | "userPostPublish"
   | "userPostFileHint"
   | "userPostEmpty"
+  | "userPostDelete"
+  | "userPostDeleteConfirm"
   | "profileHeaderLabel"
   | "profileHeaderNameFallback"
   | "profileNameLabel"
@@ -478,6 +480,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPostPublish: "Veröffentlichen",
     userPostFileHint: "Foto oder Video (PNG/JPG/MP4)",
     userPostEmpty: "Noch keine Beiträge.",
+    userPostDelete: "Löschen",
+    userPostDeleteConfirm: "Beitrag wirklich löschen?",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Konto",
     profileNameLabel: "Name",
@@ -562,6 +566,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPostPublish: "Publish",
     userPostFileHint: "Photo or video (PNG/JPG/MP4)",
     userPostEmpty: "No posts yet.",
+    userPostDelete: "Delete",
+    userPostDeleteConfirm: "Delete this post?",
     profileHeaderLabel: "Profile",
     profileHeaderNameFallback: "Account",
     profileNameLabel: "Name",
@@ -646,6 +652,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPostPublish: "Опубликовать",
     userPostFileHint: "Фото или видео (PNG/JPG/MP4)",
     userPostEmpty: "Пока нет постов.",
+    userPostDelete: "Удалить",
+    userPostDeleteConfirm: "Удалить этот пост?",
     profileHeaderLabel: "Профиль",
     profileHeaderNameFallback: "Аккаунт",
     profileNameLabel: "Имя",
@@ -730,6 +738,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPostPublish: "Опублікувати",
     userPostFileHint: "Фото або відео (PNG/JPG/MP4)",
     userPostEmpty: "Поки що немає постів.",
+    userPostDelete: "Видалити",
+    userPostDeleteConfirm: "Видалити цей пост?",
     profileHeaderLabel: "Профіль",
     profileHeaderNameFallback: "Акаунт",
     profileNameLabel: "Ім’я",
@@ -814,6 +824,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPostPublish: "انتشار",
     userPostFileHint: "عکس یا ویدیو (PNG/JPG/MP4)",
     userPostEmpty: "هنوز پستی نیست.",
+    userPostDelete: "حذف",
+    userPostDeleteConfirm: "این پست حذف شود؟",
     profileHeaderLabel: "پروفایل",
     profileHeaderNameFallback: "حساب",
     profileNameLabel: "نام",
@@ -898,6 +910,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPostPublish: "نشر",
     userPostFileHint: "صورة أو فيديو (PNG/JPG/MP4)",
     userPostEmpty: "لا توجد منشورات بعد.",
+    userPostDelete: "حذف",
+    userPostDeleteConfirm: "هل تريد حذف هذا المنشور؟",
     profileHeaderLabel: "الملف الشخصي",
     profileHeaderNameFallback: "الحساب",
     profileNameLabel: "الاسم",
@@ -982,6 +996,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPostPublish: "Publiko",
     userPostFileHint: "Foto ose video (PNG/JPG/MP4)",
     userPostEmpty: "Ende nuk ka postime.",
+    userPostDelete: "Fshi",
+    userPostDeleteConfirm: "Të fshihet ky postim?",
     profileHeaderLabel: "Profili",
     profileHeaderNameFallback: "Llogaria",
     profileNameLabel: "Emri",
@@ -1066,6 +1082,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPostPublish: "Yayınla",
     userPostFileHint: "Fotoğraf veya video (PNG/JPG/MP4)",
     userPostEmpty: "Henüz gönderi yok.",
+    userPostDelete: "Sil",
+    userPostDeleteConfirm: "Bu gönderi silinsin mi?",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Hesap",
     profileNameLabel: "Ad",
@@ -1150,6 +1168,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPostPublish: "Publier",
     userPostFileHint: "Photo ou vidéo (PNG/JPG/MP4)",
     userPostEmpty: "Aucune publication pour l'instant.",
+    userPostDelete: "Supprimer",
+    userPostDeleteConfirm: "Supprimer cette publication ?",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Compte",
     profileNameLabel: "Nom",
@@ -1234,6 +1254,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPostPublish: "Publicar",
     userPostFileHint: "Foto o video (PNG/JPG/MP4)",
     userPostEmpty: "Aún no hay publicaciones.",
+    userPostDelete: "Eliminar",
+    userPostDeleteConfirm: "¿Eliminar esta publicación?",
     profileHeaderLabel: "Perfil",
     profileHeaderNameFallback: "Cuenta",
     profileNameLabel: "Nombre",
@@ -1318,6 +1340,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPostPublish: "Pubblica",
     userPostFileHint: "Foto o video (PNG/JPG/MP4)",
     userPostEmpty: "Ancora nessun post.",
+    userPostDelete: "Elimina",
+    userPostDeleteConfirm: "Eliminare questo post?",
     profileHeaderLabel: "Profilo",
     profileHeaderNameFallback: "Account",
     profileNameLabel: "Nome",
@@ -1402,6 +1426,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userPostPublish: "Opublikuj",
     userPostFileHint: "Zdjęcie lub wideo (PNG/JPG/MP4)",
     userPostEmpty: "Brak postów.",
+    userPostDelete: "Usuń",
+    userPostDeleteConfirm: "Usunąć ten post?",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Konto",
     profileNameLabel: "Imię",
@@ -1444,6 +1470,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
 const FALLBACK_LOCALE: Locale = "en";
 const POST_AUTH_ROUTE_KEY = "vela-post-auth-route";
 const PROFILE_PHOTO_BUCKET = "avatars";
+const POSTS_BUCKET = "posts";
 const POSTS_TABLE = "posts";
 const POST_MEDIA_FOLDER = "posts";
 const AVATAR_CROP_SIZE = 180;
@@ -6229,14 +6256,14 @@ export default function App() {
           .slice(2, 8)}.${extension}`;
         const filePath = `${user.id}/${POST_MEDIA_FOLDER}/${fileName}`;
         const { error: uploadError } = await supabase.storage
-          .from(PROFILE_PHOTO_BUCKET)
+          .from(POSTS_BUCKET)
           .upload(filePath, postFile, {
             upsert: false,
             contentType: postFile.type || "application/octet-stream",
           });
         if (uploadError) throw uploadError;
         const { data: publicData } = supabase.storage
-          .from(PROFILE_PHOTO_BUCKET)
+          .from(POSTS_BUCKET)
           .getPublicUrl(filePath);
         mediaUrl = publicData.publicUrl ?? null;
       }
@@ -6272,11 +6299,66 @@ export default function App() {
     }
   }
 
-  function getStoragePathFromUrl(url: string) {
+  async function handleDeletePost(post: UserPost) {
+    if (postActionStatus.type === "loading") return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setPostActionStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(strings.userPostDeleteConfirm);
+      if (!confirmed) return;
+    }
+    setPostActionStatus({ type: "loading", message: strings.loadingLabel });
+    try {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const user = sessionData.session?.user;
+      if (!user) {
+        setPostActionStatus({
+          type: "error",
+          message: strings.profileAuthRequired,
+        });
+        return;
+      }
+      if (post.media_url) {
+        const path = getStoragePathFromUrl(post.media_url, POSTS_BUCKET);
+        if (path) {
+          const { error: removeError } = await supabase.storage
+            .from(POSTS_BUCKET)
+            .remove([path]);
+          if (removeError) throw removeError;
+        }
+      }
+      const { error } = await supabase
+        .from(POSTS_TABLE)
+        .delete()
+        .eq("id", post.id)
+        .eq("user_id", user.id);
+      if (error) throw error;
+      setUserPosts((prev) => prev.filter((item) => item.id !== post.id));
+      setPostActionStatus({ type: "idle", message: "" });
+    } catch (error) {
+      setPostActionStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    }
+  }
+
+  function getStoragePathFromUrl(
+    url: string,
+    bucketName: string = PROFILE_PHOTO_BUCKET
+  ) {
     const cleanUrl = url.split("?")[0];
     const patterns = [
-      `/storage/v1/object/public/${PROFILE_PHOTO_BUCKET}/`,
-      `/object/public/${PROFILE_PHOTO_BUCKET}/`,
+      `/storage/v1/object/public/${bucketName}/`,
+      `/object/public/${bucketName}/`,
     ];
     for (const pattern of patterns) {
       const index = cleanUrl.indexOf(pattern);
@@ -6974,6 +7056,16 @@ export default function App() {
                                 {post.caption}
                               </div>
                             ) : null}
+                            <div className="userPostActions">
+                              <button
+                                className="userPostDelete"
+                                type="button"
+                                onClick={() => handleDeletePost(post)}
+                                disabled={postActionStatus.type === "loading"}
+                              >
+                                {strings.userPostDelete}
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -7188,23 +7280,6 @@ export default function App() {
                     </select>
                   </div>
                   <div className="field">
-                    <span className="label">{strings.profileLevelLabel}</span>
-                    <div className="levelGrid">
-                      {LANGUAGE_LEVELS.map((level) => (
-                        <button
-                          key={level}
-                          className={`levelButton${
-                            profileLevel === level ? " levelButton--active" : ""
-                          }`}
-                          type="button"
-                          onClick={() => updateProfileLevel(level)}
-                        >
-                          {level}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="field">
                     <span className="label">{strings.profileLearningLabel}</span>
                     <div className="tagGrid">
                       {LANGUAGE_LIST.map((lang) => {
@@ -7246,6 +7321,23 @@ export default function App() {
                           </button>
                         );
                       })}
+                    </div>
+                  </div>
+                  <div className="field">
+                    <span className="label">{strings.profileLevelLabel}</span>
+                    <div className="levelGrid">
+                      {LANGUAGE_LEVELS.map((level) => (
+                        <button
+                          key={level}
+                          className={`levelButton${
+                            profileLevel === level ? " levelButton--active" : ""
+                          }`}
+                          type="button"
+                          onClick={() => updateProfileLevel(level)}
+                        >
+                          {level}
+                        </button>
+                      ))}
                     </div>
                   </div>
                   <div className="field">

@@ -889,6 +889,35 @@ button:focus-visible {
   box-shadow: 0 8px 18px rgba(31, 27, 22, 0.08);
 }
 
+.userPostActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.userPostDelete {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 92, 56, 0.45);
+  background: rgba(255, 255, 255, 0.9);
+  color: #b1462a;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.userPostDelete:hover {
+  transform: translateY(-1px);
+  border-color: rgba(214, 92, 56, 0.7);
+  box-shadow: 0 8px 16px rgba(31, 27, 22, 0.12);
+}
+
+.userPostDelete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
 .userPostCaption {
   font-size: 13px;
   color: var(--ink);
