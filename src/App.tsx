@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type KeyboardEvent,
   type PointerEvent,
 } from "react";
 import { openKlaroSettings, setupKlaro } from "./klaro";
@@ -24,8 +25,184 @@ const LANGUAGE_LIST = [
   { label: "Polski", locale: "pl", codes: ["PL"] },
 ] as const;
 
+const LANGUAGE_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
+
 type LanguagePref = (typeof LANGUAGE_LIST)[number];
 type Locale = LanguagePref["locale"];
+type LanguageLevel = (typeof LANGUAGE_LEVELS)[number] | "";
+
+const INTEREST_PRESETS = [
+  {
+    key: "travel",
+    labels: {
+      de: "Reisen",
+      en: "Travel",
+      ru: "Путешествия",
+      uk: "Подорожі",
+      fa: "سفر",
+      ar: "السفر",
+      sq: "Udhëtime",
+      tr: "Seyahat",
+      fr: "Voyage",
+      es: "Viajes",
+      it: "Viaggi",
+      pl: "Podróże",
+    },
+  },
+  {
+    key: "music",
+    labels: {
+      de: "Musik",
+      en: "Music",
+      ru: "Музыка",
+      uk: "Музика",
+      fa: "موسیقی",
+      ar: "الموسيقى",
+      sq: "Muzikë",
+      tr: "Müzik",
+      fr: "Musique",
+      es: "Música",
+      it: "Musica",
+      pl: "Muzyka",
+    },
+  },
+  {
+    key: "movies",
+    labels: {
+      de: "Filme",
+      en: "Movies",
+      ru: "Кино",
+      uk: "Кіно",
+      fa: "فیلم",
+      ar: "الأفلام",
+      sq: "Filma",
+      tr: "Filmler",
+      fr: "Films",
+      es: "Películas",
+      it: "Film",
+      pl: "Filmy",
+    },
+  },
+  {
+    key: "books",
+    labels: {
+      de: "Bücher",
+      en: "Books",
+      ru: "Книги",
+      uk: "Книги",
+      fa: "کتاب",
+      ar: "الكتب",
+      sq: "Libra",
+      tr: "Kitaplar",
+      fr: "Livres",
+      es: "Libros",
+      it: "Libri",
+      pl: "Książki",
+    },
+  },
+  {
+    key: "cooking",
+    labels: {
+      de: "Kochen",
+      en: "Cooking",
+      ru: "Кулинария",
+      uk: "Кулінарія",
+      fa: "آشپزی",
+      ar: "الطبخ",
+      sq: "Gatim",
+      tr: "Yemek",
+      fr: "Cuisine",
+      es: "Cocina",
+      it: "Cucina",
+      pl: "Gotowanie",
+    },
+  },
+  {
+    key: "sports",
+    labels: {
+      de: "Sport",
+      en: "Sports",
+      ru: "Спорт",
+      uk: "Спорт",
+      fa: "ورزش",
+      ar: "الرياضة",
+      sq: "Sport",
+      tr: "Spor",
+      fr: "Sport",
+      es: "Deporte",
+      it: "Sport",
+      pl: "Sport",
+    },
+  },
+  {
+    key: "art",
+    labels: {
+      de: "Kunst",
+      en: "Art",
+      ru: "Искусство",
+      uk: "Мистецтво",
+      fa: "هنر",
+      ar: "الفن",
+      sq: "Art",
+      tr: "Sanat",
+      fr: "Art",
+      es: "Arte",
+      it: "Arte",
+      pl: "Sztuka",
+    },
+  },
+  {
+    key: "photography",
+    labels: {
+      de: "Fotografie",
+      en: "Photography",
+      ru: "Фотография",
+      uk: "Фотографія",
+      fa: "عکاسی",
+      ar: "التصوير",
+      sq: "Fotografi",
+      tr: "Fotoğrafçılık",
+      fr: "Photo",
+      es: "Fotografía",
+      it: "Fotografia",
+      pl: "Fotografia",
+    },
+  },
+  {
+    key: "gaming",
+    labels: {
+      de: "Games",
+      en: "Gaming",
+      ru: "Игры",
+      uk: "Ігри",
+      fa: "بازی",
+      ar: "الألعاب",
+      sq: "Lojëra",
+      tr: "Oyunlar",
+      fr: "Jeux",
+      es: "Juegos",
+      it: "Giochi",
+      pl: "Gry",
+    },
+  },
+  {
+    key: "nature",
+    labels: {
+      de: "Natur",
+      en: "Nature",
+      ru: "Природа",
+      uk: "Природа",
+      fa: "طبیعت",
+      ar: "الطبيعة",
+      sq: "Natyrë",
+      tr: "Doğa",
+      fr: "Nature",
+      es: "Naturaleza",
+      it: "Natura",
+      pl: "Natura",
+    },
+  },
+] as const;
 type Route =
   | "login"
   | "register"
@@ -53,6 +230,13 @@ type ProfileRecord = {
   city: string | null;
   language: string | null;
   avatar_url: string | null;
+  language_level?: string | null;
+  learning_languages?: string[] | null;
+  practice_languages?: string[] | null;
+  bio?: string | null;
+  interests?: string[] | null;
+  telegram?: string | null;
+  instagram?: string | null;
 };
 
 type MessageKey =
@@ -108,6 +292,18 @@ type MessageKey =
   | "profileCityLabel"
   | "profileLanguageLabel"
   | "profileLanguagePlaceholder"
+  | "profileLevelLabel"
+  | "profileLearningLabel"
+  | "profilePracticeLabel"
+  | "profileBioLabel"
+  | "profileBioPlaceholder"
+  | "profileInterestsLabel"
+  | "profileInterestsPlaceholder"
+  | "profileInterestsAdd"
+  | "profileInterestsSuggestions"
+  | "profileSocialLabel"
+  | "profileTelegramLabel"
+  | "profileInstagramLabel"
   | "profilePhotoLabel"
   | "profilePhotoHint"
   | "profilePhotoRemove"
@@ -128,6 +324,25 @@ function getFlagEmoji(code: string): string {
   const first = normalized.charCodeAt(0) + base;
   const second = normalized.charCodeAt(1) + base;
   return String.fromCodePoint(first, second);
+}
+
+function resolveInterestLabel(value: string, locale: Locale): string {
+  const preset = INTEREST_PRESETS.find((item) => item.key === value);
+  if (!preset) return value;
+  return preset.labels[locale] ?? preset.labels.en;
+}
+
+function matchInterestPreset(value: string, locale: Locale): string | null {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return null;
+  for (const preset of INTEREST_PRESETS) {
+    const localized = (preset.labels[locale] ?? preset.labels.en).toLowerCase();
+    const english = preset.labels.en.toLowerCase();
+    if (normalized === localized || normalized === english) {
+      return preset.key;
+    }
+  }
+  return null;
 }
 
 function isProfileComplete(data: ProfileRecord | null): boolean {
@@ -248,6 +463,18 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileCityLabel: "Stadt",
     profileLanguageLabel: "Ihre Sprache",
     profileLanguagePlaceholder: "Sprache auswählen",
+    profileLevelLabel: "Sprachniveau",
+    profileLearningLabel: "Ich lerne",
+    profilePracticeLabel: "Ich übe",
+    profileBioLabel: "Über mich",
+    profileBioPlaceholder: "Kurz über dich, deine Ziele und Sprachen.",
+    profileInterestsLabel: "Interessen",
+    profileInterestsPlaceholder: "Interesse hinzufügen",
+    profileInterestsAdd: "Hinzufügen",
+    profileInterestsSuggestions: "Beliebt",
+    profileSocialLabel: "Soziale Netzwerke",
+    profileTelegramLabel: "Telegram",
+    profileInstagramLabel: "Instagram",
     profilePhotoLabel: "Profilfoto",
     profilePhotoHint: "Optional. PNG/JPG bis 5 MB.",
     profilePhotoRemove: "Foto löschen",
@@ -310,6 +537,18 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileCityLabel: "City",
     profileLanguageLabel: "Your language",
     profileLanguagePlaceholder: "Select a language",
+    profileLevelLabel: "Language level",
+    profileLearningLabel: "Learning",
+    profilePracticeLabel: "Practicing",
+    profileBioLabel: "About me",
+    profileBioPlaceholder: "Short bio about you and your goals.",
+    profileInterestsLabel: "Interests",
+    profileInterestsPlaceholder: "Add interest",
+    profileInterestsAdd: "Add",
+    profileInterestsSuggestions: "Popular",
+    profileSocialLabel: "Social links",
+    profileTelegramLabel: "Telegram",
+    profileInstagramLabel: "Instagram",
     profilePhotoLabel: "Profile photo",
     profilePhotoHint: "Optional. PNG/JPG up to 5 MB.",
     profilePhotoRemove: "Remove photo",
@@ -372,6 +611,18 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileCityLabel: "Город",
     profileLanguageLabel: "Ваш язык",
     profileLanguagePlaceholder: "Выберите язык",
+    profileLevelLabel: "Уровень языка",
+    profileLearningLabel: "Изучаю",
+    profilePracticeLabel: "Практикую",
+    profileBioLabel: "О себе",
+    profileBioPlaceholder: "Коротко о себе и целях.",
+    profileInterestsLabel: "Интересы",
+    profileInterestsPlaceholder: "Добавить интерес",
+    profileInterestsAdd: "Добавить",
+    profileInterestsSuggestions: "Популярные",
+    profileSocialLabel: "Соцсети",
+    profileTelegramLabel: "Telegram",
+    profileInstagramLabel: "Instagram",
     profilePhotoLabel: "Фото профиля",
     profilePhotoHint: "Необязательно. PNG/JPG до 5 МБ.",
     profilePhotoRemove: "Удалить фото",
@@ -434,6 +685,18 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileCityLabel: "Місто",
     profileLanguageLabel: "Ваша мова",
     profileLanguagePlaceholder: "Оберіть мову",
+    profileLevelLabel: "Рівень мови",
+    profileLearningLabel: "Вивчаю",
+    profilePracticeLabel: "Практикую",
+    profileBioLabel: "Про себе",
+    profileBioPlaceholder: "Коротко про себе та цілі.",
+    profileInterestsLabel: "Інтереси",
+    profileInterestsPlaceholder: "Додати інтерес",
+    profileInterestsAdd: "Додати",
+    profileInterestsSuggestions: "Популярні",
+    profileSocialLabel: "Соцмережі",
+    profileTelegramLabel: "Telegram",
+    profileInstagramLabel: "Instagram",
     profilePhotoLabel: "Фото профілю",
     profilePhotoHint: "Необов’язково. PNG/JPG до 5 МБ.",
     profilePhotoRemove: "Видалити фото",
@@ -496,6 +759,18 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileCityLabel: "شهر",
     profileLanguageLabel: "زبان شما",
     profileLanguagePlaceholder: "انتخاب زبان",
+    profileLevelLabel: "سطح زبان",
+    profileLearningLabel: "در حال یادگیری",
+    profilePracticeLabel: "تمرین می‌کنم",
+    profileBioLabel: "درباره من",
+    profileBioPlaceholder: "کمی درباره خود و هدفتان بنویسید.",
+    profileInterestsLabel: "علایق",
+    profileInterestsPlaceholder: "افزودن علاقه",
+    profileInterestsAdd: "افزودن",
+    profileInterestsSuggestions: "محبوب",
+    profileSocialLabel: "شبکه‌های اجتماعی",
+    profileTelegramLabel: "Telegram",
+    profileInstagramLabel: "Instagram",
     profilePhotoLabel: "عکس پروفایل",
     profilePhotoHint: "اختیاری. PNG/JPG تا ۵ مگابایت.",
     profilePhotoRemove: "حذف عکس",
@@ -558,6 +833,18 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileCityLabel: "المدينة",
     profileLanguageLabel: "لغتك",
     profileLanguagePlaceholder: "اختر اللغة",
+    profileLevelLabel: "مستوى اللغة",
+    profileLearningLabel: "أتعلم",
+    profilePracticeLabel: "أتمرن",
+    profileBioLabel: "نبذة عني",
+    profileBioPlaceholder: "اكتب نبذة قصيرة عنك وأهدافك.",
+    profileInterestsLabel: "الاهتمامات",
+    profileInterestsPlaceholder: "إضافة اهتمام",
+    profileInterestsAdd: "إضافة",
+    profileInterestsSuggestions: "الأكثر شيوعاً",
+    profileSocialLabel: "روابط اجتماعية",
+    profileTelegramLabel: "Telegram",
+    profileInstagramLabel: "Instagram",
     profilePhotoLabel: "صورة الملف الشخصي",
     profilePhotoHint: "اختياري. PNG/JPG حتى 5 ميغابايت.",
     profilePhotoRemove: "حذف الصورة",
@@ -620,6 +907,18 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileCityLabel: "Qyteti",
     profileLanguageLabel: "Gjuha juaj",
     profileLanguagePlaceholder: "Zgjidh gjuhën",
+    profileLevelLabel: "Niveli i gjuhës",
+    profileLearningLabel: "Po mësoj",
+    profilePracticeLabel: "Po praktikoj",
+    profileBioLabel: "Rreth meje",
+    profileBioPlaceholder: "Shkruaj shkurt për veten dhe qëllimet.",
+    profileInterestsLabel: "Interesa",
+    profileInterestsPlaceholder: "Shto interes",
+    profileInterestsAdd: "Shto",
+    profileInterestsSuggestions: "Popullore",
+    profileSocialLabel: "Rrjetet sociale",
+    profileTelegramLabel: "Telegram",
+    profileInstagramLabel: "Instagram",
     profilePhotoLabel: "Foto profili",
     profilePhotoHint: "Opsionale. PNG/JPG deri në 5 MB.",
     profilePhotoRemove: "Hiq foton",
@@ -682,6 +981,18 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileCityLabel: "Şehir",
     profileLanguageLabel: "Diliniz",
     profileLanguagePlaceholder: "Dil seçin",
+    profileLevelLabel: "Dil seviyesi",
+    profileLearningLabel: "Öğreniyorum",
+    profilePracticeLabel: "Pratik yapıyorum",
+    profileBioLabel: "Hakkımda",
+    profileBioPlaceholder: "Kendiniz ve hedefleriniz hakkında kısaca yazın.",
+    profileInterestsLabel: "İlgi alanları",
+    profileInterestsPlaceholder: "İlgi ekle",
+    profileInterestsAdd: "Ekle",
+    profileInterestsSuggestions: "Popüler",
+    profileSocialLabel: "Sosyal bağlantılar",
+    profileTelegramLabel: "Telegram",
+    profileInstagramLabel: "Instagram",
     profilePhotoLabel: "Profil fotoğrafı",
     profilePhotoHint: "İsteğe bağlı. PNG/JPG 5 MB'a kadar.",
     profilePhotoRemove: "Fotoğrafı sil",
@@ -744,6 +1055,18 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileCityLabel: "Ville",
     profileLanguageLabel: "Votre langue",
     profileLanguagePlaceholder: "Choisir une langue",
+    profileLevelLabel: "Niveau de langue",
+    profileLearningLabel: "J'apprends",
+    profilePracticeLabel: "Je pratique",
+    profileBioLabel: "À propos",
+    profileBioPlaceholder: "Bref portrait de vous et de vos objectifs.",
+    profileInterestsLabel: "Centres d’intérêt",
+    profileInterestsPlaceholder: "Ajouter un intérêt",
+    profileInterestsAdd: "Ajouter",
+    profileInterestsSuggestions: "Populaires",
+    profileSocialLabel: "Réseaux sociaux",
+    profileTelegramLabel: "Telegram",
+    profileInstagramLabel: "Instagram",
     profilePhotoLabel: "Photo de profil",
     profilePhotoHint: "Optionnel. PNG/JPG jusqu’à 5 Mo.",
     profilePhotoRemove: "Supprimer la photo",
@@ -806,6 +1129,18 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileCityLabel: "Ciudad",
     profileLanguageLabel: "Tu idioma",
     profileLanguagePlaceholder: "Selecciona un idioma",
+    profileLevelLabel: "Nivel de idioma",
+    profileLearningLabel: "Estoy aprendiendo",
+    profilePracticeLabel: "Practico",
+    profileBioLabel: "Sobre mí",
+    profileBioPlaceholder: "Breve descripción sobre ti y tus objetivos.",
+    profileInterestsLabel: "Intereses",
+    profileInterestsPlaceholder: "Agregar interés",
+    profileInterestsAdd: "Agregar",
+    profileInterestsSuggestions: "Populares",
+    profileSocialLabel: "Redes sociales",
+    profileTelegramLabel: "Telegram",
+    profileInstagramLabel: "Instagram",
     profilePhotoLabel: "Foto de perfil",
     profilePhotoHint: "Opcional. PNG/JPG hasta 5 MB.",
     profilePhotoRemove: "Eliminar foto",
@@ -868,6 +1203,18 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileCityLabel: "Città",
     profileLanguageLabel: "La tua lingua",
     profileLanguagePlaceholder: "Seleziona una lingua",
+    profileLevelLabel: "Livello di lingua",
+    profileLearningLabel: "Sto imparando",
+    profilePracticeLabel: "Pratico",
+    profileBioLabel: "Su di me",
+    profileBioPlaceholder: "Breve descrizione su di te e i tuoi obiettivi.",
+    profileInterestsLabel: "Interessi",
+    profileInterestsPlaceholder: "Aggiungi interesse",
+    profileInterestsAdd: "Aggiungi",
+    profileInterestsSuggestions: "Popolari",
+    profileSocialLabel: "Social",
+    profileTelegramLabel: "Telegram",
+    profileInstagramLabel: "Instagram",
     profilePhotoLabel: "Foto profilo",
     profilePhotoHint: "Opzionale. PNG/JPG fino a 5 MB.",
     profilePhotoRemove: "Rimuovi foto",
@@ -930,6 +1277,18 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileCityLabel: "Miasto",
     profileLanguageLabel: "Twój język",
     profileLanguagePlaceholder: "Wybierz język",
+    profileLevelLabel: "Poziom języka",
+    profileLearningLabel: "Uczę się",
+    profilePracticeLabel: "Ćwiczę",
+    profileBioLabel: "O mnie",
+    profileBioPlaceholder: "Krótko o sobie i swoich celach.",
+    profileInterestsLabel: "Zainteresowania",
+    profileInterestsPlaceholder: "Dodaj zainteresowanie",
+    profileInterestsAdd: "Dodaj",
+    profileInterestsSuggestions: "Popularne",
+    profileSocialLabel: "Social media",
+    profileTelegramLabel: "Telegram",
+    profileInstagramLabel: "Instagram",
     profilePhotoLabel: "Zdjęcie profilowe",
     profilePhotoHint: "Opcjonalnie. PNG/JPG do 5 MB.",
     profilePhotoRemove: "Usuń zdjęcie",
@@ -4791,6 +5150,14 @@ export default function App() {
   const [profileCountry, setProfileCountry] = useState("");
   const [profileCity, setProfileCity] = useState("");
   const [profileLanguage, setProfileLanguage] = useState<Locale | "">(() => locale);
+  const [profileLevel, setProfileLevel] = useState<LanguageLevel>("");
+  const [profileLearningLanguages, setProfileLearningLanguages] = useState<Locale[]>([]);
+  const [profilePracticeLanguages, setProfilePracticeLanguages] = useState<Locale[]>([]);
+  const [profileBio, setProfileBio] = useState("");
+  const [profileInterests, setProfileInterests] = useState<string[]>([]);
+  const [profileInterestInput, setProfileInterestInput] = useState("");
+  const [profileTelegram, setProfileTelegram] = useState("");
+  const [profileInstagram, setProfileInstagram] = useState("");
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(
@@ -4882,6 +5249,25 @@ export default function App() {
     (languageLabels[profileLanguage] ??
       LANGUAGE_LIST.find((lang) => lang.locale === profileLanguage)?.label ??
       profileLanguage);
+  const profileLearningLabels = profileLearningLanguages
+    .map(
+      (lang) =>
+        languageLabels[lang] ??
+        LANGUAGE_LIST.find((item) => item.locale === lang)?.label ??
+        lang
+    )
+    .join(", ");
+  const profilePracticeLabels = profilePracticeLanguages
+    .map(
+      (lang) =>
+        languageLabels[lang] ??
+        LANGUAGE_LIST.find((item) => item.locale === lang)?.label ??
+        lang
+    )
+    .join(", ");
+  const profileInterestsLabel = profileInterests
+    .map((interest) => resolveInterestLabel(interest, locale))
+    .join(", ");
   const getSupabaseErrorMessage = useCallback((error: unknown) => {
     if (error && typeof error === "object" && "message" in error) {
       const message = (error as { message?: unknown }).message;
@@ -5131,7 +5517,7 @@ export default function App() {
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "full_name,birth_date,gender,country,city,language,avatar_url"
+          "full_name,birth_date,gender,country,city,language,avatar_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram"
         )
         .eq("id", user.id)
         .maybeSingle();
@@ -5158,6 +5544,29 @@ export default function App() {
             ? data.language
             : locale
         );
+        setProfileLevel(
+          data.language_level &&
+            LANGUAGE_LEVELS.includes(data.language_level as (typeof LANGUAGE_LEVELS)[number])
+            ? (data.language_level as LanguageLevel)
+            : ""
+        );
+        const learningLanguages = Array.isArray(data.learning_languages)
+          ? data.learning_languages.filter((lang) => isSupportedLocale(lang))
+          : [];
+        const practiceLanguages = Array.isArray(data.practice_languages)
+          ? data.practice_languages.filter((lang) => isSupportedLocale(lang))
+          : [];
+        setProfileLearningLanguages(learningLanguages as Locale[]);
+        setProfilePracticeLanguages(practiceLanguages as Locale[]);
+        setProfileBio(data.bio ?? "");
+        setProfileInterests(
+          Array.isArray(data.interests)
+            ? data.interests.filter((item) => typeof item === "string" && item.trim())
+            : []
+        );
+        setProfileInterestInput("");
+        setProfileTelegram(data.telegram ?? "");
+        setProfileInstagram(data.instagram ?? "");
         setProfileAvatarUrl(data.avatar_url ?? null);
         setProfilePhotoPreview(data.avatar_url ?? null);
         setProfilePhoto(null);
@@ -5234,6 +5643,82 @@ export default function App() {
 
   function updateProfileLanguage(value: Locale | "") {
     setProfileLanguage(value);
+    resetProfileStatus();
+  }
+
+  function updateProfileLevel(value: LanguageLevel) {
+    setProfileLevel(value);
+    resetProfileStatus();
+  }
+
+  function toggleProfileLearningLanguage(value: Locale) {
+    setProfileLearningLanguages((prev) => {
+      if (prev.includes(value)) {
+        return prev.filter((item) => item !== value);
+      }
+      return [...prev, value];
+    });
+    resetProfileStatus();
+  }
+
+  function toggleProfilePracticeLanguage(value: Locale) {
+    setProfilePracticeLanguages((prev) => {
+      if (prev.includes(value)) {
+        return prev.filter((item) => item !== value);
+      }
+      return [...prev, value];
+    });
+    resetProfileStatus();
+  }
+
+  function updateProfileBio(value: string) {
+    setProfileBio(value);
+    resetProfileStatus();
+  }
+
+  function updateProfileInterestInput(value: string) {
+    setProfileInterestInput(value);
+  }
+
+  function addProfileInterest(raw?: string) {
+    const trimmed = (raw ?? profileInterestInput).trim();
+    if (!trimmed) return;
+    const presetKey = matchInterestPreset(trimmed, locale);
+    const value = presetKey ?? trimmed;
+    setProfileInterests((prev) => (prev.includes(value) ? prev : [...prev, value]));
+    setProfileInterestInput("");
+    resetProfileStatus();
+  }
+
+  function removeProfileInterest(value: string) {
+    setProfileInterests((prev) => prev.filter((item) => item !== value));
+    resetProfileStatus();
+  }
+
+  function handleInterestKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addProfileInterest();
+    }
+  }
+
+  function toggleProfileInterestPreset(value: string) {
+    setProfileInterests((prev) => {
+      if (prev.includes(value)) {
+        return prev.filter((item) => item !== value);
+      }
+      return [...prev, value];
+    });
+    resetProfileStatus();
+  }
+
+  function updateProfileTelegram(value: string) {
+    setProfileTelegram(value);
+    resetProfileStatus();
+  }
+
+  function updateProfileInstagram(value: string) {
+    setProfileInstagram(value);
     resetProfileStatus();
   }
 
@@ -5612,6 +6097,17 @@ export default function App() {
         country: profileCountry.trim() || null,
         city: profileCity.trim() || null,
         language: profileLanguage || null,
+        language_level: profileLevel || null,
+        learning_languages: profileLearningLanguages.length
+          ? profileLearningLanguages
+          : null,
+        practice_languages: profilePracticeLanguages.length
+          ? profilePracticeLanguages
+          : null,
+        bio: profileBio.trim() || null,
+        interests: profileInterests.length ? profileInterests : null,
+        telegram: profileTelegram.trim() || null,
+        instagram: profileInstagram.trim() || null,
         locale,
         updated_at: new Date().toISOString(),
       } as Record<string, unknown>;
@@ -5833,7 +6329,9 @@ export default function App() {
 
                 {userTab === "about" ? (
                   <div className="userAboutCard">
-                    <div className="userBio">{strings.userBioPlaceholder}</div>
+                  <div className="userBio">
+                    {profileBio.trim() ? profileBio : strings.userBioPlaceholder}
+                  </div>
                     <div className="userInfoGrid">
                       <div className="userInfoItem">
                         <span className="userInfoLabel">
@@ -5873,6 +6371,54 @@ export default function App() {
                         </span>
                         <span className="userInfoValue">
                           {profileLanguageLabel || emptyProfileValue}
+                        </span>
+                      </div>
+                      <div className="userInfoItem">
+                        <span className="userInfoLabel">
+                          {strings.profileLevelLabel}
+                        </span>
+                        <span className="userInfoValue">
+                          {profileLevel || emptyProfileValue}
+                        </span>
+                      </div>
+                      <div className="userInfoItem userInfoItem--full">
+                        <span className="userInfoLabel">
+                          {strings.profileLearningLabel}
+                        </span>
+                        <span className="userInfoValue">
+                          {profileLearningLabels || emptyProfileValue}
+                        </span>
+                      </div>
+                      <div className="userInfoItem userInfoItem--full">
+                        <span className="userInfoLabel">
+                          {strings.profilePracticeLabel}
+                        </span>
+                        <span className="userInfoValue">
+                          {profilePracticeLabels || emptyProfileValue}
+                        </span>
+                      </div>
+                      <div className="userInfoItem userInfoItem--full">
+                        <span className="userInfoLabel">
+                          {strings.profileInterestsLabel}
+                        </span>
+                        <span className="userInfoValue">
+                          {profileInterestsLabel || emptyProfileValue}
+                        </span>
+                      </div>
+                      <div className="userInfoItem">
+                        <span className="userInfoLabel">
+                          {strings.profileTelegramLabel}
+                        </span>
+                        <span className="userInfoValue">
+                          {profileTelegram.trim() || emptyProfileValue}
+                        </span>
+                      </div>
+                      <div className="userInfoItem">
+                        <span className="userInfoLabel">
+                          {strings.profileInstagramLabel}
+                        </span>
+                        <span className="userInfoValue">
+                          {profileInstagram.trim() || emptyProfileValue}
                         </span>
                       </div>
                     </div>
@@ -6025,6 +6571,183 @@ export default function App() {
                         );
                       })}
                     </select>
+                  </div>
+                  <div className="field">
+                    <span className="label">{strings.profileLevelLabel}</span>
+                    <div className="levelGrid">
+                      {LANGUAGE_LEVELS.map((level) => (
+                        <button
+                          key={level}
+                          className={`levelButton${
+                            profileLevel === level ? " levelButton--active" : ""
+                          }`}
+                          type="button"
+                          onClick={() => updateProfileLevel(level)}
+                        >
+                          {level}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="field">
+                    <span className="label">{strings.profileLearningLabel}</span>
+                    <div className="tagGrid">
+                      {LANGUAGE_LIST.map((lang) => {
+                        const translatedLabel =
+                          languageLabels[lang.locale] ?? lang.label;
+                        const isActive = profileLearningLanguages.includes(lang.locale);
+                        return (
+                          <button
+                            key={`learn-${lang.locale}`}
+                            className={`tagButton${
+                              isActive ? " tagButton--active" : ""
+                            }`}
+                            type="button"
+                            onClick={() => toggleProfileLearningLanguage(lang.locale)}
+                          >
+                            {translatedLabel}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="field">
+                    <span className="label">{strings.profilePracticeLabel}</span>
+                    <div className="tagGrid">
+                      {LANGUAGE_LIST.map((lang) => {
+                        const translatedLabel =
+                          languageLabels[lang.locale] ?? lang.label;
+                        const isActive = profilePracticeLanguages.includes(lang.locale);
+                        return (
+                          <button
+                            key={`practice-${lang.locale}`}
+                            className={`tagButton${
+                              isActive ? " tagButton--active" : ""
+                            }`}
+                            type="button"
+                            onClick={() => toggleProfilePracticeLanguage(lang.locale)}
+                          >
+                            {translatedLabel}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label className="label" htmlFor="profileBio">
+                      {strings.profileBioLabel}
+                    </label>
+                    <textarea
+                      className="input input--textarea"
+                      id="profileBio"
+                      rows={3}
+                      placeholder={strings.profileBioPlaceholder}
+                      value={profileBio}
+                      onChange={(event) => updateProfileBio(event.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label className="label" htmlFor="profileInterests">
+                      {strings.profileInterestsLabel}
+                    </label>
+                    <div className="interestInputRow">
+                      <input
+                        className="input"
+                        id="profileInterests"
+                        type="text"
+                        placeholder={strings.profileInterestsPlaceholder}
+                        value={profileInterestInput}
+                        onChange={(event) =>
+                          updateProfileInterestInput(event.target.value)
+                        }
+                        onKeyDown={handleInterestKeyDown}
+                      />
+                      <button
+                        className="interestAdd"
+                        type="button"
+                        onClick={() => addProfileInterest()}
+                      >
+                        {strings.profileInterestsAdd}
+                      </button>
+                    </div>
+                    {profileInterests.length ? (
+                      <div className="interestChips">
+                        {profileInterests.map((interest) => (
+                          <span key={interest} className="interestChip">
+                            {resolveInterestLabel(interest, locale)}
+                            <button
+                              className="interestRemove"
+                              type="button"
+                              onClick={() => removeProfileInterest(interest)}
+                              aria-label="Remove"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="interestPresetRow">
+                      <span className="interestPresetLabel">
+                        {strings.profileInterestsSuggestions}
+                      </span>
+                      <div className="tagGrid">
+                        {INTEREST_PRESETS.map((preset) => {
+                          const label =
+                            preset.labels[locale] ?? preset.labels.en;
+                          const isActive = profileInterests.includes(preset.key);
+                          return (
+                            <button
+                              key={preset.key}
+                              className={`tagButton${
+                                isActive ? " tagButton--active" : ""
+                              }`}
+                              type="button"
+                              onClick={() =>
+                                toggleProfileInterestPreset(preset.key)
+                              }
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="field">
+                    <span className="label">{strings.profileSocialLabel}</span>
+                    <div className="formRow">
+                      <div className="field">
+                        <label className="label" htmlFor="profileTelegram">
+                          {strings.profileTelegramLabel}
+                        </label>
+                        <input
+                          className="input"
+                          id="profileTelegram"
+                          type="text"
+                          placeholder="@username"
+                          value={profileTelegram}
+                          onChange={(event) =>
+                            updateProfileTelegram(event.target.value)
+                          }
+                        />
+                      </div>
+                      <div className="field">
+                        <label className="label" htmlFor="profileInstagram">
+                          {strings.profileInstagramLabel}
+                        </label>
+                        <input
+                          className="input"
+                          id="profileInstagram"
+                          type="text"
+                          placeholder="@username"
+                          value={profileInstagram}
+                          onChange={(event) =>
+                            updateProfileInstagram(event.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
                   </div>
                   <div className="field">
                     <label className="label" htmlFor="profilePhoto">
