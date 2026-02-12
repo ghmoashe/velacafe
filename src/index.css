@@ -340,6 +340,124 @@ button:focus-visible {
   cursor: default;
 }
 
+.authBox--register {
+  background: #ffffff;
+  border: 1px solid #dfe6f2;
+  color: #1f1b16;
+  box-shadow: 0 10px 22px rgba(31, 27, 22, 0.12);
+}
+
+.authBox--register .input {
+  background: #ffffff;
+  border-color: #d6d8ea;
+  color: #1f1b16;
+}
+
+.authBox--register .input::placeholder {
+  color: #8c91a8;
+}
+
+.authBox--register .authPrimary {
+  background: #d6d04a;
+  color: #2f2b44;
+  border: none;
+  border-radius: 999px;
+  padding: 16px 18px;
+  font-size: 17px;
+  letter-spacing: 0.2px;
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.22);
+}
+
+.authBox--register .authPrimary:disabled {
+  opacity: 0.72;
+  box-shadow: none;
+}
+
+.authBox--register .authPrimary.cardButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.26);
+}
+
+.authBox--register .authStatus--success {
+  color: #1a7f37;
+  background: rgba(26, 127, 55, 0.08);
+  border-color: rgba(26, 127, 55, 0.2);
+}
+
+.authBox--register .authStatus--error {
+  color: #b42318;
+  background: rgba(180, 35, 24, 0.08);
+  border-color: rgba(180, 35, 24, 0.2);
+}
+
+.authBox--register .authStatus--loading {
+  color: #3550bc;
+  background: rgba(53, 80, 188, 0.08);
+  border-color: rgba(53, 80, 188, 0.2);
+}
+
+.authBox--register .authLink {
+  color: #1a64f1;
+}
+
+.authBox--register .authLink:hover {
+  text-decoration: underline;
+}
+
+.authBox--register .authGmail {
+  background: #ffffff;
+  border-color: #e0e6f0;
+  color: #2f2b44;
+}
+
+.registerLegal {
+  display: grid;
+  gap: 10px;
+  text-align: center;
+  color: #6b5d52;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.registerLegalIcon {
+  width: 28px;
+  height: 28px;
+  margin: 4px auto 0;
+  color: #5b577a;
+}
+
+.registerLegalIcon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.registerLegalText {
+  margin: 0;
+}
+
+.registerLegalLinks {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.registerLegalLink {
+  background: none;
+  border: none;
+  color: #1a64f1;
+  text-decoration: underline;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+
+.registerLegalDot {
+  opacity: 0.7;
+}
+
 .authStatus {
   width: 100%;
   padding: 8px 10px;
@@ -444,6 +562,100 @@ button:focus-visible {
   width: 20px;
   height: 20px;
   display: block;
+}
+
+.profilePage {
+  display: grid;
+  gap: 16px;
+}
+
+.profileHeader {
+  text-align: center;
+}
+
+.profileTitle {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.profileSubtitle {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.profileCard {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid #dfe6f2;
+  background: #fff;
+  width: min(560px, 100%);
+  margin: 0 auto;
+  box-shadow: 0 8px 20px rgba(31, 27, 22, 0.08);
+}
+
+.genderRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.genderOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.genderOption input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.genderOption--active {
+  border-color: rgba(200, 106, 59, 0.6);
+  box-shadow: 0 8px 16px rgba(31, 27, 22, 0.08);
+}
+
+.profileActions {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.profileSave {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #3fb82e;
+  color: #fff;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-weight: 700;
+  min-width: 220px;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.profileSave:hover {
+  transform: translateY(-1px);
+  filter: brightness(0.98);
+  box-shadow: 0 10px 20px rgba(31, 27, 22, 0.08);
+}
+
+.profileSave:disabled {
+  opacity: 0.7;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
 }
 
 .telegramLogin {
@@ -1364,6 +1576,15 @@ button:focus-visible {
     width: 100%;
   }
 
+  .profileCard {
+    width: 100%;
+    padding: 16px;
+  }
+
+  .profileSave {
+    width: 100%;
+  }
+
   .languageGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1438,6 +1659,10 @@ button:focus-visible {
   }
 
   .authPrimary {
+    font-size: 15px;
+  }
+
+  .authBox--register .authPrimary {
     font-size: 15px;
   }
 

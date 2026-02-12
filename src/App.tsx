@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { openKlaroSettings, setupKlaro } from "./klaro";
 import { getSupabaseClient } from "./supabaseClient";
 
@@ -23,6 +23,7 @@ type Route =
   | "login"
   | "register"
   | "forgot"
+  | "profile"
   | "partners"
   | "privacy"
   | "impressum"
@@ -53,7 +54,24 @@ type MessageKey =
   | "privacyButton"
   | "impressumButton"
   | "termsButton"
-  | "partnersTitle";
+  | "partnersTitle"
+  | "profileTitle"
+  | "profileSubtitle"
+  | "profileNameLabel"
+  | "profileBirthLabel"
+  | "profileGenderLabel"
+  | "profileGenderFemale"
+  | "profileGenderMale"
+  | "profileGenderOther"
+  | "profileCountryLabel"
+  | "profileCityLabel"
+  | "profileLanguageLabel"
+  | "profileLanguagePlaceholder"
+  | "profilePhotoLabel"
+  | "profilePhotoHint"
+  | "profileSave"
+  | "profileSuccess"
+  | "profileAuthRequired";
 
 function getRouteFromHash(): Route {
   if (typeof window === "undefined") return "login";
@@ -70,6 +88,7 @@ function getRouteFromHash(): Route {
   if (
     hash === "register" ||
     hash === "forgot" ||
+    hash === "profile" ||
     hash === "partners" ||
     hash === "privacy" ||
     hash === "terms"
@@ -87,7 +106,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     passwordPlaceholder: "Passwort",
     confirmPasswordPlaceholder: "Passwort bestätigen",
     loginButton: "Anmelden",
-    registerButton: "Konto erstellen",
+    registerButton: "Jetzt kostenlos anmelden",
     gmailButton: "Mit Gmail fortfahren",
     resetButton: "Link senden",
     forgotPassword: "Passwort vergessen?",
@@ -106,6 +125,23 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     impressumButton: "Impressum",
     termsButton: "Nutzungsbedingungen",
     partnersTitle: "Unsere Partner",
+    profileTitle: "Profil vervollständigen",
+    profileSubtitle: "Erzählen Sie kurz etwas über sich.",
+    profileNameLabel: "Name",
+    profileBirthLabel: "Geburtsdatum",
+    profileGenderLabel: "Geschlecht",
+    profileGenderFemale: "Weiblich",
+    profileGenderMale: "Männlich",
+    profileGenderOther: "Divers",
+    profileCountryLabel: "Land",
+    profileCityLabel: "Stadt",
+    profileLanguageLabel: "Ihre Sprache",
+    profileLanguagePlaceholder: "Sprache auswählen",
+    profilePhotoLabel: "Profilfoto",
+    profilePhotoHint: "Optional. PNG/JPG bis 5 MB.",
+    profileSave: "Profil speichern",
+    profileSuccess: "Profil gespeichert.",
+    profileAuthRequired: "Bitte anmelden, um das Profil zu speichern.",
   },
   en: {
     brandTag: "Language cafe",
@@ -133,6 +169,23 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     impressumButton: "Imprint",
     termsButton: "Terms of Service",
     partnersTitle: "Our partners",
+    profileTitle: "Complete your profile",
+    profileSubtitle: "Tell us a bit about yourself.",
+    profileNameLabel: "Name",
+    profileBirthLabel: "Date of birth",
+    profileGenderLabel: "Gender",
+    profileGenderFemale: "Female",
+    profileGenderMale: "Male",
+    profileGenderOther: "Other",
+    profileCountryLabel: "Country",
+    profileCityLabel: "City",
+    profileLanguageLabel: "Your language",
+    profileLanguagePlaceholder: "Select a language",
+    profilePhotoLabel: "Profile photo",
+    profilePhotoHint: "Optional. PNG/JPG up to 5 MB.",
+    profileSave: "Save profile",
+    profileSuccess: "Profile saved.",
+    profileAuthRequired: "Please sign in to save your profile.",
   },
   ru: {
     brandTag: "Языковое кафе",
@@ -160,6 +213,23 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     impressumButton: "Выходные данные",
     termsButton: "Условия использования",
     partnersTitle: "Наши партнеры",
+    profileTitle: "Заполните профиль",
+    profileSubtitle: "Расскажите немного о себе.",
+    profileNameLabel: "Имя",
+    profileBirthLabel: "Дата рождения",
+    profileGenderLabel: "Пол",
+    profileGenderFemale: "Женщина",
+    profileGenderMale: "Мужчина",
+    profileGenderOther: "Другое",
+    profileCountryLabel: "Страна",
+    profileCityLabel: "Город",
+    profileLanguageLabel: "Ваш язык",
+    profileLanguagePlaceholder: "Выберите язык",
+    profilePhotoLabel: "Фото профиля",
+    profilePhotoHint: "Необязательно. PNG/JPG до 5 МБ.",
+    profileSave: "Сохранить профиль",
+    profileSuccess: "Профиль сохранен.",
+    profileAuthRequired: "Войдите, чтобы сохранить профиль.",
   },
   uk: {
     brandTag: "Мовне кафе",
@@ -187,6 +257,23 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     impressumButton: "Вихідні дані",
     termsButton: "Умови користування",
     partnersTitle: "Наші партнери",
+    profileTitle: "Заповніть профіль",
+    profileSubtitle: "Розкажіть трохи про себе.",
+    profileNameLabel: "Ім’я",
+    profileBirthLabel: "Дата народження",
+    profileGenderLabel: "Стать",
+    profileGenderFemale: "Жінка",
+    profileGenderMale: "Чоловік",
+    profileGenderOther: "Інше",
+    profileCountryLabel: "Країна",
+    profileCityLabel: "Місто",
+    profileLanguageLabel: "Ваша мова",
+    profileLanguagePlaceholder: "Оберіть мову",
+    profilePhotoLabel: "Фото профілю",
+    profilePhotoHint: "Необов’язково. PNG/JPG до 5 МБ.",
+    profileSave: "Зберегти профіль",
+    profileSuccess: "Профіль збережено.",
+    profileAuthRequired: "Увійдіть, щоб зберегти профіль.",
   },
   fa: {
     brandTag: "کافه زبان",
@@ -214,6 +301,23 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     impressumButton: "اطلاعات حقوقی",
     termsButton: "شرایط استفاده",
     partnersTitle: "شرکای ما",
+    profileTitle: "تکمیل پروفایل",
+    profileSubtitle: "کمی درباره خودتان بگویید.",
+    profileNameLabel: "نام",
+    profileBirthLabel: "تاریخ تولد",
+    profileGenderLabel: "جنسیت",
+    profileGenderFemale: "زن",
+    profileGenderMale: "مرد",
+    profileGenderOther: "سایر",
+    profileCountryLabel: "کشور",
+    profileCityLabel: "شهر",
+    profileLanguageLabel: "زبان شما",
+    profileLanguagePlaceholder: "انتخاب زبان",
+    profilePhotoLabel: "عکس پروفایل",
+    profilePhotoHint: "اختیاری. PNG/JPG تا ۵ مگابایت.",
+    profileSave: "ذخیره پروفایل",
+    profileSuccess: "پروفایل ذخیره شد.",
+    profileAuthRequired: "برای ذخیره پروفایل وارد شوید.",
   },
   ar: {
     brandTag: "مقهى اللغات",
@@ -241,6 +345,23 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     impressumButton: "الإفصاح القانوني",
     termsButton: "شروط الاستخدام",
     partnersTitle: "شركاؤنا",
+    profileTitle: "أكمل ملفك الشخصي",
+    profileSubtitle: "أخبرنا قليلاً عنك.",
+    profileNameLabel: "الاسم",
+    profileBirthLabel: "تاريخ الميلاد",
+    profileGenderLabel: "النوع",
+    profileGenderFemale: "أنثى",
+    profileGenderMale: "ذكر",
+    profileGenderOther: "آخر",
+    profileCountryLabel: "البلد",
+    profileCityLabel: "المدينة",
+    profileLanguageLabel: "لغتك",
+    profileLanguagePlaceholder: "اختر اللغة",
+    profilePhotoLabel: "صورة الملف الشخصي",
+    profilePhotoHint: "اختياري. PNG/JPG حتى 5 ميغابايت.",
+    profileSave: "حفظ الملف الشخصي",
+    profileSuccess: "تم حفظ الملف الشخصي.",
+    profileAuthRequired: "يرجى تسجيل الدخول لحفظ الملف الشخصي.",
   },
   sq: {
     brandTag: "Kafene gjuhe",
@@ -268,6 +389,23 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     impressumButton: "Njoftim ligjor",
     termsButton: "Kushtet e përdorimit",
     partnersTitle: "Partnerët tanë",
+    profileTitle: "Plotëso profilin",
+    profileSubtitle: "Na trego pak për veten.",
+    profileNameLabel: "Emri",
+    profileBirthLabel: "Data e lindjes",
+    profileGenderLabel: "Gjinia",
+    profileGenderFemale: "Femër",
+    profileGenderMale: "Mashkull",
+    profileGenderOther: "Tjetër",
+    profileCountryLabel: "Shteti",
+    profileCityLabel: "Qyteti",
+    profileLanguageLabel: "Gjuha juaj",
+    profileLanguagePlaceholder: "Zgjidh gjuhën",
+    profilePhotoLabel: "Foto profili",
+    profilePhotoHint: "Opsionale. PNG/JPG deri në 5 MB.",
+    profileSave: "Ruaj profilin",
+    profileSuccess: "Profili u ruajt.",
+    profileAuthRequired: "Ju lutemi hyni për të ruajtur profilin.",
   },
   tr: {
     brandTag: "Dil kafe",
@@ -295,6 +433,23 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     impressumButton: "Künye",
     termsButton: "Kullanım şartları",
     partnersTitle: "Ortaklarımız",
+    profileTitle: "Profili tamamlayın",
+    profileSubtitle: "Kendiniz hakkında biraz bilgi verin.",
+    profileNameLabel: "Ad",
+    profileBirthLabel: "Doğum tarihi",
+    profileGenderLabel: "Cinsiyet",
+    profileGenderFemale: "Kadın",
+    profileGenderMale: "Erkek",
+    profileGenderOther: "Diğer",
+    profileCountryLabel: "Ülke",
+    profileCityLabel: "Şehir",
+    profileLanguageLabel: "Diliniz",
+    profileLanguagePlaceholder: "Dil seçin",
+    profilePhotoLabel: "Profil fotoğrafı",
+    profilePhotoHint: "İsteğe bağlı. PNG/JPG 5 MB'a kadar.",
+    profileSave: "Profili kaydet",
+    profileSuccess: "Profil kaydedildi.",
+    profileAuthRequired: "Profili kaydetmek için giriş yapın.",
   },
   fr: {
     brandTag: "Café des langues",
@@ -322,6 +477,23 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     impressumButton: "Mentions légales",
     termsButton: "Conditions d'utilisation",
     partnersTitle: "Nos partenaires",
+    profileTitle: "Complétez votre profil",
+    profileSubtitle: "Parlez-nous un peu de vous.",
+    profileNameLabel: "Nom",
+    profileBirthLabel: "Date de naissance",
+    profileGenderLabel: "Genre",
+    profileGenderFemale: "Femme",
+    profileGenderMale: "Homme",
+    profileGenderOther: "Autre",
+    profileCountryLabel: "Pays",
+    profileCityLabel: "Ville",
+    profileLanguageLabel: "Votre langue",
+    profileLanguagePlaceholder: "Choisir une langue",
+    profilePhotoLabel: "Photo de profil",
+    profilePhotoHint: "Optionnel. PNG/JPG jusqu’à 5 Mo.",
+    profileSave: "Enregistrer le profil",
+    profileSuccess: "Profil enregistré.",
+    profileAuthRequired: "Connectez-vous pour enregistrer le profil.",
   },
   es: {
     brandTag: "Café de idiomas",
@@ -349,6 +521,23 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     impressumButton: "Aviso legal",
     termsButton: "Términos de uso",
     partnersTitle: "Nuestros socios",
+    profileTitle: "Completa tu perfil",
+    profileSubtitle: "Cuéntanos un poco sobre ti.",
+    profileNameLabel: "Nombre",
+    profileBirthLabel: "Fecha de nacimiento",
+    profileGenderLabel: "Género",
+    profileGenderFemale: "Mujer",
+    profileGenderMale: "Hombre",
+    profileGenderOther: "Otro",
+    profileCountryLabel: "País",
+    profileCityLabel: "Ciudad",
+    profileLanguageLabel: "Tu idioma",
+    profileLanguagePlaceholder: "Selecciona un idioma",
+    profilePhotoLabel: "Foto de perfil",
+    profilePhotoHint: "Opcional. PNG/JPG hasta 5 MB.",
+    profileSave: "Guardar perfil",
+    profileSuccess: "Perfil guardado.",
+    profileAuthRequired: "Inicia sesión para guardar el perfil.",
   },
   it: {
     brandTag: "Caffè delle lingue",
@@ -376,6 +565,23 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     impressumButton: "Note legali",
     termsButton: "Termini di utilizzo",
     partnersTitle: "I nostri partner",
+    profileTitle: "Completa il profilo",
+    profileSubtitle: "Raccontaci qualcosa su di te.",
+    profileNameLabel: "Nome",
+    profileBirthLabel: "Data di nascita",
+    profileGenderLabel: "Genere",
+    profileGenderFemale: "Donna",
+    profileGenderMale: "Uomo",
+    profileGenderOther: "Altro",
+    profileCountryLabel: "Paese",
+    profileCityLabel: "Città",
+    profileLanguageLabel: "La tua lingua",
+    profileLanguagePlaceholder: "Seleziona una lingua",
+    profilePhotoLabel: "Foto profilo",
+    profilePhotoHint: "Opzionale. PNG/JPG fino a 5 MB.",
+    profileSave: "Salva profilo",
+    profileSuccess: "Profilo salvato.",
+    profileAuthRequired: "Accedi per salvare il profilo.",
   },
   pl: {
     brandTag: "Kawiarnia językowa",
@@ -403,10 +609,28 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     impressumButton: "Nota prawna",
     termsButton: "Warunki korzystania",
     partnersTitle: "Nasi partnerzy",
+    profileTitle: "Uzupełnij profil",
+    profileSubtitle: "Opowiedz nam krótko o sobie.",
+    profileNameLabel: "Imię",
+    profileBirthLabel: "Data urodzenia",
+    profileGenderLabel: "Płeć",
+    profileGenderFemale: "Kobieta",
+    profileGenderMale: "Mężczyzna",
+    profileGenderOther: "Inna",
+    profileCountryLabel: "Kraj",
+    profileCityLabel: "Miasto",
+    profileLanguageLabel: "Twój język",
+    profileLanguagePlaceholder: "Wybierz język",
+    profilePhotoLabel: "Zdjęcie profilowe",
+    profilePhotoHint: "Opcjonalnie. PNG/JPG do 5 MB.",
+    profileSave: "Zapisz profil",
+    profileSuccess: "Profil zapisany.",
+    profileAuthRequired: "Zaloguj się, aby zapisać profil.",
   },
 };
 
 const FALLBACK_LOCALE: Locale = "en";
+const POST_AUTH_ROUTE_KEY = "vela-post-auth-route";
 
 const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   de: {
@@ -4241,8 +4465,24 @@ export default function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [profileName, setProfileName] = useState("");
+  const [profileBirthDate, setProfileBirthDate] = useState("");
+  const [profileGender, setProfileGender] = useState<
+    "" | "female" | "male" | "other"
+  >("");
+  const [profileCountry, setProfileCountry] = useState("");
+  const [profileCity, setProfileCity] = useState("");
+  const [profileLanguage, setProfileLanguage] = useState<Locale | "">(() => locale);
+  const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(
+    null
+  );
   const klaroAutoOpened = useRef(false);
   const [authState, setAuthState] = useState<{
+    type: "idle" | "loading" | "success" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [profileStatus, setProfileStatus] = useState<{
     type: "idle" | "loading" | "success" | "error";
     message: string;
   }>({ type: "idle", message: "" });
@@ -4255,6 +4495,9 @@ export default function App() {
     IMPRESSUM_CONTENT[locale] ?? IMPRESSUM_CONTENT[FALLBACK_LOCALE];
   const termsContent =
     TERMS_CONTENT[locale] ?? TERMS_CONTENT[FALLBACK_LOCALE];
+  const registerConsentLine =
+    termsContent.sections.find((section) => section.afterList?.length)
+      ?.afterList?.[0] ?? "";
   const legalDir = isRtlLocale(locale) ? "rtl" : "ltr";
   const partnerCount = PARTNER_LOGOS.length;
   const partnerPair =
@@ -4270,6 +4513,9 @@ export default function App() {
       if (next === route) return;
       setRoute(next);
       setAuthState({ type: "idle", message: "" });
+      if (next !== "profile") {
+        setProfileStatus({ type: "idle", message: "" });
+      }
       if (next !== "register") {
         setConfirmPassword("");
       }
@@ -4307,6 +4553,32 @@ export default function App() {
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, [applyRouteChange]);
+
+  useEffect(() => {
+    if (route !== "profile") return;
+    if (!profileLanguage) {
+      setProfileLanguage(locale);
+    }
+  }, [route, locale, profileLanguage]);
+
+  useEffect(() => {
+    if (route !== "profile") return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      if (!data.session?.user) {
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(POST_AUTH_ROUTE_KEY, "profile");
+        }
+        navigate("login");
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [route]);
 
 
   function navigate(next: Route) {
@@ -4349,6 +4621,47 @@ export default function App() {
     }
   }
 
+  function resetProfileStatus() {
+    if (profileStatus.type !== "idle") {
+      setProfileStatus({ type: "idle", message: "" });
+    }
+  }
+
+  function updateProfileName(value: string) {
+    setProfileName(value);
+    resetProfileStatus();
+  }
+
+  function updateProfileBirthDate(value: string) {
+    setProfileBirthDate(value);
+    resetProfileStatus();
+  }
+
+  function updateProfileGender(value: "" | "female" | "male" | "other") {
+    setProfileGender(value);
+    resetProfileStatus();
+  }
+
+  function updateProfileCountry(value: string) {
+    setProfileCountry(value);
+    resetProfileStatus();
+  }
+
+  function updateProfileCity(value: string) {
+    setProfileCity(value);
+    resetProfileStatus();
+  }
+
+  function updateProfileLanguage(value: Locale | "") {
+    setProfileLanguage(value);
+    resetProfileStatus();
+  }
+
+  function updateProfilePhoto(file: File | null) {
+    setProfilePhoto(file);
+    resetProfileStatus();
+  }
+
   function setError(message: string) {
     setAuthState({ type: "error", message });
   }
@@ -4385,11 +4698,19 @@ export default function App() {
       if (!session?.user) return;
       void upsertProfile(session.user);
       setAuthState({ type: "success", message: strings.successLogin });
+      if (typeof window !== "undefined") {
+        const postAuthRoute = window.localStorage.getItem(POST_AUTH_ROUTE_KEY);
+        if (postAuthRoute === "profile") {
+          window.localStorage.removeItem(POST_AUTH_ROUTE_KEY);
+          window.location.hash = "profile";
+          applyRouteChange("profile");
+        }
+      }
     });
     return () => {
       data.subscription.unsubscribe();
     };
-  }, [strings.successLogin, upsertProfile]);
+  }, [applyRouteChange, strings.successLogin, upsertProfile]);
 
   async function handlePrimaryAction() {
     if (authState.type === "loading") return;
@@ -4432,20 +4753,32 @@ export default function App() {
           await upsertProfile(data.user);
         }
         setAuthState({ type: "success", message: strings.successLogin });
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem(POST_AUTH_ROUTE_KEY);
+        }
+        navigate("profile");
         return;
       }
 
       if (route === "register") {
+        const emailRedirectTo =
+          typeof window !== "undefined"
+            ? `${window.location.origin}/#profile`
+            : undefined;
         const { data, error } = await supabase.auth.signUp({
           email: trimmedEmail,
           password: trimmedPassword,
-          options: { data: { locale } },
+          options: { data: { locale }, emailRedirectTo },
         });
         if (error) throw error;
         if (data.user) {
           await upsertProfile(data.user);
         }
         setAuthState({ type: "success", message: strings.successRegister });
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem(POST_AUTH_ROUTE_KEY);
+        }
+        navigate("profile");
         return;
       }
 
@@ -4469,11 +4802,14 @@ export default function App() {
       setError("Supabase is not configured.");
       return;
     }
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(POST_AUTH_ROUTE_KEY, "profile");
+    }
     setAuthState({ type: "loading", message: strings.loadingLabel });
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/#login`,
+        redirectTo: `${window.location.origin}/#profile`,
       },
     });
     if (error) {
@@ -4484,12 +4820,72 @@ export default function App() {
     }
   }
 
+  function handleProfilePhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    updateProfilePhoto(file);
+    if (!file) {
+      setProfilePhotoPreview(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setProfilePhotoPreview(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function handleProfileSave() {
+    if (profileStatus.type === "loading") return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setProfileStatus({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
+    setProfileStatus({ type: "loading", message: strings.loadingLabel });
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const user = data.session?.user;
+      if (!user) {
+        setProfileStatus({
+          type: "error",
+          message: strings.profileAuthRequired,
+        });
+        return;
+      }
+      const payload = {
+        id: user.id,
+        full_name: profileName.trim() || null,
+        birth_date: profileBirthDate || null,
+        gender: profileGender || null,
+        country: profileCountry.trim() || null,
+        city: profileCity.trim() || null,
+        language: profileLanguage || null,
+        avatar_url: profilePhotoPreview || null,
+        locale,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await supabase
+        .from("profiles")
+        .upsert(payload, { onConflict: "id" });
+      if (error) throw error;
+      setProfileStatus({ type: "success", message: strings.profileSuccess });
+    } catch (error) {
+      setProfileStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    }
+  }
+
   const isPartnersRoute = route === "partners";
   const isPrivacyRoute = route === "privacy";
   const isImpressumRoute = route === "impressum";
   const isTermsRoute = route === "terms";
-  const isAuthRoute =
-    !isPartnersRoute && !isPrivacyRoute && !isImpressumRoute && !isTermsRoute;
+  const isProfileRoute = route === "profile";
+  const isAuthRoute = route === "login" || route === "register" || route === "forgot";
   const showPassword = isAuthRoute && route !== "forgot";
   const showConfirm = isAuthRoute && route === "register";
   const primaryLabel =
@@ -4584,9 +4980,208 @@ export default function App() {
                 </button>
                 {renderLegalContent(termsContent.title, termsContent.sections)}
               </div>
+            ) : isProfileRoute ? (
+              <div className="profilePage">
+                <div className="profileHeader">
+                  <div className="profileTitle">{strings.profileTitle}</div>
+                  <div className="profileSubtitle">{strings.profileSubtitle}</div>
+                </div>
+                <div className="profileCard">
+                  <div className="formRow">
+                    <div className="field">
+                      <label className="label" htmlFor="profileName">
+                        {strings.profileNameLabel}
+                      </label>
+                      <input
+                        className="input"
+                        id="profileName"
+                        type="text"
+                        autoComplete="name"
+                        value={profileName}
+                        onChange={(event) => updateProfileName(event.target.value)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label className="label" htmlFor="profileBirth">
+                        {strings.profileBirthLabel}
+                      </label>
+                      <input
+                        className="input"
+                        id="profileBirth"
+                        type="date"
+                        value={profileBirthDate}
+                        onChange={(event) =>
+                          updateProfileBirthDate(event.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="field">
+                    <span className="label">{strings.profileGenderLabel}</span>
+                    <div className="genderRow">
+                      <label
+                        className={`genderOption${
+                          profileGender === "female" ? " genderOption--active" : ""
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="gender"
+                          value="female"
+                          checked={profileGender === "female"}
+                          onChange={() => updateProfileGender("female")}
+                        />
+                        <span>{strings.profileGenderFemale}</span>
+                      </label>
+                      <label
+                        className={`genderOption${
+                          profileGender === "male" ? " genderOption--active" : ""
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="gender"
+                          value="male"
+                          checked={profileGender === "male"}
+                          onChange={() => updateProfileGender("male")}
+                        />
+                        <span>{strings.profileGenderMale}</span>
+                      </label>
+                      <label
+                        className={`genderOption${
+                          profileGender === "other" ? " genderOption--active" : ""
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="gender"
+                          value="other"
+                          checked={profileGender === "other"}
+                          onChange={() => updateProfileGender("other")}
+                        />
+                        <span>{strings.profileGenderOther}</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="formRow">
+                    <div className="field">
+                      <label className="label" htmlFor="profileCountry">
+                        {strings.profileCountryLabel}
+                      </label>
+                      <input
+                        className="input"
+                        id="profileCountry"
+                        type="text"
+                        autoComplete="country-name"
+                        value={profileCountry}
+                        onChange={(event) =>
+                          updateProfileCountry(event.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <label className="label" htmlFor="profileCity">
+                        {strings.profileCityLabel}
+                      </label>
+                      <input
+                        className="input"
+                        id="profileCity"
+                        type="text"
+                        autoComplete="address-level2"
+                        value={profileCity}
+                        onChange={(event) =>
+                          updateProfileCity(event.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label className="label" htmlFor="profileLanguage">
+                      {strings.profileLanguageLabel}
+                    </label>
+                    <select
+                      className="input"
+                      id="profileLanguage"
+                      value={profileLanguage}
+                      onChange={(event) =>
+                        updateProfileLanguage(event.target.value as Locale | "")
+                      }
+                    >
+                      <option value="">
+                        {strings.profileLanguagePlaceholder}
+                      </option>
+                      {LANGUAGE_LIST.map((lang) => {
+                        const translatedLabel =
+                          languageLabels[lang.locale] ?? lang.label;
+                        return (
+                          <option key={lang.locale} value={lang.locale}>
+                            {translatedLabel}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label className="label" htmlFor="profilePhoto">
+                      {strings.profilePhotoLabel}
+                    </label>
+                    <div className="fileRow">
+                      <input
+                        className="fileInput"
+                        id="profilePhoto"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleProfilePhotoChange}
+                      />
+                      <span className="fileName">
+                        {profilePhoto ? profilePhoto.name : strings.profilePhotoHint}
+                      </span>
+                    </div>
+                    {profilePhotoPreview ? (
+                      <img
+                        className="imagePreview"
+                        src={profilePhotoPreview}
+                        alt={strings.profilePhotoLabel}
+                      />
+                    ) : null}
+                  </div>
+                  {profileStatus.type !== "idle" ? (
+                    <div
+                      className={`authStatus authStatus--${profileStatus.type}`}
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {profileStatus.message}
+                    </div>
+                  ) : null}
+                  <div className="profileActions">
+                    <button
+                      className="profileSave"
+                      type="button"
+                      onClick={handleProfileSave}
+                      disabled={profileStatus.type === "loading"}
+                    >
+                      {profileStatus.type === "loading"
+                        ? strings.loadingLabel
+                        : strings.profileSave}
+                    </button>
+                    <button
+                      className="authLink"
+                      type="button"
+                      onClick={() => navigate("login")}
+                    >
+                      {strings.backToLogin}
+                    </button>
+                  </div>
+                </div>
+              </div>
             ) : (
               <>
-                <div className="authBox">
+                <div
+                  className={`authBox${
+                    route === "register" ? " authBox--register" : ""
+                  }`}
+                >
                   <div className="authFields">
                     <div className="field">
                       <input
@@ -4650,6 +5245,67 @@ export default function App() {
                       ? strings.loadingLabel
                       : primaryLabel}
                   </button>
+                  {route === "register" ? (
+                    <div className="registerLegal">
+                      <span
+                        className="registerLegalIcon"
+                        aria-hidden="true"
+                      >
+                        <svg viewBox="0 0 24 24">
+                          <rect
+                            x="5"
+                            y="4"
+                            width="14"
+                            height="16"
+                            rx="2"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                          />
+                          <rect
+                            x="8"
+                            y="2"
+                            width="8"
+                            height="4"
+                            rx="1.5"
+                            fill="currentColor"
+                          />
+                          <path
+                            d="M9 12.2l2 2.1 4.3-4.4"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                      {registerConsentLine ? (
+                        <p className="registerLegalText">
+                          {registerConsentLine}
+                        </p>
+                      ) : null}
+                      <p className="registerLegalText registerLegalLinks">
+                        <button
+                          className="registerLegalLink"
+                          type="button"
+                          onClick={() => navigate("terms")}
+                        >
+                          {strings.termsButton}
+                        </button>
+                        <span className="registerLegalDot" aria-hidden="true">
+                          /
+                        </span>
+                        <button
+                          className="registerLegalLink"
+                          type="button"
+                          onClick={() => navigate("privacy")}
+                        >
+                          {strings.privacyButton}
+                        </button>
+                      </p>
+                    </div>
+                  ) : null}
                   {route === "login" ? (
                     <>
                       <button
