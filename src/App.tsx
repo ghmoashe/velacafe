@@ -73,30 +73,54 @@ type MessageKey =
   | "profileSuccess"
   | "profileAuthRequired";
 
-function getRouteFromHash(): Route {
-  if (typeof window === "undefined") return "login";
-  const hash = window.location.hash.replace("#", "");
-  if (hash === "datenschutz") {
-    return "privacy";
+function resolveRoute(slug: string): Route | null {
+  if (!slug) return null;
+  switch (slug) {
+    case "login":
+      return "login";
+    case "register":
+      return "register";
+    case "forgot":
+      return "forgot";
+    case "profile":
+      return "profile";
+    case "partners":
+      return "partners";
+    case "privacy":
+    case "datenschutz":
+      return "privacy";
+    case "impressum":
+      return "impressum";
+    case "terms":
+    case "nutzungsbedingungen":
+      return "terms";
+    default:
+      return null;
   }
-  if (hash === "impressum") {
-    return "impressum";
-  }
-  if (hash === "nutzungsbedingungen" || hash === "terms") {
-    return "terms";
-  }
-  if (
-    hash === "register" ||
-    hash === "forgot" ||
-    hash === "profile" ||
-    hash === "partners" ||
-    hash === "privacy" ||
-    hash === "terms"
-  ) {
-    return hash;
-  }
-  return "login";
 }
+
+function getRouteFromLocation(): Route {
+  if (typeof window === "undefined") return "login";
+  const path = window.location.pathname.replace(/\/+$/, "");
+  const slug =
+    path === "" || path === "/" ? "login" : path.replace(/^\//, "");
+  const resolved = resolveRoute(slug.toLowerCase());
+  if (resolved) return resolved;
+  const hash = window.location.hash.replace("#", "");
+  const resolvedFromHash = resolveRoute(hash.toLowerCase());
+  return resolvedFromHash ?? "login";
+}
+
+const ROUTE_PATHS: Record<Route, string> = {
+  login: "/login",
+  register: "/register",
+  forgot: "/forgot",
+  profile: "/profile",
+  partners: "/partners",
+  privacy: "/privacy",
+  impressum: "/impressum",
+  terms: "/terms",
+};
 
 const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
   de: {
@@ -4461,7 +4485,7 @@ export default function App() {
   const [locale, setLocale] = useState<Locale>("ru");
   const [partnerOffset, setPartnerOffset] = useState(0);
   const [partnerCycle, setPartnerCycle] = useState(0);
-  const [route, setRoute] = useState<Route>(() => getRouteFromHash());
+  const [route, setRoute] = useState<Route>(() => getRouteFromLocation());
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -4549,9 +4573,18 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    const onHashChange = () => applyRouteChange(getRouteFromHash());
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
+    const params = new URLSearchParams(window.location.search);
+    const postAuthRoute = params.get("postAuth");
+    if (postAuthRoute) {
+      window.localStorage.setItem(POST_AUTH_ROUTE_KEY, postAuthRoute);
+    }
+    const onLocationChange = () => applyRouteChange(getRouteFromLocation());
+    window.addEventListener("popstate", onLocationChange);
+    window.addEventListener("hashchange", onLocationChange);
+    return () => {
+      window.removeEventListener("popstate", onLocationChange);
+      window.removeEventListener("hashchange", onLocationChange);
+    };
   }, [applyRouteChange]);
 
   useEffect(() => {
@@ -4578,21 +4611,21 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [route]);
+  }, [navigate, route]);
 
 
-  function navigate(next: Route) {
-    if (typeof window !== "undefined") {
-      const hash =
-        next === "privacy"
-          ? "datenschutz"
-          : next === "terms"
-            ? "nutzungsbedingungen"
-            : next;
-      window.location.hash = hash;
-    }
-    applyRouteChange(next);
-  }
+  const navigate = useCallback(
+    (next: Route) => {
+      if (typeof window !== "undefined") {
+        const path = ROUTE_PATHS[next] ?? "/";
+        if (window.location.pathname !== path) {
+          window.history.pushState({}, "", path);
+        }
+      }
+      applyRouteChange(next);
+    },
+    [applyRouteChange]
+  );
 
   function handleLocaleSelect(next: Locale) {
     if (next === locale) return;
@@ -4702,15 +4735,14 @@ export default function App() {
         const postAuthRoute = window.localStorage.getItem(POST_AUTH_ROUTE_KEY);
         if (postAuthRoute === "profile") {
           window.localStorage.removeItem(POST_AUTH_ROUTE_KEY);
-          window.location.hash = "profile";
-          applyRouteChange("profile");
+          navigate("profile");
         }
       }
     });
     return () => {
       data.subscription.unsubscribe();
     };
-  }, [applyRouteChange, strings.successLogin, upsertProfile]);
+  }, [navigate, strings.successLogin, upsertProfile]);
 
   async function handlePrimaryAction() {
     if (authState.type === "loading") return;
@@ -4763,7 +4795,7 @@ export default function App() {
       if (route === "register") {
         const emailRedirectTo =
           typeof window !== "undefined"
-            ? `${window.location.origin}/#profile`
+            ? `${window.location.origin}/profile`
             : undefined;
         const { data, error } = await supabase.auth.signUp({
           email: trimmedEmail,
@@ -4783,7 +4815,7 @@ export default function App() {
       }
 
       const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-        redirectTo: `${window.location.origin}/#login`,
+        redirectTo: `${window.location.origin}/login`,
       });
       if (error) throw error;
       setAuthState({ type: "success", message: strings.successReset });
@@ -4809,7 +4841,7 @@ export default function App() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/#profile`,
+        redirectTo: `${window.location.origin}/profile`,
       },
     });
     if (error) {
