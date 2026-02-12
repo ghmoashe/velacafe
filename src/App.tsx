@@ -43,6 +43,16 @@ type SessionUser = {
   user_metadata?: Record<string, unknown>;
 };
 
+type ProfileRecord = {
+  full_name: string | null;
+  birth_date: string | null;
+  gender: string | null;
+  country: string | null;
+  city: string | null;
+  language: string | null;
+  avatar_url: string | null;
+};
+
 type MessageKey =
   | "brandTag"
   | "brandSub"
@@ -97,6 +107,27 @@ type MessageKey =
 
 function isSupportedLocale(value: string): value is Locale {
   return LANGUAGE_LIST.some((lang) => lang.locale === value);
+}
+
+function getFlagEmoji(code: string): string {
+  const normalized = code.trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalized)) return code;
+  const base = 127397;
+  const first = normalized.charCodeAt(0) + base;
+  const second = normalized.charCodeAt(1) + base;
+  return String.fromCodePoint(first, second);
+}
+
+function isProfileComplete(data: ProfileRecord | null): boolean {
+  if (!data) return false;
+  return Boolean(
+    data.full_name &&
+      data.birth_date &&
+      data.gender &&
+      data.country &&
+      data.city &&
+      data.language
+  );
 }
 
 function resolveRoute(slug: string): Route | null {
@@ -4615,6 +4646,7 @@ export default function App() {
   const [partnerCycle, setPartnerCycle] = useState(0);
   const [route, setRoute] = useState<Route>(() => getRouteFromLocation());
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const routeRef = useRef<Route>(route);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -4861,6 +4893,10 @@ export default function App() {
   }, [applyRouteChange]);
 
   useEffect(() => {
+    routeRef.current = route;
+  }, [route]);
+
+  useEffect(() => {
     if (route !== "profile") return;
     if (!profileLanguage) {
       setProfileLanguage(locale);
@@ -5064,6 +5100,52 @@ export default function App() {
     setAuthState({ type: "error", message });
   }
 
+  const handlePostAuthRedirect = useCallback(
+    async (user: SessionUser) => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return;
+      let profileData: ProfileRecord | null = null;
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("full_name,birth_date,gender,country,city,language,avatar_url")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (error) throw error;
+        profileData = data;
+      } catch {
+        navigate("profile");
+        return;
+      }
+
+      const complete = isProfileComplete(profileData);
+      let preferredRoute: Route | null = null;
+      if (typeof window !== "undefined") {
+        const storedRoute = window.localStorage.getItem(POST_AUTH_ROUTE_KEY);
+        if (storedRoute) {
+          window.localStorage.removeItem(POST_AUTH_ROUTE_KEY);
+          const resolved = resolveRoute(storedRoute.toLowerCase());
+          if (
+            resolved &&
+            resolved !== "login" &&
+            resolved !== "register" &&
+            resolved !== "forgot"
+          ) {
+            preferredRoute = resolved;
+          }
+        }
+      }
+
+      if (!complete) {
+        navigate("profile");
+        return;
+      }
+
+      navigate(preferredRoute ?? "me");
+    },
+    [navigate]
+  );
+
   const upsertProfile = useCallback(
     async (user: { id: string; email?: string | null }) => {
       const supabase = getSupabaseClient();
@@ -5093,22 +5175,20 @@ export default function App() {
       if (!session?.user) return;
       void upsertProfile(session.user);
       setAuthState({ type: "success", message: strings.successLogin });
-      if (typeof window !== "undefined") {
-        const postAuthRoute = window.localStorage.getItem(POST_AUTH_ROUTE_KEY);
-        const resolvedPostAuth = postAuthRoute
-          ? resolveRoute(postAuthRoute.toLowerCase())
-          : null;
-        if (resolvedPostAuth) {
-          window.localStorage.removeItem(POST_AUTH_ROUTE_KEY);
-          navigate(resolvedPostAuth);
-        }
+      const currentRoute = routeRef.current;
+      if (
+        currentRoute === "login" ||
+        currentRoute === "register" ||
+        currentRoute === "forgot"
+      ) {
+        void handlePostAuthRedirect(session.user);
       }
     });
     return () => {
       active = false;
       data.subscription.unsubscribe();
     };
-  }, [navigate, strings.successLogin, upsertProfile]);
+  }, [handlePostAuthRedirect, strings.successLogin, upsertProfile]);
 
   async function handlePrimaryAction() {
     if (authState.type === "loading") return;
@@ -5151,17 +5231,13 @@ export default function App() {
           await upsertProfile(data.user);
         }
         setAuthState({ type: "success", message: strings.successLogin });
-        if (typeof window !== "undefined") {
-          window.localStorage.removeItem(POST_AUTH_ROUTE_KEY);
-        }
-        navigate("profile");
         return;
       }
 
       if (route === "register") {
         const emailRedirectTo =
           typeof window !== "undefined"
-            ? `${window.location.origin}/profile`
+            ? `${window.location.origin}/login`
             : undefined;
         const { data, error } = await supabase.auth.signUp({
           email: trimmedEmail,
@@ -5173,10 +5249,6 @@ export default function App() {
           await upsertProfile(data.user);
         }
         setAuthState({ type: "success", message: strings.successRegister });
-        if (typeof window !== "undefined") {
-          window.localStorage.removeItem(POST_AUTH_ROUTE_KEY);
-        }
-        navigate("profile");
         return;
       }
 
@@ -5200,14 +5272,11 @@ export default function App() {
       setError("Supabase is not configured.");
       return;
     }
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(POST_AUTH_ROUTE_KEY, "profile");
-    }
     setAuthState({ type: "loading", message: strings.loadingLabel });
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/profile`,
+        redirectTo: `${window.location.origin}/login`,
       },
     });
     if (error) {
@@ -6105,11 +6174,11 @@ export default function App() {
                   <div className="languagesSubtitle">
                     {strings.languageSubtitle}
                   </div>
-                  {LANGUAGE_LIST.map((lang) => {
-                    const translatedLabel =
-                      languageLabels[lang.locale] ?? lang.label;
-                    const hasTranslation =
-                      languageLabels[lang.locale] !== undefined;
+                      {LANGUAGE_LIST.map((lang) => {
+                        const translatedLabel =
+                          languageLabels[lang.locale] ?? lang.label;
+                        const hasTranslation =
+                          languageLabels[lang.locale] !== undefined;
                     const labelDir = hasTranslation
                       ? isRtlLocale(locale)
                         ? "rtl"
@@ -6118,33 +6187,34 @@ export default function App() {
                         ? lang.dir
                         : "ltr";
 
-                    return (
-                      <button
-                        key={lang.locale}
-                        className="cardButton"
-                        type="button"
-                        onClick={() => handleLocaleSelect(lang.locale)}
-                      >
-                        <div className="cardTitle" dir={labelDir}>
-                          {translatedLabel}
-                        </div>
-                        <div className="cardMeta">
-                          <span className="langPills">
-                            {lang.codes.map((code) => (
-                              <span
-                                key={code}
-                                className="pill langPill"
-                                title={code}
-                              >
-                                <span className="langCode" aria-hidden="true">
-                                  {code}
-                                </span>
+                        return (
+                          <button
+                            key={lang.locale}
+                            className="cardButton"
+                            type="button"
+                            onClick={() => handleLocaleSelect(lang.locale)}
+                          >
+                            <div className="cardTitle" dir={labelDir}>
+                              {translatedLabel}
+                            </div>
+                            <div className="cardMeta">
+                              <span className="langPills">
+                                {lang.codes.map((code) => (
+                                  <span
+                                    key={code}
+                                    className="pill langPill"
+                                    title={code}
+                                  >
+                                    <span className="langFlag" aria-hidden="true">
+                                      {getFlagEmoji(code)}
+                                    </span>
+                                    <span className="langCode">{code}</span>
+                                  </span>
+                                ))}
                               </span>
-                            ))}
-                          </span>
-                        </div>
-                      </button>
-                    );
+                            </div>
+                          </button>
+                        );
                   })}
                 </div>
                 <div className="partnersSection">
