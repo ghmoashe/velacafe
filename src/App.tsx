@@ -237,6 +237,7 @@ type ProfileRecord = {
   interests?: string[] | null;
   telegram?: string | null;
   instagram?: string | null;
+  cover_url?: string | null;
 };
 
 type MessageKey =
@@ -304,6 +305,10 @@ type MessageKey =
   | "profileSocialLabel"
   | "profileTelegramLabel"
   | "profileInstagramLabel"
+  | "profileCoverLabel"
+  | "profileCoverHint"
+  | "profileCoverRemove"
+  | "profileCoverClear"
   | "profilePhotoLabel"
   | "profilePhotoHint"
   | "profilePhotoRemove"
@@ -475,6 +480,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileSocialLabel: "Soziale Netzwerke",
     profileTelegramLabel: "Telegram",
     profileInstagramLabel: "Instagram",
+    profileCoverLabel: "Titelbild",
+    profileCoverHint: "Optional. PNG/JPG bis 5 MB.",
+    profileCoverRemove: "Titelbild entfernen",
+    profileCoverClear: "Auswahl zurücksetzen",
     profilePhotoLabel: "Profilfoto",
     profilePhotoHint: "Optional. PNG/JPG bis 5 MB.",
     profilePhotoRemove: "Foto löschen",
@@ -549,6 +558,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileSocialLabel: "Social links",
     profileTelegramLabel: "Telegram",
     profileInstagramLabel: "Instagram",
+    profileCoverLabel: "Cover photo",
+    profileCoverHint: "Optional. PNG/JPG up to 5 MB.",
+    profileCoverRemove: "Remove cover",
+    profileCoverClear: "Clear selection",
     profilePhotoLabel: "Profile photo",
     profilePhotoHint: "Optional. PNG/JPG up to 5 MB.",
     profilePhotoRemove: "Remove photo",
@@ -623,6 +636,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileSocialLabel: "Соцсети",
     profileTelegramLabel: "Telegram",
     profileInstagramLabel: "Instagram",
+    profileCoverLabel: "Фото обложки",
+    profileCoverHint: "Необязательно. PNG/JPG до 5 МБ.",
+    profileCoverRemove: "Удалить обложку",
+    profileCoverClear: "Сбросить выбор",
     profilePhotoLabel: "Фото профиля",
     profilePhotoHint: "Необязательно. PNG/JPG до 5 МБ.",
     profilePhotoRemove: "Удалить фото",
@@ -697,6 +714,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileSocialLabel: "Соцмережі",
     profileTelegramLabel: "Telegram",
     profileInstagramLabel: "Instagram",
+    profileCoverLabel: "Фото обкладинки",
+    profileCoverHint: "Необов’язково. PNG/JPG до 5 МБ.",
+    profileCoverRemove: "Видалити обкладинку",
+    profileCoverClear: "Скинути вибір",
     profilePhotoLabel: "Фото профілю",
     profilePhotoHint: "Необов’язково. PNG/JPG до 5 МБ.",
     profilePhotoRemove: "Видалити фото",
@@ -771,6 +792,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileSocialLabel: "شبکه‌های اجتماعی",
     profileTelegramLabel: "Telegram",
     profileInstagramLabel: "Instagram",
+    profileCoverLabel: "تصویر کاور",
+    profileCoverHint: "اختیاری. PNG/JPG تا ۵ مگابایت.",
+    profileCoverRemove: "حذف کاور",
+    profileCoverClear: "لغو انتخاب",
     profilePhotoLabel: "عکس پروفایل",
     profilePhotoHint: "اختیاری. PNG/JPG تا ۵ مگابایت.",
     profilePhotoRemove: "حذف عکس",
@@ -845,6 +870,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileSocialLabel: "روابط اجتماعية",
     profileTelegramLabel: "Telegram",
     profileInstagramLabel: "Instagram",
+    profileCoverLabel: "صورة الغلاف",
+    profileCoverHint: "اختياري. PNG/JPG حتى 5 ميغابايت.",
+    profileCoverRemove: "حذف الغلاف",
+    profileCoverClear: "إلغاء الاختيار",
     profilePhotoLabel: "صورة الملف الشخصي",
     profilePhotoHint: "اختياري. PNG/JPG حتى 5 ميغابايت.",
     profilePhotoRemove: "حذف الصورة",
@@ -919,6 +948,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileSocialLabel: "Rrjetet sociale",
     profileTelegramLabel: "Telegram",
     profileInstagramLabel: "Instagram",
+    profileCoverLabel: "Foto kopertine",
+    profileCoverHint: "Opsionale. PNG/JPG deri në 5 MB.",
+    profileCoverRemove: "Hiq kopertinën",
+    profileCoverClear: "Pastro përzgjedhjen",
     profilePhotoLabel: "Foto profili",
     profilePhotoHint: "Opsionale. PNG/JPG deri në 5 MB.",
     profilePhotoRemove: "Hiq foton",
@@ -993,6 +1026,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileSocialLabel: "Sosyal bağlantılar",
     profileTelegramLabel: "Telegram",
     profileInstagramLabel: "Instagram",
+    profileCoverLabel: "Kapak fotoğrafı",
+    profileCoverHint: "İsteğe bağlı. PNG/JPG 5 MB'a kadar.",
+    profileCoverRemove: "Kapak fotoğrafını sil",
+    profileCoverClear: "Seçimi temizle",
     profilePhotoLabel: "Profil fotoğrafı",
     profilePhotoHint: "İsteğe bağlı. PNG/JPG 5 MB'a kadar.",
     profilePhotoRemove: "Fotoğrafı sil",
@@ -1067,6 +1104,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileSocialLabel: "Réseaux sociaux",
     profileTelegramLabel: "Telegram",
     profileInstagramLabel: "Instagram",
+    profileCoverLabel: "Photo de couverture",
+    profileCoverHint: "Optionnel. PNG/JPG jusqu’à 5 Mo.",
+    profileCoverRemove: "Supprimer la couverture",
+    profileCoverClear: "Annuler la sélection",
     profilePhotoLabel: "Photo de profil",
     profilePhotoHint: "Optionnel. PNG/JPG jusqu’à 5 Mo.",
     profilePhotoRemove: "Supprimer la photo",
@@ -1141,6 +1182,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileSocialLabel: "Redes sociales",
     profileTelegramLabel: "Telegram",
     profileInstagramLabel: "Instagram",
+    profileCoverLabel: "Foto de portada",
+    profileCoverHint: "Opcional. PNG/JPG hasta 5 MB.",
+    profileCoverRemove: "Eliminar portada",
+    profileCoverClear: "Quitar selección",
     profilePhotoLabel: "Foto de perfil",
     profilePhotoHint: "Opcional. PNG/JPG hasta 5 MB.",
     profilePhotoRemove: "Eliminar foto",
@@ -1215,6 +1260,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileSocialLabel: "Social",
     profileTelegramLabel: "Telegram",
     profileInstagramLabel: "Instagram",
+    profileCoverLabel: "Foto di copertina",
+    profileCoverHint: "Opzionale. PNG/JPG fino a 5 MB.",
+    profileCoverRemove: "Rimuovi copertina",
+    profileCoverClear: "Annulla selezione",
     profilePhotoLabel: "Foto profilo",
     profilePhotoHint: "Opzionale. PNG/JPG fino a 5 MB.",
     profilePhotoRemove: "Rimuovi foto",
@@ -1289,6 +1338,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     profileSocialLabel: "Social media",
     profileTelegramLabel: "Telegram",
     profileInstagramLabel: "Instagram",
+    profileCoverLabel: "Zdjęcie w tle",
+    profileCoverHint: "Opcjonalnie. PNG/JPG do 5 MB.",
+    profileCoverRemove: "Usuń tło",
+    profileCoverClear: "Wyczyść wybór",
     profilePhotoLabel: "Zdjęcie profilowe",
     profilePhotoHint: "Opcjonalnie. PNG/JPG do 5 MB.",
     profilePhotoRemove: "Usuń zdjęcie",
@@ -5158,6 +5211,11 @@ export default function App() {
   const [profileInterestInput, setProfileInterestInput] = useState("");
   const [profileTelegram, setProfileTelegram] = useState("");
   const [profileInstagram, setProfileInstagram] = useState("");
+  const [profileCoverPhoto, setProfileCoverPhoto] = useState<File | null>(null);
+  const [profileCoverPreview, setProfileCoverPreview] = useState<string | null>(
+    null
+  );
+  const [profileCoverUrl, setProfileCoverUrl] = useState<string | null>(null);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(
@@ -5171,6 +5229,7 @@ export default function App() {
   const [cropMinScale, setCropMinScale] = useState(1);
   const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
   const profileLoaded = useRef(false);
+  const profileCoverInputRef = useRef<HTMLInputElement | null>(null);
   const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
   const cropImageRef = useRef<HTMLImageElement | null>(null);
   const cropDragRef = useRef<{
@@ -5221,6 +5280,12 @@ export default function App() {
   const profileHeaderAvatar = profileAvatarUrl ?? sessionAvatar ?? null;
   const profileHeaderInitial =
     profileHeaderName.trim().charAt(0).toUpperCase() || "?";
+  const profileCoverDisplay = profileCoverUrl ?? null;
+  const profileCoverStyle = profileCoverDisplay
+    ? {
+        backgroundImage: `linear-gradient(135deg, rgba(245, 194, 164, 0.35), rgba(247, 214, 193, 0.3)), url(${profileCoverDisplay})`,
+      }
+    : undefined;
   const showBrandUser = Boolean(sessionUser);
   const emptyProfileValue = "-";
   const followerInitials = ["V", "E", "L", "A"];
@@ -5443,6 +5508,13 @@ export default function App() {
   }, [profilePhotoPreview]);
 
   useEffect(() => {
+    if (!profileCoverPreview?.startsWith("blob:")) return undefined;
+    return () => {
+      URL.revokeObjectURL(profileCoverPreview);
+    };
+  }, [profileCoverPreview]);
+
+  useEffect(() => {
     if (!cropImageUrl) {
       setCropImageSize(null);
       cropImageRef.current = null;
@@ -5517,7 +5589,7 @@ export default function App() {
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "full_name,birth_date,gender,country,city,language,avatar_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram"
+          "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram"
         )
         .eq("id", user.id)
         .maybeSingle();
@@ -5567,6 +5639,12 @@ export default function App() {
         setProfileInterestInput("");
         setProfileTelegram(data.telegram ?? "");
         setProfileInstagram(data.instagram ?? "");
+        setProfileCoverUrl(data.cover_url ?? null);
+        setProfileCoverPreview(data.cover_url ?? null);
+        setProfileCoverPhoto(null);
+        if (profileCoverInputRef.current) {
+          profileCoverInputRef.current.value = "";
+        }
         setProfileAvatarUrl(data.avatar_url ?? null);
         setProfilePhotoPreview(data.avatar_url ?? null);
         setProfilePhoto(null);
@@ -5719,6 +5797,11 @@ export default function App() {
 
   function updateProfileInstagram(value: string) {
     setProfileInstagram(value);
+    resetProfileStatus();
+  }
+
+  function updateProfileCoverPhoto(file: File | null) {
+    setProfileCoverPhoto(file);
     resetProfileStatus();
   }
 
@@ -5918,7 +6001,7 @@ export default function App() {
     }
   }
 
-  function getAvatarPathFromUrl(url: string) {
+  function getStoragePathFromUrl(url: string) {
     const cleanUrl = url.split("?")[0];
     const patterns = [
       `/storage/v1/object/public/${PROFILE_PHOTO_BUCKET}/`,
@@ -5931,6 +6014,20 @@ export default function App() {
       }
     }
     return null;
+  }
+
+  function handleCoverPhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (profileCoverPreview?.startsWith("blob:")) {
+      URL.revokeObjectURL(profileCoverPreview);
+    }
+    updateProfileCoverPhoto(file);
+    if (!file) {
+      setProfileCoverPreview(profileCoverUrl);
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setProfileCoverPreview(previewUrl);
   }
 
   function handleProfilePhotoChange(event: ChangeEvent<HTMLInputElement>) {
@@ -6030,7 +6127,7 @@ export default function App() {
         });
         return;
       }
-      const path = getAvatarPathFromUrl(profileAvatarUrl);
+      const path = getStoragePathFromUrl(profileAvatarUrl);
       if (path) {
         const { error: removeError } = await supabase.storage
           .from(PROFILE_PHOTO_BUCKET)
@@ -6044,6 +6141,65 @@ export default function App() {
       if (error) throw error;
       setProfileAvatarUrl(null);
       setProfilePhotoPreview(null);
+      setProfileStatus({ type: "success", message: strings.profileSuccess });
+      navigate("me");
+    } catch (error) {
+      setProfileStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    }
+  }
+
+  async function handleRemoveCoverPhoto() {
+    if (profileStatus.type === "loading") return;
+    if (profileCoverPhoto) {
+      setProfileCoverPhoto(null);
+      if (profileCoverInputRef.current) {
+        profileCoverInputRef.current.value = "";
+      }
+      if (profileCoverPreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(profileCoverPreview);
+      }
+      setProfileCoverPreview(profileCoverUrl);
+      return;
+    }
+    if (!profileCoverUrl) return;
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(strings.profileCoverRemove);
+      if (!confirmed) return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setProfileStatus({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
+    setProfileStatus({ type: "loading", message: strings.loadingLabel });
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const user = data.session?.user;
+      if (!user) {
+        setProfileStatus({
+          type: "error",
+          message: strings.profileAuthRequired,
+        });
+        return;
+      }
+      const path = getStoragePathFromUrl(profileCoverUrl);
+      if (path) {
+        const { error: removeError } = await supabase.storage
+          .from(PROFILE_PHOTO_BUCKET)
+          .remove([path]);
+        if (removeError) throw removeError;
+      }
+      const { error } = await supabase
+        .from("profiles")
+        .update({ cover_url: null, updated_at: new Date().toISOString() })
+        .eq("id", user.id);
+      if (error) throw error;
+      setProfileCoverUrl(null);
+      setProfileCoverPreview(null);
       setProfileStatus({ type: "success", message: strings.profileSuccess });
       navigate("me");
     } catch (error) {
@@ -6074,6 +6230,7 @@ export default function App() {
         return;
       }
       let avatarUrl: string | null = null;
+      let coverUrl: string | null = null;
       if (profilePhoto) {
         const croppedBlob = await createCroppedAvatarBlob();
         const filePath = `${user.id}/avatar.jpg`;
@@ -6088,6 +6245,20 @@ export default function App() {
           .from(PROFILE_PHOTO_BUCKET)
           .getPublicUrl(filePath);
         avatarUrl = publicData.publicUrl ?? null;
+      }
+      if (profileCoverPhoto) {
+        const filePath = `${user.id}/cover.jpg`;
+        const { error: uploadError } = await supabase.storage
+          .from(PROFILE_PHOTO_BUCKET)
+          .upload(filePath, profileCoverPhoto, {
+            upsert: true,
+            contentType: profileCoverPhoto.type || "image/jpeg",
+          });
+        if (uploadError) throw uploadError;
+        const { data: publicData } = supabase.storage
+          .from(PROFILE_PHOTO_BUCKET)
+          .getPublicUrl(filePath);
+        coverUrl = publicData.publicUrl ?? null;
       }
       const payload = {
         id: user.id,
@@ -6114,6 +6285,9 @@ export default function App() {
       if (avatarUrl) {
         payload.avatar_url = avatarUrl;
       }
+      if (coverUrl) {
+        payload.cover_url = coverUrl;
+      }
       const { error } = await supabase
         .from("profiles")
         .upsert(payload, { onConflict: "id" });
@@ -6125,6 +6299,14 @@ export default function App() {
         setCropImageUrl(null);
         if (profilePhotoInputRef.current) {
           profilePhotoInputRef.current.value = "";
+        }
+      }
+      if (coverUrl) {
+        setProfileCoverUrl(coverUrl);
+        setProfileCoverPreview(coverUrl);
+        setProfileCoverPhoto(null);
+        if (profileCoverInputRef.current) {
+          profileCoverInputRef.current.value = "";
         }
       }
       setProfileStatus({ type: "success", message: strings.profileSuccess });
@@ -6260,7 +6442,12 @@ export default function App() {
             ) : isUserRoute ? (
               <div className="userPage">
                 <div className="userHero">
-                  <div className="userCover" />
+                  <div
+                    className={`userCover${
+                      profileCoverDisplay ? " userCover--image" : ""
+                    }`}
+                    style={profileCoverStyle}
+                  />
                   <div className="userAvatarWrap">
                     {profileHeaderAvatar ? (
                       <img
@@ -6287,22 +6474,19 @@ export default function App() {
                     </div>
                     <span className="avatarMore">+23</span>
                   </div>
+                  <div className="userHeroName">{profileHeaderName}</div>
                 </div>
 
-                <div className="userPrimary">
-                  <div className="userNameLarge">{profileHeaderName}</div>
-                  <div className="userActionsRow">
-                    <button className="userAction userAction--primary" type="button">
-                      {strings.userActionFollow}
-                    </button>
-                    <button
-                      className="userAction userAction--ghost"
-                      type="button"
-                      onClick={() => navigate("profile")}
-                    >
-                      {strings.profileEditButton}
-                    </button>
-                  </div>
+                  <div className="userPrimary">
+                    <div className="userActionsRow">
+                      <button
+                        className="userAction userAction--ghost"
+                        type="button"
+                        onClick={() => navigate("profile")}
+                      >
+                        {strings.profileEditButton}
+                      </button>
+                    </div>
                   <div className="userStatsRow">
                     {userStats.map((stat) => (
                       <div key={stat.label} className="userStat">
@@ -6748,6 +6932,50 @@ export default function App() {
                         />
                       </div>
                     </div>
+                  </div>
+                  <div className="field">
+                    <label className="label" htmlFor="profileCover">
+                      {strings.profileCoverLabel}
+                    </label>
+                    <div className="fileRow">
+                      <input
+                        className="fileInput"
+                        id="profileCover"
+                        type="file"
+                        accept="image/*"
+                        ref={profileCoverInputRef}
+                        onChange={handleCoverPhotoChange}
+                      />
+                      <span className="fileName">
+                        {profileCoverPhoto
+                          ? profileCoverPhoto.name
+                          : strings.profileCoverHint}
+                      </span>
+                      {profileCoverPhoto ? (
+                        <button
+                          className="photoAction"
+                          type="button"
+                          onClick={handleRemoveCoverPhoto}
+                        >
+                          {strings.profileCoverClear}
+                        </button>
+                      ) : profileCoverUrl ? (
+                        <button
+                          className="photoAction photoAction--danger"
+                          type="button"
+                          onClick={handleRemoveCoverPhoto}
+                        >
+                          {strings.profileCoverRemove}
+                        </button>
+                      ) : null}
+                    </div>
+                    {profileCoverPreview ? (
+                      <img
+                        className="coverPreview"
+                        src={profileCoverPreview}
+                        alt={strings.profileCoverLabel}
+                      />
+                    ) : null}
                   </div>
                   <div className="field">
                     <label className="label" htmlFor="profilePhoto">
