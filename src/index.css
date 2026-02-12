@@ -567,7 +567,7 @@ button:focus-visible {
 .userAvatarWrap {
   position: absolute;
   left: 50%;
-  bottom: -24px;
+  bottom: -18px;
   transform: translateX(-50%);
   padding: 0;
   border: none;
@@ -1953,16 +1953,18 @@ button:focus-visible {
   }
 
   .brandRow .brandTextStack {
-    left: 50%;
-    transform: translateX(-50%);
-    max-width: 240px;
-    width: min(260px, 100%);
-    padding-inline: 8px;
+    position: static;
+    left: auto;
+    transform: none;
+    max-width: 100%;
+    width: 100%;
+    padding-inline: 0;
   }
 
   [dir="rtl"] .brandRow .brandTextStack {
-    left: 50%;
-    transform: translateX(-50%);
+    position: static;
+    left: auto;
+    transform: none;
   }
 
   .authBox {

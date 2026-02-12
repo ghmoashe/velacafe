@@ -7228,6 +7228,63 @@ export default function App() {
                   ) : null}
                   {route === "login" ? (
                     <>
+                      <div className="authSocial">
+                        <button
+                          className="authGmail"
+                          type="button"
+                          onClick={handleGmailLogin}
+                          disabled={authState.type === "loading"}
+                        >
+                          <span className="authGmailIcon" aria-hidden="true">
+                            <svg
+                              viewBox="0 0 24 24"
+                              role="img"
+                              aria-hidden="true"
+                              focusable="false"
+                            >
+                              <rect
+                                x="2"
+                                y="4"
+                                width="20"
+                                height="16"
+                                rx="3"
+                                fill="#fff"
+                                stroke="#d7dce5"
+                              />
+                              <path
+                                d="M3.5 7.2L12 12.6L20.5 7.2"
+                                fill="none"
+                                stroke="#EA4335"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <path
+                                d="M3.5 7.2V18.2"
+                                fill="none"
+                                stroke="#4285F4"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                              />
+                              <path
+                                d="M20.5 7.2V18.2"
+                                fill="none"
+                                stroke="#34A853"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                              />
+                              <path
+                                d="M3.5 18.2H20.5"
+                                fill="none"
+                                stroke="#FBBC05"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          </span>
+                          <span>{strings.gmailButton}</span>
+                        </button>
+                      </div>
                       <button
                         className="authLink"
                         type="button"
