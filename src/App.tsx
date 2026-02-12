@@ -6208,7 +6208,6 @@ export default function App() {
                                     <span className="langFlag" aria-hidden="true">
                                       {getFlagEmoji(code)}
                                     </span>
-                                    <span className="langCode">{code}</span>
                                   </span>
                                 ))}
                               </span>
