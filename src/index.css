@@ -808,6 +808,124 @@ button:focus-visible {
   background: linear-gradient(135deg, #f1c2a7, #f5e6db);
 }
 
+.userPosts {
+  display: grid;
+  gap: 16px;
+}
+
+.userPostComposer {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(223, 230, 242, 0.9);
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(31, 27, 22, 0.08);
+}
+
+.userPostInput {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.userPostFooter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.userPostUpload {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px dashed rgba(200, 106, 59, 0.4);
+  background: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+
+.userPostUpload input {
+  display: none;
+}
+
+.userPostUploadText {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.userPostPublish {
+  min-width: 160px;
+}
+
+.userPostPreview {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(234, 222, 211, 0.9);
+  background: rgba(248, 244, 238, 0.8);
+}
+
+.userPostMedia {
+  width: 100%;
+  display: block;
+  border-radius: 16px;
+  object-fit: cover;
+}
+
+.userPostList {
+  display: grid;
+  gap: 12px;
+}
+
+.userPostCard {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(223, 230, 242, 0.9);
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(31, 27, 22, 0.08);
+}
+
+.userPostCaption {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.userPostEmpty {
+  text-align: center;
+  color: var(--muted);
+  padding: 18px 12px;
+  border-radius: 16px;
+  border: 1px dashed rgba(223, 230, 242, 0.9);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.userMediaGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.userMediaItem {
+  aspect-ratio: 1 / 1;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(234, 222, 211, 0.9);
+  background: rgba(248, 244, 238, 0.8);
+  box-shadow: 0 8px 16px rgba(31, 27, 22, 0.08);
+}
+
+.userMediaItem img,
+.userMediaItem video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
 .input--static {
   background: rgba(248, 244, 238, 0.8);
 }
@@ -845,6 +963,19 @@ button:focus-visible {
 
   .userGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .userMediaGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .userPostFooter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .userPostPublish {
+    width: 100%;
   }
 }
 

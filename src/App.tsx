@@ -220,7 +220,17 @@ type SessionUser = {
   user_metadata?: Record<string, unknown>;
 };
 
-type UserTab = "about" | "photos" | "videos" | "tagged";
+type UserTab = "about" | "photos" | "videos" | "posts" | "tagged";
+
+type PostMediaType = "image" | "video" | "text";
+
+type UserPost = {
+  id: string;
+  media_url: string | null;
+  media_type: PostMediaType;
+  caption: string | null;
+  created_at: string;
+};
 
 type ProfileRecord = {
   full_name: string | null;
@@ -279,9 +289,14 @@ type MessageKey =
   | "userTabAbout"
   | "userTabPhotos"
   | "userTabVideos"
+  | "userTabPosts"
   | "userTabTagged"
   | "userBioPlaceholder"
   | "userActionOrganizer"
+  | "userPostCaptionPlaceholder"
+  | "userPostPublish"
+  | "userPostFileHint"
+  | "userPostEmpty"
   | "profileHeaderLabel"
   | "profileHeaderNameFallback"
   | "profileNameLabel"
@@ -456,8 +471,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabAbout: "Über",
     userTabPhotos: "Fotos",
     userTabVideos: "Videos",
+    userTabPosts: "Beiträge",
     userTabTagged: "Markiert",
     userBioPlaceholder: "Erzählen Sie kurz etwas über sich und Ihre Sprachen.",
+    userPostCaptionPlaceholder: "Schreib etwas...",
+    userPostPublish: "Veröffentlichen",
+    userPostFileHint: "Foto oder Video (PNG/JPG/MP4)",
+    userPostEmpty: "Noch keine Beiträge.",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Konto",
     profileNameLabel: "Name",
@@ -535,8 +555,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabAbout: "About",
     userTabPhotos: "Photos",
     userTabVideos: "Videos",
+    userTabPosts: "Posts",
     userTabTagged: "Tagged",
     userBioPlaceholder: "Share a short bio about you and your languages.",
+    userPostCaptionPlaceholder: "Write something...",
+    userPostPublish: "Publish",
+    userPostFileHint: "Photo or video (PNG/JPG/MP4)",
+    userPostEmpty: "No posts yet.",
     profileHeaderLabel: "Profile",
     profileHeaderNameFallback: "Account",
     profileNameLabel: "Name",
@@ -614,8 +639,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabAbout: "Обо мне",
     userTabPhotos: "Фото",
     userTabVideos: "Видео",
+    userTabPosts: "Посты",
     userTabTagged: "Отмечено",
     userBioPlaceholder: "Расскажите о себе и ваших языках.",
+    userPostCaptionPlaceholder: "Напишите что-нибудь...",
+    userPostPublish: "Опубликовать",
+    userPostFileHint: "Фото или видео (PNG/JPG/MP4)",
+    userPostEmpty: "Пока нет постов.",
     profileHeaderLabel: "Профиль",
     profileHeaderNameFallback: "Аккаунт",
     profileNameLabel: "Имя",
@@ -693,8 +723,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabAbout: "Про мене",
     userTabPhotos: "Фото",
     userTabVideos: "Відео",
+    userTabPosts: "Пости",
     userTabTagged: "Позначено",
     userBioPlaceholder: "Розкажіть про себе та ваші мови.",
+    userPostCaptionPlaceholder: "Напишіть щось...",
+    userPostPublish: "Опублікувати",
+    userPostFileHint: "Фото або відео (PNG/JPG/MP4)",
+    userPostEmpty: "Поки що немає постів.",
     profileHeaderLabel: "Профіль",
     profileHeaderNameFallback: "Акаунт",
     profileNameLabel: "Ім’я",
@@ -772,8 +807,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabAbout: "درباره",
     userTabPhotos: "عکس‌ها",
     userTabVideos: "ویدیوها",
+    userTabPosts: "پست‌ها",
     userTabTagged: "برچسب‌شده",
     userBioPlaceholder: "کمی درباره خود و زبان‌هایتان بنویسید.",
+    userPostCaptionPlaceholder: "چیزی بنویسید...",
+    userPostPublish: "انتشار",
+    userPostFileHint: "عکس یا ویدیو (PNG/JPG/MP4)",
+    userPostEmpty: "هنوز پستی نیست.",
     profileHeaderLabel: "پروفایل",
     profileHeaderNameFallback: "حساب",
     profileNameLabel: "نام",
@@ -851,8 +891,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabAbout: "نبذة",
     userTabPhotos: "الصور",
     userTabVideos: "الفيديو",
+    userTabPosts: "المنشورات",
     userTabTagged: "المُشار إليه",
     userBioPlaceholder: "عرّف بنفسك وباللغات التي تتحدثها.",
+    userPostCaptionPlaceholder: "اكتب شيئًا...",
+    userPostPublish: "نشر",
+    userPostFileHint: "صورة أو فيديو (PNG/JPG/MP4)",
+    userPostEmpty: "لا توجد منشورات بعد.",
     profileHeaderLabel: "الملف الشخصي",
     profileHeaderNameFallback: "الحساب",
     profileNameLabel: "الاسم",
@@ -930,8 +975,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabAbout: "Rreth",
     userTabPhotos: "Foto",
     userTabVideos: "Video",
+    userTabPosts: "Postime",
     userTabTagged: "Etiketuar",
     userBioPlaceholder: "Trego pak për veten dhe gjuhët e tua.",
+    userPostCaptionPlaceholder: "Shkruani diçka...",
+    userPostPublish: "Publiko",
+    userPostFileHint: "Foto ose video (PNG/JPG/MP4)",
+    userPostEmpty: "Ende nuk ka postime.",
     profileHeaderLabel: "Profili",
     profileHeaderNameFallback: "Llogaria",
     profileNameLabel: "Emri",
@@ -1009,8 +1059,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabAbout: "Hakkında",
     userTabPhotos: "Fotoğraflar",
     userTabVideos: "Videolar",
+    userTabPosts: "Gönderiler",
     userTabTagged: "Etiketlenen",
     userBioPlaceholder: "Kendiniz ve dilleriniz hakkında kısa bir bilgi yazın.",
+    userPostCaptionPlaceholder: "Bir şeyler yaz...",
+    userPostPublish: "Yayınla",
+    userPostFileHint: "Fotoğraf veya video (PNG/JPG/MP4)",
+    userPostEmpty: "Henüz gönderi yok.",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Hesap",
     profileNameLabel: "Ad",
@@ -1088,8 +1143,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabAbout: "À propos",
     userTabPhotos: "Photos",
     userTabVideos: "Vidéos",
+    userTabPosts: "Publications",
     userTabTagged: "Identifié",
     userBioPlaceholder: "Partagez une courte bio sur vous et vos langues.",
+    userPostCaptionPlaceholder: "Écrivez quelque chose...",
+    userPostPublish: "Publier",
+    userPostFileHint: "Photo ou vidéo (PNG/JPG/MP4)",
+    userPostEmpty: "Aucune publication pour l'instant.",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Compte",
     profileNameLabel: "Nom",
@@ -1167,8 +1227,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabAbout: "Acerca de",
     userTabPhotos: "Fotos",
     userTabVideos: "Videos",
+    userTabPosts: "Publicaciones",
     userTabTagged: "Etiquetado",
     userBioPlaceholder: "Comparte una breve bio sobre ti y tus idiomas.",
+    userPostCaptionPlaceholder: "Escribe algo...",
+    userPostPublish: "Publicar",
+    userPostFileHint: "Foto o video (PNG/JPG/MP4)",
+    userPostEmpty: "Aún no hay publicaciones.",
     profileHeaderLabel: "Perfil",
     profileHeaderNameFallback: "Cuenta",
     profileNameLabel: "Nombre",
@@ -1246,8 +1311,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabAbout: "Info",
     userTabPhotos: "Foto",
     userTabVideos: "Video",
+    userTabPosts: "Post",
     userTabTagged: "Tag",
     userBioPlaceholder: "Condividi una breve bio su di te e le tue lingue.",
+    userPostCaptionPlaceholder: "Scrivi qualcosa...",
+    userPostPublish: "Pubblica",
+    userPostFileHint: "Foto o video (PNG/JPG/MP4)",
+    userPostEmpty: "Ancora nessun post.",
     profileHeaderLabel: "Profilo",
     profileHeaderNameFallback: "Account",
     profileNameLabel: "Nome",
@@ -1325,8 +1395,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabAbout: "O mnie",
     userTabPhotos: "Zdjęcia",
     userTabVideos: "Wideo",
+    userTabPosts: "Posty",
     userTabTagged: "Oznaczone",
     userBioPlaceholder: "Napisz krótko o sobie i swoich językach.",
+    userPostCaptionPlaceholder: "Napisz coś...",
+    userPostPublish: "Opublikuj",
+    userPostFileHint: "Zdjęcie lub wideo (PNG/JPG/MP4)",
+    userPostEmpty: "Brak postów.",
     profileHeaderLabel: "Profil",
     profileHeaderNameFallback: "Konto",
     profileNameLabel: "Imię",
@@ -1369,6 +1444,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
 const FALLBACK_LOCALE: Locale = "en";
 const POST_AUTH_ROUTE_KEY = "vela-post-auth-route";
 const PROFILE_PHOTO_BUCKET = "avatars";
+const POSTS_TABLE = "posts";
+const POST_MEDIA_FOLDER = "posts";
 const AVATAR_CROP_SIZE = 180;
 const AVATAR_OUTPUT_SIZE = 512;
 
@@ -5204,7 +5281,19 @@ export default function App() {
   const [route, setRoute] = useState<Route>(() => getRouteFromLocation());
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const routeRef = useRef<Route>(route);
-  const [userTab, setUserTab] = useState<UserTab>("photos");
+  const [userTab, setUserTab] = useState<UserTab>("posts");
+  const [userPosts, setUserPosts] = useState<UserPost[]>([]);
+  const [postCaption, setPostCaption] = useState("");
+  const [postFile, setPostFile] = useState<File | null>(null);
+  const [postPreviewUrl, setPostPreviewUrl] = useState<string | null>(null);
+  const [postsStatus, setPostsStatus] = useState<{
+    type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [postActionStatus, setPostActionStatus] = useState<{
+    type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -5244,6 +5333,7 @@ export default function App() {
   const profileLoaded = useRef(false);
   const profileCoverInputRef = useRef<HTMLInputElement | null>(null);
   const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const postFileInputRef = useRef<HTMLInputElement | null>(null);
   const cropImageRef = useRef<HTMLImageElement | null>(null);
   const cropDragRef = useRef<{
     active: boolean;
@@ -5302,17 +5392,23 @@ export default function App() {
   const emptyProfileValue = "-";
   const followerInitials = ["V", "E", "L", "A"];
   const userStats = [
-    { label: strings.userStatsPosts, value: "0" },
+    { label: strings.userStatsPosts, value: String(userPosts.length) },
     { label: strings.userStatsFollowers, value: "0" },
     { label: strings.userStatsFollowing, value: "0" },
   ];
   const userTabs = [
     { id: "about" as const, label: strings.userTabAbout },
+    { id: "posts" as const, label: strings.userTabPosts },
     { id: "photos" as const, label: strings.userTabPhotos },
     { id: "videos" as const, label: strings.userTabVideos },
     { id: "tagged" as const, label: strings.userTabTagged },
   ];
-  const userGridItems = Array.from({ length: 9 }, (_, index) => index);
+  const photoPosts = userPosts.filter(
+    (post) => post.media_type === "image" && post.media_url
+  );
+  const videoPosts = userPosts.filter(
+    (post) => post.media_type === "video" && post.media_url
+  );
   const profileGenderLabel =
     profileGender === "female"
       ? strings.profileGenderFemale
@@ -5345,6 +5441,10 @@ export default function App() {
   const profileInterestsLabel = profileInterests
     .map((interest) => resolveInterestLabel(interest, locale))
     .join(", ");
+  const postPreviewIsVideo = Boolean(
+    postFile && postFile.type.startsWith("video/")
+  );
+  const postHasContent = Boolean(postCaption.trim() || postFile);
   const getSupabaseErrorMessage = useCallback((error: unknown) => {
     if (error && typeof error === "object" && "message" in error) {
       const message = (error as { message?: unknown }).message;
@@ -5527,6 +5627,13 @@ export default function App() {
   }, [profileCoverPreview]);
 
   useEffect(() => {
+    if (!postPreviewUrl?.startsWith("blob:")) return undefined;
+    return () => {
+      URL.revokeObjectURL(postPreviewUrl);
+    };
+  }, [postPreviewUrl]);
+
+  useEffect(() => {
     if (!cropImageUrl) {
       setCropImageSize(null);
       cropImageRef.current = null;
@@ -5671,6 +5778,46 @@ export default function App() {
       active = false;
     };
   }, [getSupabaseErrorMessage, locale, route]);
+
+  useEffect(() => {
+    if (route !== "me") {
+      setUserPosts([]);
+      setPostsStatus({ type: "idle", message: "" });
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setPostsStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    if (!sessionUser?.id) return;
+    let active = true;
+    (async () => {
+      setPostsStatus({ type: "loading", message: "" });
+      const { data, error } = await supabase
+        .from(POSTS_TABLE)
+        .select("id, media_url, media_type, caption, created_at")
+        .eq("user_id", sessionUser.id)
+        .order("created_at", { ascending: false });
+      if (!active) return;
+      if (error) {
+        setPostsStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(error),
+        });
+        setUserPosts([]);
+        return;
+      }
+      setUserPosts((data ?? []) as UserPost[]);
+      setPostsStatus({ type: "idle", message: "" });
+    })();
+    return () => {
+      active = false;
+    };
+  }, [getSupabaseErrorMessage, route, sessionUser?.id]);
 
 
   function handleLocaleSelect(next: Locale) {
@@ -5820,6 +5967,32 @@ export default function App() {
   function updateProfilePhoto(file: File | null) {
     setProfilePhoto(file);
     resetProfileStatus();
+  }
+
+  function resetPostActionStatus() {
+    if (postActionStatus.type !== "idle") {
+      setPostActionStatus({ type: "idle", message: "" });
+    }
+  }
+
+  function updatePostCaption(value: string) {
+    setPostCaption(value);
+    resetPostActionStatus();
+  }
+
+  function handlePostFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (postPreviewUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(postPreviewUrl);
+    }
+    setPostFile(file);
+    resetPostActionStatus();
+    if (!file) {
+      setPostPreviewUrl(null);
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setPostPreviewUrl(previewUrl);
   }
 
   function setError(message: string) {
@@ -6007,6 +6180,92 @@ export default function App() {
     });
     if (error) {
       setAuthState({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    }
+  }
+
+  async function handlePostPublish() {
+    if (postActionStatus.type === "loading") return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setPostActionStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    const trimmedCaption = postCaption.trim();
+    if (!trimmedCaption && !postFile) {
+      setPostActionStatus({
+        type: "error",
+        message: strings.errorRequired,
+      });
+      return;
+    }
+    setPostActionStatus({ type: "loading", message: strings.loadingLabel });
+    try {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const user = sessionData.session?.user;
+      if (!user) {
+        setPostActionStatus({
+          type: "error",
+          message: strings.profileAuthRequired,
+        });
+        return;
+      }
+      let mediaUrl: string | null = null;
+      let mediaType: PostMediaType = "text";
+      if (postFile) {
+        mediaType = postFile.type.startsWith("video/") ? "video" : "image";
+        const extension =
+          postFile.name.split(".").pop() ??
+          (mediaType === "video" ? "mp4" : "jpg");
+        const fileName = `${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}.${extension}`;
+        const filePath = `${user.id}/${POST_MEDIA_FOLDER}/${fileName}`;
+        const { error: uploadError } = await supabase.storage
+          .from(PROFILE_PHOTO_BUCKET)
+          .upload(filePath, postFile, {
+            upsert: false,
+            contentType: postFile.type || "application/octet-stream",
+          });
+        if (uploadError) throw uploadError;
+        const { data: publicData } = supabase.storage
+          .from(PROFILE_PHOTO_BUCKET)
+          .getPublicUrl(filePath);
+        mediaUrl = publicData.publicUrl ?? null;
+      }
+      const { data: inserted, error } = await supabase
+        .from(POSTS_TABLE)
+        .insert({
+          user_id: user.id,
+          media_url: mediaUrl,
+          media_type: mediaType,
+          caption: trimmedCaption || null,
+        })
+        .select("id, media_url, media_type, caption, created_at")
+        .single();
+      if (error) throw error;
+      if (inserted) {
+        setUserPosts((prev) => [inserted as UserPost, ...prev]);
+      }
+      setPostCaption("");
+      setPostFile(null);
+      if (postPreviewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(postPreviewUrl);
+      }
+      setPostPreviewUrl(null);
+      if (postFileInputRef.current) {
+        postFileInputRef.current.value = "";
+      }
+      setPostActionStatus({ type: "idle", message: "" });
+    } catch (error) {
+      setPostActionStatus({
         type: "error",
         message: getSupabaseErrorMessage(error),
       });
@@ -6513,9 +6772,11 @@ export default function App() {
 
                 {userTab === "about" ? (
                   <div className="userAboutCard">
-                  <div className="userBio">
-                    {profileBio.trim() ? profileBio : strings.userBioPlaceholder}
-                  </div>
+                    <div className="userBio">
+                      {profileBio.trim()
+                        ? profileBio
+                        : strings.userBioPlaceholder}
+                    </div>
                     <div className="userInfoGrid">
                       <div className="userInfoItem">
                         <span className="userInfoLabel">
@@ -6607,12 +6868,182 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="userGrid">
-                    {userGridItems.map((item) => (
-                      <div key={item} className="userGridItem" />
-                    ))}
+                ) : userTab === "posts" ? (
+                  <div className="userPosts">
+                    <div className="userPostComposer">
+                      <textarea
+                        className="input userPostInput"
+                        placeholder={strings.userPostCaptionPlaceholder}
+                        value={postCaption}
+                        onChange={(event) => updatePostCaption(event.target.value)}
+                      />
+                      <div className="userPostFooter">
+                        <label className="userPostUpload">
+                          <input
+                            ref={postFileInputRef}
+                            type="file"
+                            accept="image/*,video/*"
+                            onChange={handlePostFileChange}
+                          />
+                          <span className="userPostUploadText">
+                            {strings.userPostFileHint}
+                          </span>
+                        </label>
+                        <button
+                          className="userAction userAction--primary userPostPublish"
+                          type="button"
+                          onClick={handlePostPublish}
+                          disabled={
+                            postActionStatus.type === "loading" || !postHasContent
+                          }
+                        >
+                          {postActionStatus.type === "loading"
+                            ? strings.loadingLabel
+                            : strings.userPostPublish}
+                        </button>
+                      </div>
+                      {postPreviewUrl ? (
+                        <div className="userPostPreview">
+                          {postPreviewIsVideo ? (
+                            <video
+                              className="userPostMedia"
+                              src={postPreviewUrl}
+                              controls
+                            />
+                          ) : (
+                            <img
+                              className="userPostMedia"
+                              src={postPreviewUrl}
+                              alt={strings.userTabPhotos}
+                            />
+                          )}
+                        </div>
+                      ) : null}
+                      {postActionStatus.type === "error" ? (
+                        <div
+                          className="authStatus authStatus--error"
+                          role="status"
+                          aria-live="polite"
+                        >
+                          {postActionStatus.message}
+                        </div>
+                      ) : null}
+                    </div>
+                    {postsStatus.type === "loading" ? (
+                      <div
+                        className="authStatus authStatus--loading"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        {strings.loadingLabel}
+                      </div>
+                    ) : postsStatus.type === "error" ? (
+                      <div
+                        className="authStatus authStatus--error"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        {postsStatus.message}
+                      </div>
+                    ) : userPosts.length === 0 ? (
+                      <div className="userPostEmpty">
+                        {strings.userPostEmpty}
+                      </div>
+                    ) : (
+                      <div className="userPostList">
+                        {userPosts.map((post) => (
+                          <div key={post.id} className="userPostCard">
+                            {post.media_type === "image" &&
+                            post.media_url ? (
+                              <img
+                                className="userPostMedia"
+                                src={post.media_url}
+                                alt={post.caption || strings.userTabPhotos}
+                              />
+                            ) : null}
+                            {post.media_type === "video" &&
+                            post.media_url ? (
+                              <video
+                                className="userPostMedia"
+                                src={post.media_url}
+                                controls
+                              />
+                            ) : null}
+                            {post.caption ? (
+                              <div className="userPostCaption">
+                                {post.caption}
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                ) : userTab === "photos" ? (
+                  postsStatus.type === "loading" ? (
+                    <div
+                      className="authStatus authStatus--loading"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {strings.loadingLabel}
+                    </div>
+                  ) : postsStatus.type === "error" ? (
+                    <div
+                      className="authStatus authStatus--error"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {postsStatus.message}
+                    </div>
+                  ) : photoPosts.length === 0 ? (
+                    <div className="userPostEmpty">{strings.userPostEmpty}</div>
+                  ) : (
+                    <div className="userMediaGrid">
+                      {photoPosts.map((post) =>
+                        post.media_url ? (
+                          <div key={post.id} className="userMediaItem">
+                            <img
+                              src={post.media_url}
+                              alt={post.caption || strings.userTabPhotos}
+                            />
+                          </div>
+                        ) : null
+                      )}
+                    </div>
+                  )
+                ) : userTab === "videos" ? (
+                  postsStatus.type === "loading" ? (
+                    <div
+                      className="authStatus authStatus--loading"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {strings.loadingLabel}
+                    </div>
+                  ) : postsStatus.type === "error" ? (
+                    <div
+                      className="authStatus authStatus--error"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {postsStatus.message}
+                    </div>
+                  ) : videoPosts.length === 0 ? (
+                    <div className="userPostEmpty">{strings.userPostEmpty}</div>
+                  ) : (
+                    <div className="userMediaGrid">
+                      {videoPosts.map((post) =>
+                        post.media_url ? (
+                          <div key={post.id} className="userMediaItem">
+                            <video src={post.media_url} controls />
+                          </div>
+                        ) : null
+                      )}
+                    </div>
+                  )
+                ) : (
+                  <div className="userPostEmpty">{strings.userPostEmpty}</div>
                 )}
               </div>
             ) : isProfileRoute ? (
