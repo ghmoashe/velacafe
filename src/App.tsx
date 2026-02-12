@@ -4547,6 +4547,19 @@ export default function App() {
     [route]
   );
 
+  const navigate = useCallback(
+    (next: Route) => {
+      if (typeof window !== "undefined") {
+        const path = ROUTE_PATHS[next] ?? "/";
+        if (window.location.pathname !== path) {
+          window.history.pushState({}, "", path);
+        }
+      }
+      applyRouteChange(next);
+    },
+    [applyRouteChange]
+  );
+
   useEffect(() => {
     if (partnerCount <= 2) return undefined;
     const id = window.setInterval(() => {
@@ -4613,19 +4626,6 @@ export default function App() {
     };
   }, [navigate, route]);
 
-
-  const navigate = useCallback(
-    (next: Route) => {
-      if (typeof window !== "undefined") {
-        const path = ROUTE_PATHS[next] ?? "/";
-        if (window.location.pathname !== path) {
-          window.history.pushState({}, "", path);
-        }
-      }
-      applyRouteChange(next);
-    },
-    [applyRouteChange]
-  );
 
   function handleLocaleSelect(next: Locale) {
     if (next === locale) return;
