@@ -263,6 +263,7 @@ type MessageKey =
   | "forgotPassword"
   | "createAccount"
   | "backToLogin"
+  | "backButton"
   | "loadingLabel"
   | "successLogin"
   | "successRegister"
@@ -446,6 +447,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     forgotPassword: "Passwort vergessen?",
     createAccount: "Neues Konto erstellen",
     backToLogin: "Zurück zum Login",
+    backButton: "Zurück",
     loadingLabel: "Wird geprüft...",
     successLogin: "Erfolgreich angemeldet.",
     successRegister: "Konto erstellt.",
@@ -532,6 +534,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     forgotPassword: "Forgot password?",
     createAccount: "Create new account",
     backToLogin: "Back to sign in",
+    backButton: "Back",
     loadingLabel: "Checking...",
     successLogin: "Signed in successfully.",
     successRegister: "Account created.",
@@ -618,6 +621,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     forgotPassword: "Забыли пароль?",
     createAccount: "Создать новый аккаунт",
     backToLogin: "Вернуться ко входу",
+    backButton: "Назад",
     loadingLabel: "Проверяем...",
     successLogin: "Успешный вход.",
     successRegister: "Аккаунт создан.",
@@ -704,6 +708,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     forgotPassword: "Забули пароль?",
     createAccount: "Створити новий акаунт",
     backToLogin: "Повернутися до входу",
+    backButton: "Назад",
     loadingLabel: "Перевіряємо...",
     successLogin: "Успішний вхід.",
     successRegister: "Акаунт створено.",
@@ -790,6 +795,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     forgotPassword: "رمز عبور را فراموش کردید؟",
     createAccount: "ایجاد حساب جدید",
     backToLogin: "بازگشت به ورود",
+    backButton: "بازگشت",
     loadingLabel: "در حال بررسی...",
     successLogin: "ورود با موفقیت انجام شد.",
     successRegister: "حساب ایجاد شد.",
@@ -876,6 +882,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     forgotPassword: "هل نسيت كلمة المرور؟",
     createAccount: "إنشاء حساب جديد",
     backToLogin: "العودة لتسجيل الدخول",
+    backButton: "رجوع",
     loadingLabel: "جارٍ التحقق...",
     successLogin: "تم تسجيل الدخول بنجاح.",
     successRegister: "تم إنشاء الحساب.",
@@ -962,6 +969,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     forgotPassword: "Keni harruar fjalëkalimin?",
     createAccount: "Krijo llogari të re",
     backToLogin: "Kthehu te hyrja",
+    backButton: "Kthehu",
     loadingLabel: "Duke kontrolluar...",
     successLogin: "Hyrja u krye me sukses.",
     successRegister: "Llogaria u krijua.",
@@ -1048,6 +1056,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     forgotPassword: "Şifrenizi mi unuttunuz?",
     createAccount: "Yeni hesap oluştur",
     backToLogin: "Girişe dön",
+    backButton: "Geri",
     loadingLabel: "Kontrol ediliyor...",
     successLogin: "Başarıyla giriş yapıldı.",
     successRegister: "Hesap oluşturuldu.",
@@ -1134,6 +1143,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     forgotPassword: "Mot de passe oublié ?",
     createAccount: "Créer un nouveau compte",
     backToLogin: "Retour à la connexion",
+    backButton: "Retour",
     loadingLabel: "Vérification...",
     successLogin: "Connexion réussie.",
     successRegister: "Compte créé.",
@@ -1220,6 +1230,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     forgotPassword: "¿Olvidaste tu contraseña?",
     createAccount: "Crear nueva cuenta",
     backToLogin: "Volver al inicio",
+    backButton: "Atrás",
     loadingLabel: "Verificando...",
     successLogin: "Sesión iniciada.",
     successRegister: "Cuenta creada.",
@@ -1306,6 +1317,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     forgotPassword: "Password dimenticata?",
     createAccount: "Crea un nuovo account",
     backToLogin: "Torna al login",
+    backButton: "Indietro",
     loadingLabel: "Verifica in corso...",
     successLogin: "Accesso riuscito.",
     successRegister: "Account creato.",
@@ -1392,6 +1404,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     forgotPassword: "Nie pamiętasz hasła?",
     createAccount: "Utwórz nowe konto",
     backToLogin: "Wróć do logowania",
+    backButton: "Wstecz",
     loadingLabel: "Sprawdzanie...",
     successLogin: "Zalogowano pomyślnie.",
     successRegister: "Konto utworzono.",
@@ -1473,6 +1486,17 @@ const PROFILE_PHOTO_BUCKET = "avatars";
 const POSTS_BUCKET = "posts";
 const POSTS_TABLE = "posts";
 const POST_MEDIA_FOLDER = "posts";
+const LEARN_PRACTICE_EXCLUDED = new Set<Locale>([
+  "ru",
+  "uk",
+  "fa",
+  "ar",
+  "sq",
+  "pl",
+]);
+const LEARN_PRACTICE_LANGS = LANGUAGE_LIST.filter(
+  (lang) => !LEARN_PRACTICE_EXCLUDED.has(lang.locale)
+);
 const AVATAR_CROP_SIZE = 180;
 const AVATAR_OUTPUT_SIZE = 512;
 
@@ -5518,6 +5542,14 @@ export default function App() {
     [applyRouteChange]
   );
 
+  const handleBack = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    navigate("login");
+  }, [navigate]);
+
   const clampCropOffset = useCallback(
     (nextX: number, nextY: number, scale: number) => {
       if (!cropImageSize) {
@@ -5769,10 +5801,18 @@ export default function App() {
             : ""
         );
         const learningLanguages = Array.isArray(data.learning_languages)
-          ? data.learning_languages.filter((lang) => isSupportedLocale(lang))
+          ? data.learning_languages.filter(
+              (lang) =>
+                isSupportedLocale(lang) &&
+                !LEARN_PRACTICE_EXCLUDED.has(lang)
+            )
           : [];
         const practiceLanguages = Array.isArray(data.practice_languages)
-          ? data.practice_languages.filter((lang) => isSupportedLocale(lang))
+          ? data.practice_languages.filter(
+              (lang) =>
+                isSupportedLocale(lang) &&
+                !LEARN_PRACTICE_EXCLUDED.has(lang)
+            )
           : [];
         setProfileLearningLanguages(learningLanguages as Locale[]);
         setProfilePracticeLanguages(practiceLanguages as Locale[]);
@@ -6680,6 +6720,7 @@ export default function App() {
   const isAuthRoute = route === "login" || route === "register" || route === "forgot";
   const showPassword = isAuthRoute && route !== "forgot";
   const showConfirm = isAuthRoute && route === "register";
+  const showBackButton = !isAuthRoute;
   const primaryLabel =
     route === "login"
       ? strings.loginButton
@@ -6717,19 +6758,34 @@ export default function App() {
           <div className="divider" />
           <div className="screen">
             <div className="topbar">
-              <div />
+              <div className="topbarLeft">
+                {showBackButton ? (
+                  <button
+                    className="btn topbarBack"
+                    type="button"
+                    onClick={handleBack}
+                  >
+                    <span className="topbarBackIcon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                        <path
+                          d="M15.5 5.5L9 12l6.5 6.5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                    {strings.backButton}
+                  </button>
+                ) : null}
+              </div>
               <div className="topbarActions">
               </div>
             </div>
             {isPartnersRoute ? (
               <div className="partnersPage">
-                <button
-                  className="partnersBack btn"
-                  type="button"
-                  onClick={() => navigate("login")}
-                >
-                  {strings.backToLogin}
-                </button>
                 <div className="partnersPageTitle">{strings.partnersTitle}</div>
                 <div className="partnersGrid partnersGrid--page">
                   {PARTNER_LOGOS.map((logo) => (
@@ -6741,35 +6797,14 @@ export default function App() {
               </div>
             ) : isPrivacyRoute ? (
               <div className="privacyPage" dir={legalDir}>
-                <button
-                  className="partnersBack btn"
-                  type="button"
-                  onClick={() => navigate("login")}
-                >
-                  {strings.backToLogin}
-                </button>
                 {renderLegalContent(privacyContent.title, privacyContent.sections)}
               </div>
             ) : isImpressumRoute ? (
               <div className="privacyPage" dir={legalDir}>
-                <button
-                  className="partnersBack btn"
-                  type="button"
-                  onClick={() => navigate("login")}
-                >
-                  {strings.backToLogin}
-                </button>
                 {renderLegalContent(impressumContent.title, impressumContent.sections)}
               </div>
             ) : isTermsRoute ? (
               <div className="privacyPage" dir={legalDir}>
-                <button
-                  className="partnersBack btn"
-                  type="button"
-                  onClick={() => navigate("login")}
-                >
-                  {strings.backToLogin}
-                </button>
                 {renderLegalContent(termsContent.title, termsContent.sections)}
               </div>
             ) : isUserRoute ? (
@@ -7282,7 +7317,7 @@ export default function App() {
                   <div className="field">
                     <span className="label">{strings.profileLearningLabel}</span>
                     <div className="tagGrid">
-                      {LANGUAGE_LIST.map((lang) => {
+                      {LEARN_PRACTICE_LANGS.map((lang) => {
                         const translatedLabel =
                           languageLabels[lang.locale] ?? lang.label;
                         const isActive = profileLearningLanguages.includes(lang.locale);
@@ -7304,7 +7339,7 @@ export default function App() {
                   <div className="field">
                     <span className="label">{strings.profilePracticeLabel}</span>
                     <div className="tagGrid">
-                      {LANGUAGE_LIST.map((lang) => {
+                      {LEARN_PRACTICE_LANGS.map((lang) => {
                         const translatedLabel =
                           languageLabels[lang.locale] ?? lang.label;
                         const isActive = profilePracticeLanguages.includes(lang.locale);
