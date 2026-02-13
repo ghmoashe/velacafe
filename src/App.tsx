@@ -6721,6 +6721,7 @@ export default function App() {
   const showPassword = isAuthRoute && route !== "forgot";
   const showConfirm = isAuthRoute && route === "register";
   const showBackButton = !isAuthRoute;
+  const showUserQuickActions = isUserRoute;
   const primaryLabel =
     route === "login"
       ? strings.loginButton
@@ -6782,6 +6783,20 @@ export default function App() {
                 ) : null}
               </div>
               <div className="topbarActions">
+                {showUserQuickActions ? (
+                  <>
+                    <button
+                      className="userAction userAction--ghost"
+                      type="button"
+                      onClick={() => navigate("profile")}
+                    >
+                      {strings.profileEditButton}
+                    </button>
+                    <button className="userAction" type="button">
+                      {strings.userActionOrganizer}
+                    </button>
+                  </>
+                ) : null}
               </div>
             </div>
             {isPartnersRoute ? (
@@ -6851,18 +6866,6 @@ export default function App() {
                 </div>
 
                   <div className="userPrimary">
-                    <div className="userActionsRow">
-                      <button
-                        className="userAction userAction--ghost"
-                        type="button"
-                        onClick={() => navigate("profile")}
-                      >
-                        {strings.profileEditButton}
-                      </button>
-                      <button className="userAction" type="button">
-                        {strings.userActionOrganizer}
-                      </button>
-                    </div>
                   <div className="userStatsRow">
                     {userStats.map((stat) => (
                       <div key={stat.label} className="userStat">
