@@ -10020,8 +10020,9 @@ export default function App() {
                         ) : (
                           <div className="adminPostsGrid">
                             {adminPosts.map((post) => {
-                              const owner =
-                                post.user_id && adminUserMap.get(post.user_id);
+                              const owner = post.user_id
+                                ? adminUserMap.get(post.user_id)
+                                : undefined;
                               const ownerName =
                                 owner?.full_name ??
                                 strings.profileHeaderNameFallback;
