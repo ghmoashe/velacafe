@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -210,8 +211,10 @@ type Route =
   | "search"
   | "events"
   | "event"
+  | "organizer"
   | "profile"
   | "me"
+  | "admin"
   | "partners"
   | "privacy"
   | "impressum"
@@ -223,7 +226,7 @@ type SessionUser = {
   user_metadata?: Record<string, unknown>;
 };
 
-type UserTab = "about" | "photos" | "videos" | "posts" | "tagged";
+type UserTab = "about" | "following" | "photos" | "videos" | "posts" | "tagged";
 
 type PostMediaType = "image" | "video" | "text";
 
@@ -272,6 +275,7 @@ type ProfileRecord = {
   instagram?: string | null;
   cover_url?: string | null;
   is_organizer?: boolean | null;
+  is_admin?: boolean | null;
 };
 
 type SearchProfile = {
@@ -286,6 +290,7 @@ type SearchProfile = {
   practice_languages?: string[] | null;
   bio?: string | null;
   is_organizer?: boolean | null;
+  is_admin?: boolean | null;
 };
 
 type MessageKey =
@@ -330,6 +335,19 @@ type MessageKey =
   | "searchSectionUsers"
   | "searchEmpty"
   | "eventsButton"
+  | "adminButton"
+  | "adminTitle"
+  | "adminSubtitle"
+  | "adminTabUsers"
+  | "adminTabEvents"
+  | "adminTabPosts"
+  | "adminRoleOrganizer"
+  | "adminRoleAdmin"
+  | "adminOrganizerIdLabel"
+  | "adminAccessDenied"
+  | "adminUsersEmpty"
+  | "adminEventsEmpty"
+  | "adminPostsEmpty"
   | "eventsTitle"
   | "eventsSubtitle"
   | "eventCreateTitle"
@@ -377,6 +395,11 @@ type MessageKey =
   | "userTabVideos"
   | "userTabPosts"
   | "userTabTagged"
+  | "userTabFollowing"
+  | "userFollowingEmpty"
+  | "userFollowingSearchPlaceholder"
+  | "organizerPageTitle"
+  | "organizerFollowersEmpty"
   | "userBioPlaceholder"
   | "userActionOrganizer"
   | "userPostCaptionPlaceholder"
@@ -522,10 +545,14 @@ function resolveRoute(slug: string): Route | null {
       return "events";
     case "event":
       return "event";
+    case "organizer":
+      return "organizer";
     case "profile":
       return "profile";
     case "me":
       return "me";
+    case "admin":
+      return "admin";
     case "partners":
       return "partners";
     case "privacy":
@@ -560,6 +587,13 @@ function getEventIdFromLocation(): string | null {
   return id && id.trim() ? id.trim() : null;
 }
 
+function getOrganizerIdFromLocation(): string | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+  return id && id.trim() ? id.trim() : null;
+}
+
 const ROUTE_PATHS: Record<Route, string> = {
   login: "/login",
   register: "/register",
@@ -567,8 +601,10 @@ const ROUTE_PATHS: Record<Route, string> = {
   search: "/search",
   events: "/events",
   event: "/event",
+  organizer: "/organizer",
   profile: "/profile",
   me: "/me",
+  admin: "/admin",
   partners: "/partners",
   privacy: "/privacy",
   impressum: "/impressum",
@@ -618,6 +654,19 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Nutzer",
     searchEmpty: "Keine Ergebnisse gefunden.",
     eventsButton: "Events",
+    adminButton: "Admin",
+    adminTitle: "Admin panel",
+    adminSubtitle: "Manage users, events, and posts.",
+    adminTabUsers: "Users",
+    adminTabEvents: "Events",
+    adminTabPosts: "Posts",
+    adminRoleOrganizer: "Organizer",
+    adminRoleAdmin: "Admin",
+    adminOrganizerIdLabel: "Organizer ID",
+    adminAccessDenied: "Admin access required.",
+    adminUsersEmpty: "No users found.",
+    adminEventsEmpty: "No events found.",
+    adminPostsEmpty: "No posts found.",
     eventsTitle: "Events",
     eventsSubtitle: "Erstelle und verwalte deine Veranstaltungen.",
     eventCreateTitle: "Neues Event",
@@ -666,6 +715,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "Videos",
     userTabPosts: "Beiträge",
     userTabTagged: "Markiert",
+    userTabFollowing: "Abonnements",
+    userFollowingEmpty: "Noch keine Abonnements.",
+    userFollowingSearchPlaceholder: "Abonnements suchen",
+    organizerPageTitle: "Profil des Organisators",
+    organizerFollowersEmpty: "Noch keine Follower.",
     userBioPlaceholder: "Erzählen Sie kurz etwas über sich und Ihre Sprachen.",
     userPostCaptionPlaceholder: "Schreib etwas...",
     userPostPublish: "Veröffentlichen",
@@ -752,6 +806,19 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Users",
     searchEmpty: "No results found.",
     eventsButton: "Events",
+    adminButton: "Admin",
+    adminTitle: "Admin panel",
+    adminSubtitle: "Manage users, events, and posts.",
+    adminTabUsers: "Users",
+    adminTabEvents: "Events",
+    adminTabPosts: "Posts",
+    adminRoleOrganizer: "Organizer",
+    adminRoleAdmin: "Admin",
+    adminOrganizerIdLabel: "Organizer ID",
+    adminAccessDenied: "Admin access required.",
+    adminUsersEmpty: "No users found.",
+    adminEventsEmpty: "No events found.",
+    adminPostsEmpty: "No posts found.",
     eventsTitle: "Events",
     eventsSubtitle: "Create and manage your events.",
     eventCreateTitle: "New event",
@@ -800,6 +867,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "Videos",
     userTabPosts: "Posts",
     userTabTagged: "Tagged",
+    userTabFollowing: "Following",
+    userFollowingEmpty: "No subscriptions yet.",
+    userFollowingSearchPlaceholder: "Search subscriptions",
+    organizerPageTitle: "Organizer profile",
+    organizerFollowersEmpty: "No followers yet.",
     userBioPlaceholder: "Share a short bio about you and your languages.",
     userPostCaptionPlaceholder: "Write something...",
     userPostPublish: "Publish",
@@ -886,6 +958,19 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Пользователи",
     searchEmpty: "Ничего не найдено.",
     eventsButton: "События",
+    adminButton: "?????",
+    adminTitle: "?????? ??????????????",
+    adminSubtitle: "?????????? ??????????????, ????????? ? ???????.",
+    adminTabUsers: "????????????",
+    adminTabEvents: "???????",
+    adminTabPosts: "?????",
+    adminRoleOrganizer: "???????????",
+    adminRoleAdmin: "?????",
+    adminOrganizerIdLabel: "ID ????????????",
+    adminAccessDenied: "?????? ?????? ??? ??????????????.",
+    adminUsersEmpty: "???????????? ?? ???????.",
+    adminEventsEmpty: "??????? ?? ???????.",
+    adminPostsEmpty: "????? ?? ???????.",
     eventsTitle: "События",
     eventsSubtitle: "Создавайте и управляйте своими событиями.",
     eventCreateTitle: "Новое событие",
@@ -934,6 +1019,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "Видео",
     userTabPosts: "Посты",
     userTabTagged: "Отмечено",
+    userTabFollowing: "????????",
+    userFollowingEmpty: "??? ????????.",
+    userFollowingSearchPlaceholder: "????? ?? ?????????",
+    organizerPageTitle: "??????? ????????????",
+    organizerFollowersEmpty: "???? ??? ???????????.",
     userBioPlaceholder: "Расскажите о себе и ваших языках.",
     userPostCaptionPlaceholder: "Напишите что-нибудь...",
     userPostPublish: "Опубликовать",
@@ -1020,6 +1110,19 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Користувачі",
     searchEmpty: "Нічого не знайдено.",
     eventsButton: "Події",
+    adminButton: "Admin",
+    adminTitle: "Admin panel",
+    adminSubtitle: "Manage users, events, and posts.",
+    adminTabUsers: "Users",
+    adminTabEvents: "Events",
+    adminTabPosts: "Posts",
+    adminRoleOrganizer: "Organizer",
+    adminRoleAdmin: "Admin",
+    adminOrganizerIdLabel: "Organizer ID",
+    adminAccessDenied: "Admin access required.",
+    adminUsersEmpty: "No users found.",
+    adminEventsEmpty: "No events found.",
+    adminPostsEmpty: "No posts found.",
     eventsTitle: "Події",
     eventsSubtitle: "Створюйте та керуйте своїми подіями.",
     eventCreateTitle: "Нова подія",
@@ -1068,6 +1171,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "Відео",
     userTabPosts: "Пости",
     userTabTagged: "Позначено",
+    userTabFollowing: "????????",
+    userFollowingEmpty: "????? ????????.",
+    userFollowingSearchPlaceholder: "????? ????????",
+    organizerPageTitle: "??????? ????????????",
+    organizerFollowersEmpty: "???? ????? ???????????.",
     userBioPlaceholder: "Розкажіть про себе та ваші мови.",
     userPostCaptionPlaceholder: "Напишіть щось...",
     userPostPublish: "Опублікувати",
@@ -1154,6 +1262,19 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "کاربران",
     searchEmpty: "نتیجه‌ای یافت نشد.",
     eventsButton: "رویدادها",
+    adminButton: "Admin",
+    adminTitle: "Admin panel",
+    adminSubtitle: "Manage users, events, and posts.",
+    adminTabUsers: "Users",
+    adminTabEvents: "Events",
+    adminTabPosts: "Posts",
+    adminRoleOrganizer: "Organizer",
+    adminRoleAdmin: "Admin",
+    adminOrganizerIdLabel: "Organizer ID",
+    adminAccessDenied: "Admin access required.",
+    adminUsersEmpty: "No users found.",
+    adminEventsEmpty: "No events found.",
+    adminPostsEmpty: "No posts found.",
     eventsTitle: "رویدادها",
     eventsSubtitle: "رویدادهای خود را بسازید و مدیریت کنید.",
     eventCreateTitle: "رویداد جدید",
@@ -1202,6 +1323,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "ویدیوها",
     userTabPosts: "پست‌ها",
     userTabTagged: "برچسب‌شده",
+    userTabFollowing: "????? ??????",
+    userFollowingEmpty: "??????? ???? ?????.",
+    userFollowingSearchPlaceholder: "?????? ????????????",
+    organizerPageTitle: "??????? ???????????",
+    organizerFollowersEmpty: "???? ?????????????? ????.",
     userBioPlaceholder: "کمی درباره خود و زبان‌هایتان بنویسید.",
     userPostCaptionPlaceholder: "چیزی بنویسید...",
     userPostPublish: "انتشار",
@@ -1288,6 +1414,19 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "المستخدمون",
     searchEmpty: "لا توجد نتائج.",
     eventsButton: "الفعاليات",
+    adminButton: "Admin",
+    adminTitle: "Admin panel",
+    adminSubtitle: "Manage users, events, and posts.",
+    adminTabUsers: "Users",
+    adminTabEvents: "Events",
+    adminTabPosts: "Posts",
+    adminRoleOrganizer: "Organizer",
+    adminRoleAdmin: "Admin",
+    adminOrganizerIdLabel: "Organizer ID",
+    adminAccessDenied: "Admin access required.",
+    adminUsersEmpty: "No users found.",
+    adminEventsEmpty: "No events found.",
+    adminPostsEmpty: "No posts found.",
     eventsTitle: "الفعاليات",
     eventsSubtitle: "أنشئ فعالياتك وأدرها.",
     eventCreateTitle: "فعالية جديدة",
@@ -1336,6 +1475,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "الفيديو",
     userTabPosts: "المنشورات",
     userTabTagged: "المُشار إليه",
+    userTabFollowing: "??????????",
+    userFollowingEmpty: "?? ???? ????????.",
+    userFollowingSearchPlaceholder: "????? ?? ??????????",
+    organizerPageTitle: "??? ???????",
+    organizerFollowersEmpty: "?? ???? ??????? ???.",
     userBioPlaceholder: "عرّف بنفسك وباللغات التي تتحدثها.",
     userPostCaptionPlaceholder: "اكتب شيئًا...",
     userPostPublish: "نشر",
@@ -1422,6 +1566,19 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Përdorues",
     searchEmpty: "Nuk u gjetën rezultate.",
     eventsButton: "Evente",
+    adminButton: "Admin",
+    adminTitle: "Admin panel",
+    adminSubtitle: "Manage users, events, and posts.",
+    adminTabUsers: "Users",
+    adminTabEvents: "Events",
+    adminTabPosts: "Posts",
+    adminRoleOrganizer: "Organizer",
+    adminRoleAdmin: "Admin",
+    adminOrganizerIdLabel: "Organizer ID",
+    adminAccessDenied: "Admin access required.",
+    adminUsersEmpty: "No users found.",
+    adminEventsEmpty: "No events found.",
+    adminPostsEmpty: "No posts found.",
     eventsTitle: "Evente",
     eventsSubtitle: "Krijoni dhe menaxhoni eventet tuaja.",
     eventCreateTitle: "Event i ri",
@@ -1470,6 +1627,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "Video",
     userTabPosts: "Postime",
     userTabTagged: "Etiketuar",
+    userTabFollowing: "Ndjekje",
+    userFollowingEmpty: "Nuk ka ndjekje.",
+    userFollowingSearchPlaceholder: "K?rko ndjekjet",
+    organizerPageTitle: "Profili i organizatorit",
+    organizerFollowersEmpty: "Ende pa ndjek?s.",
     userBioPlaceholder: "Trego pak për veten dhe gjuhët e tua.",
     userPostCaptionPlaceholder: "Shkruani diçka...",
     userPostPublish: "Publiko",
@@ -1556,6 +1718,19 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Kullanıcılar",
     searchEmpty: "Sonuç bulunamadı.",
     eventsButton: "Etkinlikler",
+    adminButton: "Admin",
+    adminTitle: "Admin panel",
+    adminSubtitle: "Manage users, events, and posts.",
+    adminTabUsers: "Users",
+    adminTabEvents: "Events",
+    adminTabPosts: "Posts",
+    adminRoleOrganizer: "Organizer",
+    adminRoleAdmin: "Admin",
+    adminOrganizerIdLabel: "Organizer ID",
+    adminAccessDenied: "Admin access required.",
+    adminUsersEmpty: "No users found.",
+    adminEventsEmpty: "No events found.",
+    adminPostsEmpty: "No posts found.",
     eventsTitle: "Etkinlikler",
     eventsSubtitle: "Etkinliklerinizi oluşturun ve yönetin.",
     eventCreateTitle: "Yeni etkinlik",
@@ -1604,6 +1779,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "Videolar",
     userTabPosts: "Gönderiler",
     userTabTagged: "Etiketlenen",
+    userTabFollowing: "Takip",
+    userFollowingEmpty: "Hen?z takip yok.",
+    userFollowingSearchPlaceholder: "Takip edilenleri ara",
+    organizerPageTitle: "Organizat?r profili",
+    organizerFollowersEmpty: "Hen?z takip?i yok.",
     userBioPlaceholder: "Kendiniz ve dilleriniz hakkında kısa bir bilgi yazın.",
     userPostCaptionPlaceholder: "Bir şeyler yaz...",
     userPostPublish: "Yayınla",
@@ -1690,6 +1870,19 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Utilisateurs",
     searchEmpty: "Aucun résultat.",
     eventsButton: "Événements",
+    adminButton: "Admin",
+    adminTitle: "Admin panel",
+    adminSubtitle: "Manage users, events, and posts.",
+    adminTabUsers: "Users",
+    adminTabEvents: "Events",
+    adminTabPosts: "Posts",
+    adminRoleOrganizer: "Organizer",
+    adminRoleAdmin: "Admin",
+    adminOrganizerIdLabel: "Organizer ID",
+    adminAccessDenied: "Admin access required.",
+    adminUsersEmpty: "No users found.",
+    adminEventsEmpty: "No events found.",
+    adminPostsEmpty: "No posts found.",
     eventsTitle: "Événements",
     eventsSubtitle: "Créez et gérez vos événements.",
     eventCreateTitle: "Nouvel événement",
@@ -1738,6 +1931,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "Vidéos",
     userTabPosts: "Publications",
     userTabTagged: "Identifié",
+    userTabFollowing: "Abonnements",
+    userFollowingEmpty: "Aucun abonnement.",
+    userFollowingSearchPlaceholder: "Rechercher des abonnements",
+    organizerPageTitle: "Profil de l'organisateur",
+    organizerFollowersEmpty: "Pas encore d'abonn?s.",
     userBioPlaceholder: "Partagez une courte bio sur vous et vos langues.",
     userPostCaptionPlaceholder: "Écrivez quelque chose...",
     userPostPublish: "Publier",
@@ -1824,6 +2022,19 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Usuarios",
     searchEmpty: "No se encontraron resultados.",
     eventsButton: "Eventos",
+    adminButton: "Admin",
+    adminTitle: "Admin panel",
+    adminSubtitle: "Manage users, events, and posts.",
+    adminTabUsers: "Users",
+    adminTabEvents: "Events",
+    adminTabPosts: "Posts",
+    adminRoleOrganizer: "Organizer",
+    adminRoleAdmin: "Admin",
+    adminOrganizerIdLabel: "Organizer ID",
+    adminAccessDenied: "Admin access required.",
+    adminUsersEmpty: "No users found.",
+    adminEventsEmpty: "No events found.",
+    adminPostsEmpty: "No posts found.",
     eventsTitle: "Eventos",
     eventsSubtitle: "Crea y gestiona tus eventos.",
     eventCreateTitle: "Nuevo evento",
@@ -1872,6 +2083,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "Videos",
     userTabPosts: "Publicaciones",
     userTabTagged: "Etiquetado",
+    userTabFollowing: "Siguiendo",
+    userFollowingEmpty: "Sin suscripciones.",
+    userFollowingSearchPlaceholder: "Buscar suscripciones",
+    organizerPageTitle: "Perfil del organizador",
+    organizerFollowersEmpty: "A?n no hay seguidores.",
     userBioPlaceholder: "Comparte una breve bio sobre ti y tus idiomas.",
     userPostCaptionPlaceholder: "Escribe algo...",
     userPostPublish: "Publicar",
@@ -1958,6 +2174,19 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Utenti",
     searchEmpty: "Nessun risultato.",
     eventsButton: "Eventi",
+    adminButton: "Admin",
+    adminTitle: "Admin panel",
+    adminSubtitle: "Manage users, events, and posts.",
+    adminTabUsers: "Users",
+    adminTabEvents: "Events",
+    adminTabPosts: "Posts",
+    adminRoleOrganizer: "Organizer",
+    adminRoleAdmin: "Admin",
+    adminOrganizerIdLabel: "Organizer ID",
+    adminAccessDenied: "Admin access required.",
+    adminUsersEmpty: "No users found.",
+    adminEventsEmpty: "No events found.",
+    adminPostsEmpty: "No posts found.",
     eventsTitle: "Eventi",
     eventsSubtitle: "Crea e gestisci i tuoi eventi.",
     eventCreateTitle: "Nuovo evento",
@@ -2006,6 +2235,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "Video",
     userTabPosts: "Post",
     userTabTagged: "Tag",
+    userTabFollowing: "Seguiti",
+    userFollowingEmpty: "Nessun seguito.",
+    userFollowingSearchPlaceholder: "Cerca seguiti",
+    organizerPageTitle: "Profilo organizzatore",
+    organizerFollowersEmpty: "Nessun follower per ora.",
     userBioPlaceholder: "Condividi una breve bio su di te e le tue lingue.",
     userPostCaptionPlaceholder: "Scrivi qualcosa...",
     userPostPublish: "Pubblica",
@@ -2092,6 +2326,19 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Użytkownicy",
     searchEmpty: "Brak wyników.",
     eventsButton: "Wydarzenia",
+    adminButton: "Admin",
+    adminTitle: "Admin panel",
+    adminSubtitle: "Manage users, events, and posts.",
+    adminTabUsers: "Users",
+    adminTabEvents: "Events",
+    adminTabPosts: "Posts",
+    adminRoleOrganizer: "Organizer",
+    adminRoleAdmin: "Admin",
+    adminOrganizerIdLabel: "Organizer ID",
+    adminAccessDenied: "Admin access required.",
+    adminUsersEmpty: "No users found.",
+    adminEventsEmpty: "No events found.",
+    adminPostsEmpty: "No posts found.",
     eventsTitle: "Wydarzenia",
     eventsSubtitle: "Twórz i zarządzaj swoimi wydarzeniami.",
     eventCreateTitle: "Nowe wydarzenie",
@@ -2140,6 +2387,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "Wideo",
     userTabPosts: "Posty",
     userTabTagged: "Oznaczone",
+    userTabFollowing: "Obserwowani",
+    userFollowingEmpty: "Brak obserwowanych.",
+    userFollowingSearchPlaceholder: "Szukaj obserwowanych",
+    organizerPageTitle: "Profil organizatora",
+    organizerFollowersEmpty: "Brak obserwuj?cych.",
     userBioPlaceholder: "Napisz krótko o sobie i swoich językach.",
     userPostCaptionPlaceholder: "Napisz coś...",
     userPostPublish: "Opublikuj",
@@ -2189,6 +2441,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
 const FALLBACK_LOCALE: Locale = "en";
 const POST_AUTH_ROUTE_KEY = "vela-post-auth-route";
 const POST_AUTH_EVENT_KEY = "vela-post-auth-event";
+const POST_AUTH_ORGANIZER_KEY = "vela-post-auth-organizer";
 const GUEST_MODE_KEY = "vela-guest-mode";
 const PROFILE_PHOTO_BUCKET = "avatars";
 const POSTS_BUCKET = "posts";
@@ -6076,6 +6329,26 @@ export default function App() {
     type: "idle" | "loading" | "error";
     message: string;
   }>({ type: "idle", message: "" });
+  const [adminTab, setAdminTab] = useState<"users" | "events" | "posts">(
+    "users"
+  );
+  const [adminUsers, setAdminUsers] = useState<SearchProfile[]>([]);
+  const [adminUsersStatus, setAdminUsersStatus] = useState<{
+    type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [adminPosts, setAdminPosts] = useState<UserPost[]>([]);
+  const [adminPostsStatus, setAdminPostsStatus] = useState<{
+    type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [adminEventsStatus, setAdminEventsStatus] = useState<{
+    type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [adminPostEditId, setAdminPostEditId] = useState<string | null>(null);
+  const [adminPostCaption, setAdminPostCaption] = useState("");
+  const [adminEventOrganizerId, setAdminEventOrganizerId] = useState("");
   const [searchTouched, setSearchTouched] = useState(false);
   const [searchFormat, setSearchFormat] = useState<"" | EventFormat>("");
   const [organizerFollowMap, setOrganizerFollowMap] = useState<
@@ -6087,10 +6360,33 @@ export default function App() {
   const [organizerFollowerCounts, setOrganizerFollowerCounts] = useState<
     Record<string, number>
   >({});
+  const [followingOrganizers, setFollowingOrganizers] = useState<SearchProfile[]>(
+    []
+  );
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followingStatus, setFollowingStatus] = useState<{
+    type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [followingSearch, setFollowingSearch] = useState("");
   const [eventsList, setEventsList] = useState<EventRecord[]>([]);
   const [eventDetails, setEventDetails] = useState<EventRecord | null>(null);
   const [eventOrganizer, setEventOrganizer] = useState<SearchProfile | null>(null);
   const [eventDetailsStatus, setEventDetailsStatus] = useState<{
+    type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [organizerDetails, setOrganizerDetails] = useState<SearchProfile | null>(
+    null
+  );
+  const [organizerDetailsStatus, setOrganizerDetailsStatus] = useState<{
+    type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [organizerFollowers, setOrganizerFollowers] = useState<SearchProfile[]>(
+    []
+  );
+  const [organizerFollowersStatus, setOrganizerFollowersStatus] = useState<{
     type: "idle" | "loading" | "error";
     message: string;
   }>({ type: "idle", message: "" });
@@ -6145,6 +6441,7 @@ export default function App() {
   const [profileTelegram, setProfileTelegram] = useState("");
   const [profileInstagram, setProfileInstagram] = useState("");
   const [profileIsOrganizer, setProfileIsOrganizer] = useState(false);
+  const [profileIsAdmin, setProfileIsAdmin] = useState(false);
   const [profileCoverPhoto, setProfileCoverPhoto] = useState<File | null>(null);
   const [profileCoverPreview, setProfileCoverPreview] = useState<string | null>(
     null
@@ -6225,6 +6522,7 @@ export default function App() {
   const emptyProfileValue = "-";
   const followerInitials = ["V", "E", "L", "A"];
   const activeEventId = getEventIdFromLocation();
+  const activeOrganizerId = getOrganizerIdFromLocation();
   const sortedEventRsvps = [...eventRsvps].sort((a, b) => {
     if (a.status === b.status) return 0;
     return a.status === "going" ? -1 : 1;
@@ -6235,17 +6533,36 @@ export default function App() {
   const eventInterestedCount = eventRsvps.filter(
     (item) => item.status === "interested"
   ).length;
-  const sessionOrganizerFollowers =
-    sessionUser?.id && profileIsOrganizer
-      ? organizerFollowerCounts[sessionUser.id] ?? 0
-      : 0;
+  const normalizedFollowingSearch = followingSearch.trim().toLowerCase();
+  const filteredFollowingOrganizers = normalizedFollowingSearch
+    ? followingOrganizers.filter((profile) => {
+        const name = profile.full_name?.toLowerCase() ?? "";
+        const city = profile.city?.toLowerCase() ?? "";
+        const country = profile.country?.toLowerCase() ?? "";
+        const bio = profile.bio?.toLowerCase() ?? "";
+        const languageLabel =
+          profile.language && isSupportedLocale(profile.language)
+            ? languageLabels[profile.language] ?? profile.language
+            : profile.language ?? "";
+        const haystack = `${name} ${city} ${country} ${bio} ${languageLabel}`.trim();
+        return haystack.includes(normalizedFollowingSearch);
+      })
+    : followingOrganizers;
+  const followingEmptyMessage =
+    followingOrganizers.length === 0
+      ? strings.userFollowingEmpty
+      : strings.searchEmpty;
+  const sessionOrganizerFollowers = sessionUser?.id
+    ? organizerFollowerCounts[sessionUser.id] ?? 0
+    : 0;
   const userStats = [
     { label: strings.userStatsPosts, value: String(userPosts.length) },
     { label: strings.userStatsFollowers, value: String(sessionOrganizerFollowers) },
-    { label: strings.userStatsFollowing, value: "0" },
+    { label: strings.userStatsFollowing, value: String(followingCount) },
   ];
   const userTabs = [
     { id: "about" as const, label: strings.userTabAbout },
+    { id: "following" as const, label: strings.userTabFollowing },
     { id: "posts" as const, label: strings.userTabPosts },
     { id: "photos" as const, label: strings.userTabPhotos },
     { id: "videos" as const, label: strings.userTabVideos },
@@ -6340,11 +6657,17 @@ export default function App() {
   );
 
   const redirectToLoginWithIntent = useCallback(
-    (intent: { route: Route; eventId?: string }) => {
+    (intent: { route: Route; eventId?: string; organizerId?: string }) => {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(POST_AUTH_ROUTE_KEY, intent.route);
         if (intent.eventId) {
           window.localStorage.setItem(POST_AUTH_EVENT_KEY, intent.eventId);
+        }
+        if (intent.organizerId) {
+          window.localStorage.setItem(
+            POST_AUTH_ORGANIZER_KEY,
+            intent.organizerId
+          );
         }
       }
       navigate("login");
@@ -6361,6 +6684,19 @@ export default function App() {
         window.history.pushState({}, "", url.toString());
       }
       applyRouteChange("event");
+    },
+    [applyRouteChange]
+  );
+
+  const goToOrganizer = useCallback(
+    (organizerId: string) => {
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.pathname = ROUTE_PATHS.organizer;
+        url.searchParams.set("id", organizerId);
+        window.history.pushState({}, "", url.toString());
+      }
+      applyRouteChange("organizer");
     },
     [applyRouteChange]
   );
@@ -6492,6 +6828,10 @@ export default function App() {
       setOrganizerFollowMap({});
       setOrganizerFollowLoading({});
       setOrganizerFollowerCounts({});
+      setFollowingOrganizers([]);
+      setFollowingCount(0);
+      setFollowingStatus({ type: "idle", message: "" });
+      setFollowingSearch("");
     }
   }, [guestMode, sessionUser?.id]);
 
@@ -6504,6 +6844,7 @@ export default function App() {
       "search",
       "events",
       "event",
+      "organizer",
       "privacy",
       "impressum",
       "terms",
@@ -6580,7 +6921,7 @@ export default function App() {
   }, [cropImageSize, cropOffset, cropScale, profilePhoto, updateCropPreview]);
 
   useEffect(() => {
-    if (route !== "profile" && route !== "me") return;
+    if (route !== "profile" && route !== "me" && route !== "admin") return;
     if (guestMode) {
       navigate("search");
       return;
@@ -6603,7 +6944,7 @@ export default function App() {
   }, [guestMode, navigate, route]);
 
   useEffect(() => {
-    if (route !== "profile" && route !== "me") {
+    if (route !== "profile" && route !== "me" && route !== "admin") {
       profileLoaded.current = false;
       return;
     }
@@ -6627,7 +6968,7 @@ export default function App() {
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram,is_organizer"
+          "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram,is_organizer,is_admin"
         )
         .eq("id", user.id)
         .maybeSingle();
@@ -6686,6 +7027,7 @@ export default function App() {
         setProfileTelegram(data.telegram ?? "");
         setProfileInstagram(data.instagram ?? "");
         setProfileIsOrganizer(Boolean(data.is_organizer));
+        setProfileIsAdmin(Boolean(data.is_admin));
         setProfileCoverUrl(data.cover_url ?? null);
         setProfileCoverPreview(data.cover_url ?? null);
         setProfileCoverPhoto(null);
@@ -6699,6 +7041,8 @@ export default function App() {
         if (profilePhotoInputRef.current) {
           profilePhotoInputRef.current.value = "";
         }
+      } else {
+        setProfileIsAdmin(false);
       }
       profileLoaded.current = true;
     })();
@@ -6845,6 +7189,72 @@ export default function App() {
     );
     return map;
   }, []);
+
+  const refreshFollowingOrganizers = useCallback(async () => {
+    if (guestMode || !sessionUser?.id) {
+      setFollowingOrganizers([]);
+      setFollowingCount(0);
+      setFollowingStatus({ type: "idle", message: "" });
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setFollowingStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    setFollowingStatus({ type: "loading", message: "" });
+    const { data: followRows, error } = await supabase
+      .from(ORGANIZER_FOLLOWS_TABLE)
+      .select("organizer_id")
+      .eq("follower_id", sessionUser.id);
+    if (error) {
+      setFollowingStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+      return;
+    }
+    const ids = (followRows ?? [])
+      .map((row) => row.organizer_id)
+      .filter(Boolean) as string[];
+    setFollowingCount(ids.length);
+    if (!ids.length) {
+      setFollowingOrganizers([]);
+      setFollowingStatus({ type: "idle", message: "" });
+      return;
+    }
+    const { data: profileRows, error: profileError } = await supabase
+      .from("profiles")
+      .select(
+        "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,is_organizer,bio"
+      )
+      .in("id", ids);
+    if (profileError) {
+      setFollowingStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(profileError),
+      });
+      return;
+    }
+    const orderMap = new Map(ids.map((id, index) => [id, index]));
+    const sortedProfiles = (profileRows ?? []).sort((a, b) => {
+      return (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0);
+    }) as SearchProfile[];
+    setFollowingOrganizers(sortedProfiles);
+    setFollowingStatus({ type: "idle", message: "" });
+    const counts = await fetchOrganizerFollowerCounts(ids);
+    if (Object.keys(counts).length) {
+      setOrganizerFollowerCounts((prev) => ({ ...prev, ...counts }));
+    }
+  }, [
+    fetchOrganizerFollowerCounts,
+    getSupabaseErrorMessage,
+    guestMode,
+    sessionUser?.id,
+  ]);
   useEffect(() => {
     if (route !== "events") return;
     const supabase = getSupabaseClient();
@@ -6893,6 +7303,130 @@ export default function App() {
       active = false;
     };
   }, [getSupabaseErrorMessage, route]);
+
+  useEffect(() => {
+    if (route !== "admin") {
+      setAdminUsers([]);
+      setAdminPosts([]);
+      setAdminPostEditId(null);
+      setAdminPostCaption("");
+      setAdminUsersStatus({ type: "idle", message: "" });
+      setAdminPostsStatus({ type: "idle", message: "" });
+      setAdminEventsStatus({ type: "idle", message: "" });
+      return;
+    }
+    if (guestMode) {
+      setAdminUsersStatus({
+        type: "error",
+        message: strings.adminAccessDenied,
+      });
+      setAdminPostsStatus({
+        type: "error",
+        message: strings.adminAccessDenied,
+      });
+      setAdminEventsStatus({
+        type: "error",
+        message: strings.adminAccessDenied,
+      });
+      return;
+    }
+    if (!profileIsAdmin) {
+      if (!profileLoaded.current) return;
+      setAdminUsersStatus({
+        type: "error",
+        message: strings.adminAccessDenied,
+      });
+      setAdminPostsStatus({
+        type: "error",
+        message: strings.adminAccessDenied,
+      });
+      setAdminEventsStatus({
+        type: "error",
+        message: strings.adminAccessDenied,
+      });
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setAdminUsersStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      setAdminPostsStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      setAdminEventsStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    let active = true;
+    (async () => {
+      setAdminUsersStatus({ type: "loading", message: "" });
+      setAdminPostsStatus({ type: "loading", message: "" });
+      setAdminEventsStatus({ type: "loading", message: "" });
+      const [usersResult, eventsResult, postsResult] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select(
+            "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,bio,is_organizer,is_admin"
+          )
+          .order("full_name", { ascending: true }),
+        supabase
+          .from("events")
+          .select(
+            "id,organizer_id,title,description,image_url,online_url,address,city,country,language,language_level,event_date,format,created_at"
+          )
+          .order("event_date", { ascending: false }),
+        supabase
+          .from(POSTS_TABLE)
+          .select("id,user_id,media_url,media_type,caption,created_at")
+          .order("created_at", { ascending: false }),
+      ]);
+      if (!active) return;
+      const { data: usersRows, error: usersError } = usersResult;
+      if (usersError) {
+        setAdminUsersStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(usersError),
+        });
+      } else {
+        setAdminUsers((usersRows ?? []) as SearchProfile[]);
+        setAdminUsersStatus({ type: "idle", message: "" });
+      }
+      const { data: eventsRows, error: eventsError } = eventsResult;
+      if (eventsError) {
+        setAdminEventsStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(eventsError),
+        });
+      } else {
+        setEventsList((eventsRows ?? []) as EventRecord[]);
+        setAdminEventsStatus({ type: "idle", message: "" });
+      }
+      const { data: postsRows, error: postsError } = postsResult;
+      if (postsError) {
+        setAdminPostsStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(postsError),
+        });
+      } else {
+        setAdminPosts((postsRows ?? []) as UserPost[]);
+        setAdminPostsStatus({ type: "idle", message: "" });
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [
+    guestMode,
+    getSupabaseErrorMessage,
+    profileIsAdmin,
+    route,
+    strings.adminAccessDenied,
+  ]);
 
   useEffect(() => {
     if (route !== "event") {
@@ -7033,6 +7567,124 @@ export default function App() {
       active = false;
     };
   }, [eventOrganizer?.id, fetchOrganizerFollowerCounts, route]);
+
+  useEffect(() => {
+    if (route !== "organizer") {
+      setOrganizerDetails(null);
+      setOrganizerFollowers([]);
+      setOrganizerDetailsStatus({ type: "idle", message: "" });
+      setOrganizerFollowersStatus({ type: "idle", message: "" });
+      return;
+    }
+    const organizerId = activeOrganizerId;
+    if (!organizerId) {
+      setOrganizerDetails(null);
+      setOrganizerFollowers([]);
+      setOrganizerDetailsStatus({
+        type: "error",
+        message: strings.searchEmpty,
+      });
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setOrganizerDetailsStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    let active = true;
+    (async () => {
+      setOrganizerDetailsStatus({ type: "loading", message: "" });
+      const { data: profileRow, error } = await supabase
+        .from("profiles")
+        .select(
+          "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,is_organizer,bio"
+        )
+        .eq("id", organizerId)
+        .maybeSingle();
+      if (!active) return;
+      if (error || !profileRow) {
+        setOrganizerDetailsStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(error ?? new Error("Not found")),
+        });
+        setOrganizerDetails(null);
+        setOrganizerFollowers([]);
+        return;
+      }
+      setOrganizerDetails(profileRow as SearchProfile);
+      setOrganizerDetailsStatus({ type: "idle", message: "" });
+      const [countMap, followMap] = await Promise.all([
+        fetchOrganizerFollowerCounts([organizerId]),
+        fetchOrganizerFollowStatus([organizerId]),
+      ]);
+      if (!active) return;
+      if (Object.keys(countMap).length) {
+        setOrganizerFollowerCounts((prev) => ({ ...prev, ...countMap }));
+      }
+      if (Object.keys(followMap).length) {
+        setOrganizerFollowMap((prev) => ({ ...prev, ...followMap }));
+      }
+      setOrganizerFollowersStatus({ type: "loading", message: "" });
+      const { data: followerRows, error: followersError } = await supabase
+        .from(ORGANIZER_FOLLOWS_TABLE)
+        .select("follower_id")
+        .eq("organizer_id", organizerId);
+      if (!active) return;
+      if (followersError) {
+        setOrganizerFollowersStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(followersError),
+        });
+        setOrganizerFollowers([]);
+        return;
+      }
+      const followerIds = (followerRows ?? [])
+        .map((row) => row.follower_id)
+        .filter(Boolean) as string[];
+      if (!followerIds.length) {
+        setOrganizerFollowers([]);
+        setOrganizerFollowersStatus({ type: "idle", message: "" });
+        return;
+      }
+      const { data: followerProfiles, error: followerProfilesError } =
+        await supabase
+          .from("profiles")
+          .select(
+            "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,is_organizer,bio"
+          )
+          .in("id", followerIds);
+      if (!active) return;
+      if (followerProfilesError) {
+        setOrganizerFollowersStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(followerProfilesError),
+        });
+        setOrganizerFollowers([]);
+        return;
+      }
+      const orderMap = new Map(
+        followerIds.map((id, index) => [id, index])
+      );
+      const sortedFollowers = (followerProfiles ?? []).sort((a, b) => {
+        return (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0);
+      }) as SearchProfile[];
+      setOrganizerFollowers(sortedFollowers);
+      setOrganizerFollowersStatus({ type: "idle", message: "" });
+    })();
+    return () => {
+      active = false;
+    };
+  }, [
+    activeOrganizerId,
+    fetchOrganizerFollowStatus,
+    fetchOrganizerFollowerCounts,
+    getSupabaseErrorMessage,
+    route,
+    strings.searchEmpty,
+  ]);
 
 
   function handleLocaleSelect(next: Locale) {
@@ -7307,6 +7959,7 @@ export default function App() {
     setEventLevel("");
     setEventDate("");
     setEventFormat("");
+    setAdminEventOrganizerId("");
   }
 
   function handleEditEvent(event: EventRecord) {
@@ -7334,8 +7987,53 @@ export default function App() {
       eventImageInputRef.current.value = "";
     }
     setEventStatus({ type: "idle", message: "" });
+    setAdminEventOrganizerId(event.organizer_id ?? "");
     if (typeof window !== "undefined") {
       window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  async function handleAdminUpdateUserRole(
+    userId: string,
+    updates: Partial<Pick<SearchProfile, "is_organizer" | "is_admin">>
+  ) {
+    if (!profileIsAdmin) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setAdminUsersStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    setAdminUsersStatus({ type: "loading", message: "" });
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .update(updates)
+        .eq("id", userId)
+        .select(
+          "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,bio,is_organizer,is_admin"
+        )
+        .maybeSingle();
+      if (error) throw error;
+      if (data) {
+        setAdminUsers((prev) =>
+          prev.map((profile) =>
+            profile.id === data.id ? (data as SearchProfile) : profile
+          )
+        );
+        if (sessionUser?.id === data.id) {
+          setProfileIsOrganizer(Boolean(data.is_organizer));
+          setProfileIsAdmin(Boolean(data.is_admin));
+        }
+      }
+      setAdminUsersStatus({ type: "idle", message: "" });
+    } catch (error) {
+      setAdminUsersStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
     }
   }
 
@@ -7380,7 +8078,9 @@ export default function App() {
 
   async function handleSaveEvent() {
     if (eventStatus.type === "loading") return;
-    if (!profileIsOrganizer) {
+    const isAdminContext = profileIsAdmin && route === "admin";
+    const canManageEvents = profileIsOrganizer || isAdminContext;
+    if (!canManageEvents) {
       setEventStatus({
         type: "error",
         message: strings.userActionOrganizer,
@@ -7405,12 +8105,15 @@ export default function App() {
       if (sessionError) throw sessionError;
       const user = data.session?.user;
       if (!user) {
-      setEventStatus({
-        type: "error",
-        message: strings.profileAuthRequired,
-      });
-      return;
-    }
+        setEventStatus({
+          type: "error",
+          message: strings.profileAuthRequired,
+        });
+        return;
+      }
+      const adminOrganizerId = isAdminContext
+        ? adminEventOrganizerId.trim()
+        : "";
       const isEditing = Boolean(eventEditingId);
       const existingImageUrl = eventExistingImageUrl ?? null;
       let nextImageUrl = existingImageUrl;
@@ -7448,11 +8151,15 @@ export default function App() {
         event_date: eventDate || null,
         format: eventFormat || null,
       };
+      const updatePayload =
+        isAdminContext && adminOrganizerId
+          ? { ...basePayload, organizer_id: adminOrganizerId }
+          : basePayload;
       let savedEvent: EventRecord | null = null;
       if (isEditing && eventEditingId) {
         const { data: updated, error } = await supabase
           .from("events")
-          .update(basePayload)
+          .update(updatePayload)
           .eq("id", eventEditingId)
           .select(
             "id,organizer_id,title,description,image_url,online_url,address,city,country,language,language_level,event_date,format,created_at"
@@ -7467,8 +8174,8 @@ export default function App() {
         }
       } else {
         const payload = {
-          ...basePayload,
-          organizer_id: user.id,
+          ...updatePayload,
+          organizer_id: adminOrganizerId || user.id,
           created_at: new Date().toISOString(),
         };
         const { data: inserted, error } = await supabase
@@ -7574,14 +8281,11 @@ export default function App() {
 
   async function handleToggleOrganizerFollow(
     organizerId: string,
-    sourceEventId?: string | null
+    intent?: { route: Route; eventId?: string; organizerId?: string }
   ) {
     if (!organizerId) return;
     if (guestMode || !sessionUser?.id) {
-      redirectToLoginWithIntent({
-        route: sourceEventId ? "event" : "search",
-        eventId: sourceEventId ?? undefined,
-      });
+      redirectToLoginWithIntent(intent ?? { route: "search" });
       return;
     }
     if (sessionUser.id === organizerId) return;
@@ -7622,6 +8326,10 @@ export default function App() {
         const next = Math.max(0, current + (isFollowing ? -1 : 1));
         return { ...prev, [organizerId]: next };
       });
+      setFollowingCount((prev) => Math.max(0, prev + (isFollowing ? -1 : 1)));
+      if (routeRef.current === "me") {
+        void refreshFollowingOrganizers();
+      }
     } catch (error) {
       if (typeof window !== "undefined") {
         window.alert(getSupabaseErrorMessage(error));
@@ -7825,6 +8533,11 @@ export default function App() {
     };
   }, [fetchOrganizerFollowerCounts, profileIsOrganizer, sessionUser?.id]);
 
+  useEffect(() => {
+    if (route !== "me") return;
+    void refreshFollowingOrganizers();
+  }, [refreshFollowingOrganizers, route]);
+
   const handlePostAuthRedirect = useCallback(
     async (user: SessionUser) => {
       const supabase = getSupabaseClient();
@@ -7846,6 +8559,7 @@ export default function App() {
       const complete = isProfileComplete(profileData);
       let preferredRoute: Route | null = null;
       let storedEventId: string | null = null;
+      let storedOrganizerId: string | null = null;
       if (typeof window !== "undefined") {
         const storedRoute = window.localStorage.getItem(POST_AUTH_ROUTE_KEY);
         if (storedRoute) {
@@ -7864,6 +8578,12 @@ export default function App() {
         if (storedEventId) {
           window.localStorage.removeItem(POST_AUTH_EVENT_KEY);
         }
+        storedOrganizerId = window.localStorage.getItem(
+          POST_AUTH_ORGANIZER_KEY
+        );
+        if (storedOrganizerId) {
+          window.localStorage.removeItem(POST_AUTH_ORGANIZER_KEY);
+        }
       }
 
       if (!complete) {
@@ -7876,9 +8596,14 @@ export default function App() {
         return;
       }
 
+      if (preferredRoute === "organizer" && storedOrganizerId) {
+        goToOrganizer(storedOrganizerId);
+        return;
+      }
+
       navigate(preferredRoute ?? "me");
     },
-    [goToEvent, navigate]
+    [goToEvent, goToOrganizer, navigate]
   );
 
   const upsertProfile = useCallback(
@@ -8160,6 +8885,91 @@ export default function App() {
       setPostActionStatus({ type: "idle", message: "" });
     } catch (error) {
       setPostActionStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    }
+  }
+
+  function startAdminPostEdit(post: UserPost) {
+    setAdminPostEditId(post.id);
+    setAdminPostCaption(post.caption ?? "");
+  }
+
+  function cancelAdminPostEdit() {
+    setAdminPostEditId(null);
+    setAdminPostCaption("");
+  }
+
+  async function handleAdminSavePost(post: UserPost) {
+    if (!profileIsAdmin || adminPostsStatus.type === "loading") return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setAdminPostsStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    setAdminPostsStatus({ type: "loading", message: "" });
+    try {
+      const { data, error } = await supabase
+        .from(POSTS_TABLE)
+        .update({ caption: adminPostCaption.trim() || null })
+        .eq("id", post.id)
+        .select("id,user_id,media_url,media_type,caption,created_at")
+        .single();
+      if (error) throw error;
+      setAdminPosts((prev) =>
+        prev.map((item) => (item.id === post.id ? (data as UserPost) : item))
+      );
+      cancelAdminPostEdit();
+      setAdminPostsStatus({ type: "idle", message: "" });
+    } catch (error) {
+      setAdminPostsStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    }
+  }
+
+  async function handleAdminDeletePost(post: UserPost) {
+    if (!profileIsAdmin || adminPostsStatus.type === "loading") return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setAdminPostsStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(strings.userPostDeleteConfirm);
+      if (!confirmed) return;
+    }
+    setAdminPostsStatus({ type: "loading", message: "" });
+    try {
+      if (post.media_url) {
+        const path = getStoragePathFromUrl(post.media_url, POSTS_BUCKET);
+        if (path) {
+          const { error: removeError } = await supabase.storage
+            .from(POSTS_BUCKET)
+            .remove([path]);
+          if (removeError) throw removeError;
+        }
+      }
+      const { error } = await supabase
+        .from(POSTS_TABLE)
+        .delete()
+        .eq("id", post.id);
+      if (error) throw error;
+      setAdminPosts((prev) => prev.filter((item) => item.id !== post.id));
+      if (adminPostEditId === post.id) {
+        cancelAdminPostEdit();
+      }
+      setAdminPostsStatus({ type: "idle", message: "" });
+    } catch (error) {
+      setAdminPostsStatus({
         type: "error",
         message: getSupabaseErrorMessage(error),
       });
@@ -8493,21 +9303,398 @@ export default function App() {
   const isSearchRoute = route === "search";
   const isEventsRoute = route === "events";
   const isEventRoute = route === "event";
+  const isOrganizerRoute = route === "organizer";
   const isProfileRoute = route === "profile";
   const isUserRoute = route === "me";
+  const isAdminRoute = route === "admin";
   const isAuthRoute = route === "login" || route === "register" || route === "forgot";
   const showPassword = isAuthRoute && route !== "forgot";
   const showConfirm = isAuthRoute && route === "register";
   const showBackButton = !isAuthRoute;
   const showSearchButton = !isAuthRoute;
   const showEventsButton = !isAuthRoute;
+  const showAdminButton = !isAuthRoute && profileIsAdmin && !guestMode;
   const showUserQuickActions = isUserRoute && !guestMode;
+  const canManageEvents = profileIsOrganizer || (profileIsAdmin && isAdminRoute);
+  const adminUserMap = useMemo(() => {
+    return new Map(adminUsers.map((profile) => [profile.id, profile]));
+  }, [adminUsers]);
   const primaryLabel =
     route === "login"
       ? strings.loginButton
       : route === "register"
         ? strings.registerButton
         : strings.resetButton;
+
+  const renderEventsManager = (options: {
+    showOrganizerHint: boolean;
+    listTitle: string;
+    emptyLabel: string;
+  }) => (
+    <>
+      {options.showOrganizerHint && !profileIsOrganizer ? (
+        <div className="eventsHint">
+          <div className="eventsHintText">{strings.userActionOrganizer}</div>
+          <button className="btn" type="button" onClick={handleBecomeOrganizer}>
+            {strings.userActionOrganizer}
+          </button>
+        </div>
+      ) : null}
+      <div className="eventsCard">
+        <div className="eventsCardTitle">
+          {eventEditingId ? strings.eventEdit : strings.eventCreateTitle}
+        </div>
+        <div className="eventsForm">
+          <div className="field">
+            <label className="label" htmlFor="eventTitle">
+              {strings.eventNameLabel}
+            </label>
+            <input
+              className="input"
+              id="eventTitle"
+              type="text"
+              value={eventTitle}
+              onChange={(event) => setEventTitle(event.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="eventDescription">
+              {strings.eventDescriptionLabel}
+            </label>
+            <textarea
+              className="input eventsTextarea"
+              id="eventDescription"
+              value={eventDescription}
+              onChange={(event) => setEventDescription(event.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="eventImage">
+              {strings.eventImageLabel}
+            </label>
+            <input
+              ref={eventImageInputRef}
+              className="input"
+              id="eventImage"
+              type="file"
+              accept="image/*"
+              onChange={handleEventImageChange}
+            />
+            <span className="fieldHint">{strings.eventImageHint}</span>
+            {eventImagePreview ? (
+              <div className="eventImageWrap">
+                <img
+                  className="eventImagePreview"
+                  src={eventImagePreview}
+                  alt={strings.eventImageLabel}
+                />
+                <button
+                  className="btn btnGhost eventImageRemove"
+                  type="button"
+                  onClick={handleRemoveEventImage}
+                >
+                  {strings.eventImageRemove}
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <div className="eventsGrid">
+            {isAdminRoute ? (
+              <div className="field">
+                <label className="label" htmlFor="adminEventOrganizer">
+                  {strings.adminOrganizerIdLabel}
+                </label>
+                <input
+                  className="input"
+                  id="adminEventOrganizer"
+                  type="text"
+                  value={adminEventOrganizerId}
+                  onChange={(event) =>
+                    setAdminEventOrganizerId(event.target.value)
+                  }
+                />
+              </div>
+            ) : null}
+            <div className="field">
+              <label className="label" htmlFor="eventDate">
+                {strings.searchDateLabel}
+              </label>
+              <input
+                className="input"
+                id="eventDate"
+                type="date"
+                value={eventDate}
+                onChange={(event) => setEventDate(event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="eventFormat">
+                {strings.eventFormatLabel}
+              </label>
+              <select
+                className="input"
+                id="eventFormat"
+                value={eventFormat}
+                onChange={(event) =>
+                  setEventFormat(event.target.value as "" | EventFormat)
+                }
+              >
+                <option value="">{strings.eventFormatLabel}</option>
+                <option value="online">{strings.eventFormatOnline}</option>
+                <option value="offline">{strings.eventFormatOffline}</option>
+              </select>
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="eventCity">
+                {strings.profileCityLabel}
+              </label>
+              <input
+                className="input"
+                id="eventCity"
+                type="text"
+                value={eventCity}
+                onChange={(event) => setEventCity(event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="eventAddress">
+                {strings.eventAddressLabel}
+              </label>
+              <input
+                className="input"
+                id="eventAddress"
+                type="text"
+                value={eventAddress}
+                onChange={(event) => setEventAddress(event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="eventCountry">
+                {strings.profileCountryLabel}
+              </label>
+              <input
+                className="input"
+                id="eventCountry"
+                type="text"
+                value={eventCountry}
+                onChange={(event) => setEventCountry(event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="eventLanguage">
+                {strings.profileLanguageLabel}
+              </label>
+              <select
+                className="input"
+                id="eventLanguage"
+                value={eventLanguage}
+                onChange={(event) =>
+                  setEventLanguage(event.target.value as Locale | "")
+                }
+              >
+                <option value="">{strings.profileLanguagePlaceholder}</option>
+                {LANGUAGE_LIST.map((lang) => {
+                  const translatedLabel = languageLabels[lang.locale] ?? lang.label;
+                  return (
+                    <option key={lang.locale} value={lang.locale}>
+                      {translatedLabel}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="eventLevel">
+                {strings.profileLevelLabel}
+              </label>
+              <select
+                className="input"
+                id="eventLevel"
+                value={eventLevel}
+                onChange={(event) =>
+                  setEventLevel(event.target.value as LanguageLevel)
+                }
+              >
+                <option value="">{strings.profileLevelLabel}</option>
+                {LANGUAGE_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="eventOnlineUrl">
+                {strings.eventOnlineLabel}
+              </label>
+              <input
+                className="input"
+                id="eventOnlineUrl"
+                type="url"
+                value={eventOnlineUrl}
+                onChange={(event) => setEventOnlineUrl(event.target.value)}
+              />
+            </div>
+          </div>
+          {eventStatus.type !== "idle" ? (
+            <div
+              className={`authStatus authStatus--${eventStatus.type}`}
+              role="status"
+              aria-live="polite"
+            >
+              {eventStatus.type === "success"
+                ? strings.eventSaved
+                : eventStatus.message}
+            </div>
+          ) : null}
+          <div className="eventsActions">
+            <button
+              className="eventsSave"
+              type="button"
+              onClick={handleSaveEvent}
+              disabled={eventStatus.type === "loading" || !canManageEvents}
+            >
+              {eventStatus.type === "loading"
+                ? strings.loadingLabel
+                : eventEditingId
+                  ? strings.eventUpdate
+                  : strings.eventSave}
+            </button>
+            {eventEditingId ? (
+              <button
+                className="btn btnGhost eventsCancel"
+                type="button"
+                onClick={resetEventForm}
+                disabled={eventStatus.type === "loading"}
+              >
+                {strings.eventCancelEdit}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+      <div className="eventsList">
+        <div className="eventsListTitle">{options.listTitle}</div>
+        {eventsList.length === 0 ? (
+          <div className="searchEmpty">{options.emptyLabel}</div>
+        ) : (
+          <div className="eventsGridList">
+            {eventsList.map((event) => {
+              const meta = [
+                event.event_date ? formatDate(event.event_date, locale) : "",
+                event.city,
+                event.language && isSupportedLocale(event.language)
+                  ? languageLabels[event.language] ?? event.language
+                  : event.language ?? "",
+                event.language_level ?? "",
+                event.format === "online"
+                  ? strings.eventFormatOnline
+                  : event.format === "offline"
+                    ? strings.eventFormatOffline
+                    : "",
+              ].filter(Boolean);
+              const details = [
+                event.address
+                  ? {
+                      label: strings.eventAddressLabel,
+                      value: event.address,
+                      isLink: false,
+                    }
+                  : null,
+                event.online_url
+                  ? {
+                      label: strings.eventOnlineLabel,
+                      value: event.online_url,
+                      isLink: true,
+                    }
+                  : null,
+              ].filter(Boolean) as {
+                label: string;
+                value: string;
+                isLink: boolean;
+              }[];
+              return (
+                <div
+                  key={event.id}
+                  className={`eventCard${
+                    eventEditingId === event.id ? " eventCard--editing" : ""
+                  }`}
+                >
+                  <div className="eventCardMedia">
+                    {event.image_url ? (
+                      <img src={event.image_url} alt={event.title} />
+                    ) : (
+                      <div className="eventCardPlaceholder" />
+                    )}
+                  </div>
+                  <div className="eventCardBody">
+                    <div className="eventCardTitle">{event.title}</div>
+                    {meta.length ? (
+                      <div className="eventCardMeta">{meta.join(" вЂў ")}</div>
+                    ) : null}
+                    {event.description ? (
+                      <div className="eventCardDesc">{event.description}</div>
+                    ) : null}
+                    {details.length ? (
+                      <div className="eventCardDetails">
+                        {details.map((detail) => (
+                          <div
+                            key={`${detail.label}-${detail.value}`}
+                            className="eventCardDetail"
+                          >
+                            <span className="eventCardDetailLabel">
+                              {detail.label}:
+                            </span>
+                            {detail.isLink ? (
+                              <a
+                                className="eventCardLink"
+                                href={detail.value}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {detail.value}
+                              </a>
+                            ) : (
+                              <span className="eventCardDetailValue">
+                                {detail.value}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="eventCardActions">
+                      <button
+                        className="btn"
+                        type="button"
+                        onClick={() => goToEvent(event.id)}
+                      >
+                        {strings.eventView}
+                      </button>
+                      <button
+                        className="btn"
+                        type="button"
+                        onClick={() => handleEditEvent(event)}
+                      >
+                        {strings.eventEdit}
+                      </button>
+                      <button
+                        className="btnDanger"
+                        type="button"
+                        onClick={() => handleDeleteEvent(event)}
+                      >
+                        {strings.eventDelete}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  );
 
   return (
     <div
@@ -8581,6 +9768,15 @@ export default function App() {
                     {strings.eventsButton}
                   </button>
                 ) : null}
+                {showAdminButton ? (
+                  <button
+                    className={`btn${isAdminRoute ? " btnActive" : ""}`}
+                    type="button"
+                    onClick={() => navigate("admin")}
+                  >
+                    {strings.adminButton}
+                  </button>
+                ) : null}
                 {showUserQuickActions ? (
                   <>
                     <button
@@ -8624,6 +9820,305 @@ export default function App() {
             ) : isTermsRoute ? (
               <div className="privacyPage" dir={legalDir}>
                 {renderLegalContent(termsContent.title, termsContent.sections)}
+              </div>
+            ) : isAdminRoute ? (
+              <div className="adminPage">
+                <div className="adminHeader">
+                  <div className="adminTitle">{strings.adminTitle}</div>
+                  <div className="adminSubtitle">{strings.adminSubtitle}</div>
+                </div>
+                {!profileIsAdmin ? (
+                  <div
+                    className="authStatus authStatus--error"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {strings.adminAccessDenied}
+                  </div>
+                ) : (
+                  <>
+                    <div className="adminTabs">
+                      <button
+                        className={`btn${adminTab === "users" ? " btnActive" : ""}`}
+                        type="button"
+                        onClick={() => setAdminTab("users")}
+                      >
+                        {strings.adminTabUsers}
+                      </button>
+                      <button
+                        className={`btn${adminTab === "events" ? " btnActive" : ""}`}
+                        type="button"
+                        onClick={() => setAdminTab("events")}
+                      >
+                        {strings.adminTabEvents}
+                      </button>
+                      <button
+                        className={`btn${adminTab === "posts" ? " btnActive" : ""}`}
+                        type="button"
+                        onClick={() => setAdminTab("posts")}
+                      >
+                        {strings.adminTabPosts}
+                      </button>
+                    </div>
+                    {adminTab === "users" ? (
+                      <div className="adminSection">
+                        {adminUsersStatus.type === "loading" ? (
+                          <div
+                            className="authStatus authStatus--loading"
+                            role="status"
+                            aria-live="polite"
+                          >
+                            {strings.loadingLabel}
+                          </div>
+                        ) : adminUsersStatus.type === "error" ? (
+                          <div
+                            className="authStatus authStatus--error"
+                            role="status"
+                            aria-live="polite"
+                          >
+                            {adminUsersStatus.message}
+                          </div>
+                        ) : adminUsers.length === 0 ? (
+                          <div className="searchEmpty">
+                            {strings.adminUsersEmpty}
+                          </div>
+                        ) : (
+                          <div className="searchProfileGrid adminUsersGrid">
+                            {adminUsers.map((profile) => {
+                              const profileLanguage =
+                                profile.language &&
+                                isSupportedLocale(profile.language)
+                                  ? languageLabels[profile.language] ??
+                                    profile.language
+                                  : profile.language ?? "";
+                              const meta = [
+                                profile.city,
+                                profileLanguage,
+                                profile.language_level,
+                              ].filter(Boolean);
+                              const isSelf = profile.id === sessionUser?.id;
+                              const isOrganizer = Boolean(profile.is_organizer);
+                              const isAdmin = Boolean(profile.is_admin);
+                              return (
+                                <div
+                                  key={profile.id}
+                                  className="searchProfileCard adminUserCard"
+                                >
+                                  <div className="searchProfileAvatar">
+                                    {profile.avatar_url ? (
+                                      <img
+                                        src={profile.avatar_url}
+                                        alt={profile.full_name ?? ""}
+                                      />
+                                    ) : (
+                                      <span>
+                                        {(profile.full_name ?? "?")
+                                          .trim()
+                                          .charAt(0)
+                                          .toUpperCase()}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="searchProfileInfo">
+                                    <div className="searchProfileName">
+                                      {profile.full_name ??
+                                        strings.profileHeaderNameFallback}
+                                    </div>
+                                    {meta.length ? (
+                                      <div className="searchProfileMeta">
+                                        {meta.join(" вЂў ")}
+                                      </div>
+                                    ) : null}
+                                    <div className="adminUserId">
+                                      {profile.id}
+                                    </div>
+                                  </div>
+                                  <div className="adminUserActions">
+                                    <button
+                                      className={`btn${
+                                        isOrganizer ? " btnActive" : ""
+                                      }`}
+                                      type="button"
+                                      onClick={() =>
+                                        handleAdminUpdateUserRole(profile.id, {
+                                          is_organizer: !isOrganizer,
+                                        })
+                                      }
+                                      disabled={adminUsersStatus.type === "loading"}
+                                    >
+                                      {strings.adminRoleOrganizer}
+                                    </button>
+                                    <button
+                                      className={`btn${isAdmin ? " btnActive" : ""}`}
+                                      type="button"
+                                      onClick={() =>
+                                        handleAdminUpdateUserRole(profile.id, {
+                                          is_admin: !isAdmin,
+                                        })
+                                      }
+                                      disabled={
+                                        adminUsersStatus.type === "loading" || isSelf
+                                      }
+                                    >
+                                      {strings.adminRoleAdmin}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ) : adminTab === "events" ? (
+                      <div className="adminSection">
+                        {adminEventsStatus.type === "loading" ? (
+                          <div
+                            className="authStatus authStatus--loading"
+                            role="status"
+                            aria-live="polite"
+                          >
+                            {strings.loadingLabel}
+                          </div>
+                        ) : adminEventsStatus.type === "error" ? (
+                          <div
+                            className="authStatus authStatus--error"
+                            role="status"
+                            aria-live="polite"
+                          >
+                            {adminEventsStatus.message}
+                          </div>
+                        ) : (
+                          renderEventsManager({
+                            showOrganizerHint: false,
+                            listTitle: strings.adminTabEvents,
+                            emptyLabel: strings.adminEventsEmpty,
+                          })
+                        )}
+                      </div>
+                    ) : (
+                      <div className="adminSection">
+                        {adminPostsStatus.type === "loading" ? (
+                          <div
+                            className="authStatus authStatus--loading"
+                            role="status"
+                            aria-live="polite"
+                          >
+                            {strings.loadingLabel}
+                          </div>
+                        ) : adminPostsStatus.type === "error" ? (
+                          <div
+                            className="authStatus authStatus--error"
+                            role="status"
+                            aria-live="polite"
+                          >
+                            {adminPostsStatus.message}
+                          </div>
+                        ) : adminPosts.length === 0 ? (
+                          <div className="searchEmpty">
+                            {strings.adminPostsEmpty}
+                          </div>
+                        ) : (
+                          <div className="adminPostsGrid">
+                            {adminPosts.map((post) => {
+                              const owner =
+                                post.user_id && adminUserMap.get(post.user_id);
+                              const ownerName =
+                                owner?.full_name ??
+                                strings.profileHeaderNameFallback;
+                              const isEditing = adminPostEditId === post.id;
+                              return (
+                                <div
+                                  key={post.id}
+                                  className="userPostCard adminPostCard"
+                                >
+                                  <div className="adminPostHeader">
+                                    <div className="adminPostOwner">
+                                      {ownerName}
+                                    </div>
+                                    <div className="adminPostDate">
+                                      {post.created_at
+                                        ? formatDate(post.created_at, locale)
+                                        : ""}
+                                    </div>
+                                  </div>
+                                  {post.media_type === "image" &&
+                                  post.media_url ? (
+                                    <img
+                                      className="userPostMedia"
+                                      src={post.media_url}
+                                      alt={post.caption || strings.userTabPhotos}
+                                    />
+                                  ) : null}
+                                  {post.media_type === "video" &&
+                                  post.media_url ? (
+                                    <video
+                                      className="userPostMedia"
+                                      src={post.media_url}
+                                      controls
+                                    />
+                                  ) : null}
+                                  {isEditing ? (
+                                    <textarea
+                                      className="input adminPostInput"
+                                      value={adminPostCaption}
+                                      onChange={(event) =>
+                                        setAdminPostCaption(event.target.value)
+                                      }
+                                    />
+                                  ) : post.caption ? (
+                                    <div className="userPostCaption">
+                                      {post.caption}
+                                    </div>
+                                  ) : null}
+                                  <div className="userPostActions">
+                                    {isEditing ? (
+                                      <>
+                                        <button
+                                          className="btn"
+                                          type="button"
+                                          onClick={() => handleAdminSavePost(post)}
+                                          disabled={adminPostsStatus.type === "loading"}
+                                        >
+                                          {strings.eventUpdate}
+                                        </button>
+                                        <button
+                                          className="btn btnGhost"
+                                          type="button"
+                                          onClick={cancelAdminPostEdit}
+                                          disabled={adminPostsStatus.type === "loading"}
+                                        >
+                                          {strings.eventCancelEdit}
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button
+                                          className="btn"
+                                          type="button"
+                                          onClick={() => startAdminPostEdit(post)}
+                                        >
+                                          {strings.eventEdit}
+                                        </button>
+                                        <button
+                                          className="userPostDelete"
+                                          type="button"
+                                          onClick={() => handleAdminDeletePost(post)}
+                                          disabled={adminPostsStatus.type === "loading"}
+                                        >
+                                          {strings.userPostDelete}
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             ) : isSearchRoute ? (
               <div className="searchPage">
@@ -8867,8 +10362,24 @@ export default function App() {
                               organizerFollowLoading[profile.id] === true;
                             const followersCount =
                               organizerFollowerCounts[profile.id] ?? 0;
+                            const openOrganizer = () => {
+                              if (!profile.id) return;
+                              goToOrganizer(profile.id);
+                            };
                             return (
-                              <div key={profile.id} className="searchProfileCard">
+                              <div
+                                key={profile.id}
+                                className="searchProfileCard searchProfileCard--clickable"
+                                role="button"
+                                tabIndex={0}
+                                onClick={openOrganizer}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    openOrganizer();
+                                  }
+                                }}
+                              >
                                 <div className="searchProfileAvatar">
                                   {profile.avatar_url ? (
                                     <img
@@ -8910,9 +10421,12 @@ export default function App() {
                                         isFollowing ? " btnActive" : ""
                                       }`}
                                       type="button"
-                                      onClick={() =>
-                                        handleToggleOrganizerFollow(profile.id)
-                                      }
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleToggleOrganizerFollow(profile.id, {
+                                          route: "search",
+                                        });
+                                      }}
                                       disabled={isFollowLoading}
                                     >
                                       {isFollowing
@@ -8997,249 +10511,301 @@ export default function App() {
                   <div className="eventsTitle">{strings.eventsTitle}</div>
                   <div className="eventsSubtitle">{strings.eventsSubtitle}</div>
                 </div>
-                {!profileIsOrganizer ? (
-                  <div className="eventsHint">
-                    <div className="eventsHintText">
-                      {strings.userActionOrganizer}
-                    </div>
-                    <button className="btn" type="button" onClick={handleBecomeOrganizer}>
-                      {strings.userActionOrganizer}
-                    </button>
-                  </div>
-                ) : null}
-                <div className="eventsCard">
-                  <div className="eventsCardTitle">
-                    {eventEditingId ? strings.eventEdit : strings.eventCreateTitle}
-                  </div>
-                  <div className="eventsForm">
-                    <div className="field">
-                      <label className="label" htmlFor="eventTitle">
-                        {strings.eventNameLabel}
-                      </label>
-                      <input
-                        className="input"
-                        id="eventTitle"
-                        type="text"
-                        value={eventTitle}
-                        onChange={(event) => setEventTitle(event.target.value)}
-                      />
-                    </div>
-                    <div className="field">
-                      <label className="label" htmlFor="eventDescription">
-                        {strings.eventDescriptionLabel}
-                      </label>
-                      <textarea
-                        className="input eventsTextarea"
-                        id="eventDescription"
-                        value={eventDescription}
-                        onChange={(event) => setEventDescription(event.target.value)}
-                      />
-                    </div>
-                    <div className="field">
-                      <label className="label" htmlFor="eventImage">
-                        {strings.eventImageLabel}
-                      </label>
-                      <input
-                        ref={eventImageInputRef}
-                        className="input"
-                        id="eventImage"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleEventImageChange}
-                      />
-                      <span className="fieldHint">{strings.eventImageHint}</span>
-                      {eventImagePreview ? (
-                        <div className="eventImageWrap">
-                          <img
-                            className="eventImagePreview"
-                            src={eventImagePreview}
-                            alt={strings.eventImageLabel}
-                          />
-                          <button
-                            className="btn btnGhost eventImageRemove"
-                            type="button"
-                            onClick={handleRemoveEventImage}
-                          >
-                            {strings.eventImageRemove}
-                          </button>
+                {!guestMode ? (
+                  <>
+                    {!profileIsOrganizer ? (
+                      <div className="eventsHint">
+                        <div className="eventsHintText">
+                          {strings.userActionOrganizer}
                         </div>
-                      ) : null}
-                    </div>
-                    <div className="eventsGrid">
-                      <div className="field">
-                        <label className="label" htmlFor="eventDate">
-                          {strings.searchDateLabel}
-                        </label>
-                        <input
-                          className="input"
-                          id="eventDate"
-                          type="date"
-                          value={eventDate}
-                          onChange={(event) => setEventDate(event.target.value)}
-                        />
-                      </div>
-                      <div className="field">
-                        <label className="label" htmlFor="eventFormat">
-                          {strings.eventFormatLabel}
-                        </label>
-                        <select
-                          className="input"
-                          id="eventFormat"
-                          value={eventFormat}
-                          onChange={(event) =>
-                            setEventFormat(event.target.value as "" | EventFormat)
-                          }
+                        <button
+                          className="btn"
+                          type="button"
+                          onClick={handleBecomeOrganizer}
                         >
-                          <option value="">{strings.eventFormatLabel}</option>
-                          <option value="online">
-                            {strings.eventFormatOnline}
-                          </option>
-                          <option value="offline">
-                            {strings.eventFormatOffline}
-                          </option>
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label className="label" htmlFor="eventCity">
-                          {strings.profileCityLabel}
-                        </label>
-                        <input
-                          className="input"
-                          id="eventCity"
-                          type="text"
-                          value={eventCity}
-                          onChange={(event) => setEventCity(event.target.value)}
-                        />
-                      </div>
-                      <div className="field">
-                        <label className="label" htmlFor="eventAddress">
-                          {strings.eventAddressLabel}
-                        </label>
-                        <input
-                          className="input"
-                          id="eventAddress"
-                          type="text"
-                          value={eventAddress}
-                          onChange={(event) => setEventAddress(event.target.value)}
-                        />
-                      </div>
-                      <div className="field">
-                        <label className="label" htmlFor="eventCountry">
-                          {strings.profileCountryLabel}
-                        </label>
-                        <input
-                          className="input"
-                          id="eventCountry"
-                          type="text"
-                          value={eventCountry}
-                          onChange={(event) => setEventCountry(event.target.value)}
-                        />
-                      </div>
-                      <div className="field">
-                        <label className="label" htmlFor="eventLanguage">
-                          {strings.profileLanguageLabel}
-                        </label>
-                        <select
-                          className="input"
-                          id="eventLanguage"
-                          value={eventLanguage}
-                          onChange={(event) =>
-                            setEventLanguage(event.target.value as Locale | "")
-                          }
-                        >
-                          <option value="">
-                            {strings.profileLanguagePlaceholder}
-                          </option>
-                          {LANGUAGE_LIST.map((lang) => {
-                            const translatedLabel =
-                              languageLabels[lang.locale] ?? lang.label;
-                            return (
-                              <option key={lang.locale} value={lang.locale}>
-                                {translatedLabel}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label className="label" htmlFor="eventLevel">
-                          {strings.profileLevelLabel}
-                        </label>
-                        <select
-                          className="input"
-                          id="eventLevel"
-                          value={eventLevel}
-                          onChange={(event) =>
-                            setEventLevel(event.target.value as LanguageLevel)
-                          }
-                        >
-                          <option value="">
-                            {strings.profileLevelLabel}
-                          </option>
-                          {LANGUAGE_LEVELS.map((level) => (
-                            <option key={level} value={level}>
-                              {level}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label className="label" htmlFor="eventOnlineUrl">
-                          {strings.eventOnlineLabel}
-                        </label>
-                        <input
-                          className="input"
-                          id="eventOnlineUrl"
-                          type="url"
-                          value={eventOnlineUrl}
-                          onChange={(event) => setEventOnlineUrl(event.target.value)}
-                        />
-                      </div>
-                    </div>
-                    {eventStatus.type !== "idle" ? (
-                      <div
-                        className={`authStatus authStatus--${eventStatus.type}`}
-                        role="status"
-                        aria-live="polite"
-                      >
-                        {eventStatus.type === "success"
-                          ? strings.eventSaved
-                          : eventStatus.message}
+                          {strings.userActionOrganizer}
+                        </button>
                       </div>
                     ) : null}
-                    <div className="eventsActions">
-                      <button
-                        className="eventsSave"
-                        type="button"
-                        onClick={handleSaveEvent}
-                        disabled={eventStatus.type === "loading" || !profileIsOrganizer}
-                      >
-                        {eventStatus.type === "loading"
-                          ? strings.loadingLabel
-                          : eventEditingId
-                            ? strings.eventUpdate
-                            : strings.eventSave}
-                      </button>
-                      {eventEditingId ? (
-                        <button
-                          className="btn btnGhost eventsCancel"
-                          type="button"
-                          onClick={resetEventForm}
-                          disabled={eventStatus.type === "loading"}
-                        >
-                          {strings.eventCancelEdit}
-                        </button>
-                      ) : null}
+                    <div className="eventsCard">
+                      <div className="eventsCardTitle">
+                        {eventEditingId
+                          ? strings.eventEdit
+                          : strings.eventCreateTitle}
+                      </div>
+                      <div className="eventsForm">
+                        <div className="field">
+                          <label className="label" htmlFor="eventTitle">
+                            {strings.eventNameLabel}
+                          </label>
+                          <input
+                            className="input"
+                            id="eventTitle"
+                            type="text"
+                            value={eventTitle}
+                            onChange={(event) =>
+                              setEventTitle(event.target.value)
+                            }
+                          />
+                        </div>
+                        <div className="field">
+                          <label className="label" htmlFor="eventDescription">
+                            {strings.eventDescriptionLabel}
+                          </label>
+                          <textarea
+                            className="input eventsTextarea"
+                            id="eventDescription"
+                            value={eventDescription}
+                            onChange={(event) =>
+                              setEventDescription(event.target.value)
+                            }
+                          />
+                        </div>
+                        <div className="field">
+                          <label className="label" htmlFor="eventImage">
+                            {strings.eventImageLabel}
+                          </label>
+                          <input
+                            ref={eventImageInputRef}
+                            className="input"
+                            id="eventImage"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleEventImageChange}
+                          />
+                          <span className="fieldHint">
+                            {strings.eventImageHint}
+                          </span>
+                          {eventImagePreview ? (
+                            <div className="eventImageWrap">
+                              <img
+                                className="eventImagePreview"
+                                src={eventImagePreview}
+                                alt={strings.eventImageLabel}
+                              />
+                              <button
+                                className="btn btnGhost eventImageRemove"
+                                type="button"
+                                onClick={handleRemoveEventImage}
+                              >
+                                {strings.eventImageRemove}
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="eventsGrid">
+                          {isAdminRoute ? (
+                            <div className="field">
+                              <label className="label" htmlFor="adminEventOrganizer">
+                                {strings.adminOrganizerIdLabel}
+                              </label>
+                              <input
+                                className="input"
+                                id="adminEventOrganizer"
+                                type="text"
+                                value={adminEventOrganizerId}
+                                onChange={(event) =>
+                                  setAdminEventOrganizerId(event.target.value)
+                                }
+                              />
+                            </div>
+                          ) : null}
+                          <div className="field">
+                            <label className="label" htmlFor="eventDate">
+                              {strings.searchDateLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="eventDate"
+                              type="date"
+                              value={eventDate}
+                              onChange={(event) =>
+                                setEventDate(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="eventFormat">
+                              {strings.eventFormatLabel}
+                            </label>
+                            <select
+                              className="input"
+                              id="eventFormat"
+                              value={eventFormat}
+                              onChange={(event) =>
+                                setEventFormat(
+                                  event.target.value as "" | EventFormat
+                                )
+                              }
+                            >
+                              <option value="">
+                                {strings.eventFormatLabel}
+                              </option>
+                              <option value="online">
+                                {strings.eventFormatOnline}
+                              </option>
+                              <option value="offline">
+                                {strings.eventFormatOffline}
+                              </option>
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="eventCity">
+                              {strings.profileCityLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="eventCity"
+                              type="text"
+                              value={eventCity}
+                              onChange={(event) =>
+                                setEventCity(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="eventAddress">
+                              {strings.eventAddressLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="eventAddress"
+                              type="text"
+                              value={eventAddress}
+                              onChange={(event) =>
+                                setEventAddress(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="eventCountry">
+                              {strings.profileCountryLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="eventCountry"
+                              type="text"
+                              value={eventCountry}
+                              onChange={(event) =>
+                                setEventCountry(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="eventLanguage">
+                              {strings.profileLanguageLabel}
+                            </label>
+                            <select
+                              className="input"
+                              id="eventLanguage"
+                              value={eventLanguage}
+                              onChange={(event) =>
+                                setEventLanguage(
+                                  event.target.value as Locale | ""
+                                )
+                              }
+                            >
+                              <option value="">
+                                {strings.profileLanguagePlaceholder}
+                              </option>
+                              {LANGUAGE_LIST.map((lang) => {
+                                const translatedLabel =
+                                  languageLabels[lang.locale] ?? lang.label;
+                                return (
+                                  <option key={lang.locale} value={lang.locale}>
+                                    {translatedLabel}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="eventLevel">
+                              {strings.profileLevelLabel}
+                            </label>
+                            <select
+                              className="input"
+                              id="eventLevel"
+                              value={eventLevel}
+                              onChange={(event) =>
+                                setEventLevel(
+                                  event.target.value as LanguageLevel
+                                )
+                              }
+                            >
+                              <option value="">
+                                {strings.profileLevelLabel}
+                              </option>
+                              {LANGUAGE_LEVELS.map((level) => (
+                                <option key={level} value={level}>
+                                  {level}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="eventOnlineUrl">
+                              {strings.eventOnlineLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="eventOnlineUrl"
+                              type="url"
+                              value={eventOnlineUrl}
+                              onChange={(event) =>
+                                setEventOnlineUrl(event.target.value)
+                              }
+                            />
+                          </div>
+                        </div>
+                        {eventStatus.type !== "idle" ? (
+                          <div
+                            className={`authStatus authStatus--${eventStatus.type}`}
+                            role="status"
+                            aria-live="polite"
+                          >
+                            {eventStatus.type === "success"
+                              ? strings.eventSaved
+                              : eventStatus.message}
+                          </div>
+                        ) : null}
+                        <div className="eventsActions">
+                          <button
+                            className="eventsSave"
+                            type="button"
+                            onClick={handleSaveEvent}
+                            disabled={
+                              eventStatus.type === "loading" || !canManageEvents
+                            }
+                          >
+                            {eventStatus.type === "loading"
+                              ? strings.loadingLabel
+                              : eventEditingId
+                                ? strings.eventUpdate
+                                : strings.eventSave}
+                          </button>
+                          {eventEditingId ? (
+                            <button
+                              className="btn btnGhost eventsCancel"
+                              type="button"
+                              onClick={resetEventForm}
+                              disabled={eventStatus.type === "loading"}
+                            >
+                              {strings.eventCancelEdit}
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                <div className="eventsList">
-                  <div className="eventsListTitle">{strings.eventListTitle}</div>
-                  {eventsList.length === 0 ? (
-                    <div className="searchEmpty">{strings.eventEmpty}</div>
-                  ) : (
-                    <div className="eventsGridList">
-                      {eventsList.map((event) => {
+                    <div className="eventsList">
+                      <div className="eventsListTitle">
+                        {strings.eventListTitle}
+                      </div>
+                      {eventsList.length === 0 ? (
+                        <div className="searchEmpty">{strings.eventEmpty}</div>
+                      ) : (
+                        <div className="eventsGridList">
+                          {eventsList.map((event) => {
                         const meta = [
                           event.event_date
                             ? formatDate(event.event_date, locale)
@@ -9364,7 +10930,9 @@ export default function App() {
                     </div>
                   )}
                 </div>
-              </div>
+              </>
+            ) : null}
+          </div>
             ) : isEventRoute ? (
               <div className="eventDetailPage">
                 <div className="eventDetailHeader">
@@ -9437,10 +11005,21 @@ export default function App() {
                           <span className="eventDetailInfoLabel">
                             {strings.eventOrganizerLabel}
                           </span>
-                          <span className="eventDetailInfoValue">
-                            {eventOrganizer?.full_name ??
-                              strings.profileHeaderNameFallback}
-                          </span>
+                          {eventOrganizer?.id ? (
+                            <button
+                              className="eventDetailInfoValue eventDetailLink eventDetailOrganizerLink"
+                              type="button"
+                              onClick={() => goToOrganizer(eventOrganizer.id)}
+                            >
+                              {eventOrganizer.full_name ??
+                                strings.profileHeaderNameFallback}
+                            </button>
+                          ) : (
+                            <span className="eventDetailInfoValue">
+                              {eventOrganizer?.full_name ??
+                                strings.profileHeaderNameFallback}
+                            </span>
+                          )}
                         </div>
                         {eventOrganizer?.id ? (
                           <div className="eventDetailInfoRow">
@@ -9511,7 +11090,10 @@ export default function App() {
                             onClick={() =>
                               handleToggleOrganizerFollow(
                                 eventOrganizer.id,
-                                eventDetails?.id
+                                {
+                                  route: "event",
+                                  eventId: eventDetails?.id,
+                                }
                               )
                             }
                             disabled={
@@ -9583,6 +11165,197 @@ export default function App() {
                     </div>
                   </div>
                 ) : null}
+              </div>
+            ) : isOrganizerRoute ? (
+              <div className="organizerPage">
+                <div className="organizerHeader">
+                  <div className="organizerTitle">
+                    {strings.organizerPageTitle}
+                  </div>
+                </div>
+                {organizerDetailsStatus.type === "loading" ? (
+                  <div
+                    className="authStatus authStatus--loading"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {strings.loadingLabel}
+                  </div>
+                ) : null}
+                {organizerDetailsStatus.type === "error" ? (
+                  <div
+                    className="authStatus authStatus--error"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {organizerDetailsStatus.message}
+                  </div>
+                ) : null}
+                {organizerDetails
+                  ? (() => {
+                      const organizerLanguage =
+                        organizerDetails.language &&
+                        isSupportedLocale(organizerDetails.language)
+                          ? languageLabels[organizerDetails.language] ??
+                            organizerDetails.language
+                          : organizerDetails.language ?? "";
+                      const organizerMeta = [
+                        organizerDetails.city,
+                        organizerLanguage,
+                        organizerDetails.language_level ?? "",
+                      ].filter(Boolean);
+                      const followersCount =
+                        organizerFollowerCounts[organizerDetails.id] ?? 0;
+                      const canFollow =
+                        organizerDetails.id !== sessionUser?.id;
+                      const isFollowing =
+                        organizerFollowMap[organizerDetails.id] === true;
+                      const isFollowLoading =
+                        organizerFollowLoading[organizerDetails.id] === true;
+                      return (
+                        <>
+                          <div className="organizerCard">
+                            <div className="organizerAvatar">
+                              {organizerDetails.avatar_url ? (
+                                <img
+                                  src={organizerDetails.avatar_url}
+                                  alt={organizerDetails.full_name ?? ""}
+                                />
+                              ) : (
+                                <span>
+                                  {(organizerDetails.full_name ??
+                                    strings.profileHeaderNameFallback)
+                                    .trim()
+                                    .charAt(0)
+                                    .toUpperCase()}
+                                </span>
+                              )}
+                            </div>
+                            <div className="organizerInfo">
+                              <div className="organizerName">
+                                {organizerDetails.full_name ??
+                                  strings.profileHeaderNameFallback}
+                              </div>
+                              {organizerMeta.length ? (
+                                <div className="organizerMeta">
+                                  {organizerMeta.join(" • ")}
+                                </div>
+                              ) : null}
+                              <div className="organizerFollowersCount">
+                                {strings.userStatsFollowers}: {followersCount}
+                              </div>
+                              {organizerDetails.bio ? (
+                                <div className="organizerBio">
+                                  {organizerDetails.bio}
+                                </div>
+                              ) : null}
+                            </div>
+                            {canFollow ? (
+                              <div className="organizerActions">
+                                <button
+                                  className={`btn${
+                                    isFollowing ? " btnActive" : ""
+                                  }`}
+                                  type="button"
+                                  onClick={() =>
+                                    handleToggleOrganizerFollow(
+                                      organizerDetails.id,
+                                      {
+                                        route: "organizer",
+                                        organizerId: organizerDetails.id,
+                                      }
+                                    )
+                                  }
+                                  disabled={isFollowLoading}
+                                >
+                                  {isFollowing
+                                    ? strings.userActionUnfollow
+                                    : strings.userActionFollow}
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className="organizerFollowersSection">
+                            <div className="organizerFollowersTitle">
+                              {strings.userStatsFollowers}
+                            </div>
+                            {organizerFollowersStatus.type === "loading" ? (
+                              <div
+                                className="authStatus authStatus--loading"
+                                role="status"
+                                aria-live="polite"
+                              >
+                                {strings.loadingLabel}
+                              </div>
+                            ) : null}
+                            {organizerFollowersStatus.type === "error" ? (
+                              <div
+                                className="authStatus authStatus--error"
+                                role="status"
+                                aria-live="polite"
+                              >
+                                {organizerFollowersStatus.message}
+                              </div>
+                            ) : null}
+                            {organizerFollowers.length === 0 ? (
+                              <div className="searchEmpty">
+                                {strings.organizerFollowersEmpty}
+                              </div>
+                            ) : (
+                              <div className="searchProfileGrid organizerFollowersGrid">
+                                {organizerFollowers.map((profile) => {
+                                  const profileLanguage =
+                                    profile.language &&
+                                    isSupportedLocale(profile.language)
+                                      ? languageLabels[profile.language] ??
+                                        profile.language
+                                      : profile.language ?? "";
+                                  const meta = [
+                                    profile.city,
+                                    profileLanguage,
+                                    profile.language_level,
+                                  ].filter(Boolean);
+                                  return (
+                                    <div
+                                      key={profile.id}
+                                      className="searchProfileCard"
+                                    >
+                                      <div className="searchProfileAvatar">
+                                        {profile.avatar_url ? (
+                                          <img
+                                            src={profile.avatar_url}
+                                            alt={profile.full_name ?? ""}
+                                          />
+                                        ) : (
+                                          <span>
+                                            {(profile.full_name ?? "?")
+                                              .trim()
+                                              .charAt(0)
+                                              .toUpperCase()}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="searchProfileInfo">
+                                        <div className="searchProfileName">
+                                          {profile.full_name ??
+                                            strings.profileHeaderNameFallback}
+                                        </div>
+                                        {meta.length ? (
+                                          <div className="searchProfileMeta">
+                                            {meta.join(" • ")}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()
+                  : null}
               </div>
             ) : isUserRoute ? (
               <div className="userPage">
@@ -9749,6 +11522,114 @@ export default function App() {
                         </span>
                       </div>
                     </div>
+                  </div>
+                ) : userTab === "following" ? (
+                  <div className="userFollowing">
+                    {followingStatus.type === "loading" ? (
+                      <div
+                        className="authStatus authStatus--loading"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        {strings.loadingLabel}
+                      </div>
+                    ) : null}
+                    {followingStatus.type === "error" ? (
+                      <div
+                        className="authStatus authStatus--error"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        {followingStatus.message}
+                      </div>
+                    ) : null}
+                    <div className="userFollowingSearch">
+                      <input
+                        className="input"
+                        type="search"
+                        placeholder={strings.userFollowingSearchPlaceholder}
+                        value={followingSearch}
+                        onChange={(event) => setFollowingSearch(event.target.value)}
+                      />
+                    </div>
+                    {filteredFollowingOrganizers.length === 0 ? (
+                      <div className="searchEmpty">
+                        {followingEmptyMessage}
+                      </div>
+                    ) : (
+                      <div className="searchProfileGrid userFollowingGrid">
+                        {filteredFollowingOrganizers.map((profile) => {
+                          const profileLanguage =
+                            profile.language &&
+                            isSupportedLocale(profile.language)
+                              ? languageLabels[profile.language] ??
+                                profile.language
+                              : profile.language ?? "";
+                          const meta = [
+                            profile.city,
+                            profileLanguage,
+                            profile.language_level,
+                          ].filter(Boolean);
+                          const followersCount =
+                            organizerFollowerCounts[profile.id] ?? 0;
+                          return (
+                            <div key={profile.id} className="searchProfileCard">
+                              <div className="searchProfileAvatar">
+                                {profile.avatar_url ? (
+                                  <img
+                                    src={profile.avatar_url}
+                                    alt={profile.full_name ?? ""}
+                                  />
+                                ) : (
+                                  <span>
+                                    {(profile.full_name ?? "?")
+                                      .trim()
+                                      .charAt(0)
+                                      .toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="searchProfileInfo">
+                                <div className="searchProfileName">
+                                  {profile.full_name ??
+                                    strings.profileHeaderNameFallback}
+                                </div>
+                                {meta.length ? (
+                                  <div className="searchProfileMeta">
+                                    {meta.join(" • ")}
+                                  </div>
+                                ) : null}
+                                <div className="searchProfileFollowers">
+                                  {strings.userStatsFollowers}: {followersCount}
+                                </div>
+                              </div>
+                              <div className="searchProfileActions">
+                                <button
+                                  className={`btn${
+                                    organizerFollowMap[profile.id]
+                                      ? " btnActive"
+                                      : ""
+                                  }`}
+                                  type="button"
+                                  onClick={() =>
+                                    handleToggleOrganizerFollow(profile.id, {
+                                      route: "me",
+                                    })
+                                  }
+                                  disabled={
+                                    organizerFollowLoading[profile.id] === true
+                                  }
+                                >
+                                  {organizerFollowMap[profile.id]
+                                    ? strings.userActionUnfollow
+                                    : strings.userActionFollow}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 ) : userTab === "posts" ? (
                   <div className="userPosts">
