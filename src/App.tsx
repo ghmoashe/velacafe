@@ -207,6 +207,9 @@ type Route =
   | "login"
   | "register"
   | "forgot"
+  | "search"
+  | "events"
+  | "event"
   | "profile"
   | "me"
   | "partners"
@@ -226,9 +229,29 @@ type PostMediaType = "image" | "video" | "text";
 
 type UserPost = {
   id: string;
+  user_id?: string | null;
   media_url: string | null;
   media_type: PostMediaType;
   caption: string | null;
+  created_at: string;
+};
+
+type EventFormat = "online" | "offline";
+
+type EventRecord = {
+  id: string;
+  organizer_id: string;
+  title: string;
+  description: string | null;
+  image_url?: string | null;
+  online_url?: string | null;
+  address?: string | null;
+  city: string | null;
+  country: string | null;
+  language: string | null;
+  language_level: string | null;
+  event_date: string | null;
+  format: EventFormat | null;
   created_at: string;
 };
 
@@ -248,6 +271,21 @@ type ProfileRecord = {
   telegram?: string | null;
   instagram?: string | null;
   cover_url?: string | null;
+  is_organizer?: boolean | null;
+};
+
+type SearchProfile = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  city: string | null;
+  country: string | null;
+  language: string | null;
+  language_level: string | null;
+  learning_languages?: string[] | null;
+  practice_languages?: string[] | null;
+  bio?: string | null;
+  is_organizer?: boolean | null;
 };
 
 type MessageKey =
@@ -264,6 +302,7 @@ type MessageKey =
   | "createAccount"
   | "backToLogin"
   | "backButton"
+  | "guestButton"
   | "loadingLabel"
   | "successLogin"
   | "successRegister"
@@ -276,6 +315,51 @@ type MessageKey =
   | "privacyButton"
   | "impressumButton"
   | "termsButton"
+  | "searchButton"
+  | "searchTitle"
+  | "searchSubtitle"
+  | "searchPlaceholder"
+  | "searchCityLabel"
+  | "searchLanguageLabel"
+  | "searchDateLabel"
+  | "searchLevelLabel"
+  | "searchApply"
+  | "searchClear"
+  | "searchSectionEvents"
+  | "searchSectionOrganizers"
+  | "searchSectionUsers"
+  | "searchEmpty"
+  | "eventsButton"
+  | "eventsTitle"
+  | "eventsSubtitle"
+  | "eventCreateTitle"
+  | "eventNameLabel"
+  | "eventDescriptionLabel"
+  | "eventFormatLabel"
+  | "eventFormatOnline"
+  | "eventFormatOffline"
+  | "eventImageLabel"
+  | "eventImageHint"
+  | "eventOnlineLabel"
+  | "eventAddressLabel"
+  | "eventJoin"
+  | "eventInterested"
+  | "eventOrganizerLabel"
+  | "eventDetailsTitle"
+  | "eventEdit"
+  | "eventUpdate"
+  | "eventDelete"
+  | "eventDeleteConfirm"
+  | "eventImageRemove"
+  | "eventCancelEdit"
+  | "eventView"
+  | "eventParticipantsTitle"
+  | "eventGoingLabel"
+  | "eventInterestedLabel"
+  | "eventSave"
+  | "eventSaved"
+  | "eventListTitle"
+  | "eventEmpty"
   | "partnersTitle"
   | "profileTitle"
   | "profileSubtitle"
@@ -286,6 +370,7 @@ type MessageKey =
   | "userStatsFollowers"
   | "userStatsFollowing"
   | "userActionFollow"
+  | "userActionUnfollow"
   | "userActionMessage"
   | "userTabAbout"
   | "userTabPhotos"
@@ -369,6 +454,47 @@ function matchInterestPreset(value: string, locale: Locale): string | null {
   return null;
 }
 
+function formatDate(value: string, locale: Locale): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(locale, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function getStoragePathFromPublicUrl(url: string, bucket: string): string | null {
+  if (!url) return null;
+  const marker = `/storage/v1/object/public/${bucket}/`;
+  const index = url.indexOf(marker);
+  if (index === -1) return null;
+  const path = url.slice(index + marker.length);
+  return path ? path.split("?")[0] : null;
+}
+
+function profileMatchesLanguage(profile: SearchProfile, language: Locale): boolean {
+  if (!language) return true;
+  if (profile.language === language) return true;
+  if (Array.isArray(profile.learning_languages)) {
+    if (profile.learning_languages.includes(language)) return true;
+  }
+  if (Array.isArray(profile.practice_languages)) {
+    if (profile.practice_languages.includes(language)) return true;
+  }
+  return false;
+}
+
+function isLanguageLevel(
+  value: string | null
+): value is (typeof LANGUAGE_LEVELS)[number] {
+  return Boolean(
+    value &&
+      LANGUAGE_LEVELS.includes(value as (typeof LANGUAGE_LEVELS)[number])
+  );
+}
+
 function isProfileComplete(data: ProfileRecord | null): boolean {
   if (!data) return false;
   return Boolean(
@@ -390,6 +516,12 @@ function resolveRoute(slug: string): Route | null {
       return "register";
     case "forgot":
       return "forgot";
+    case "search":
+      return "search";
+    case "events":
+      return "events";
+    case "event":
+      return "event";
     case "profile":
       return "profile";
     case "me":
@@ -421,10 +553,20 @@ function getRouteFromLocation(): Route {
   return resolvedFromHash ?? "login";
 }
 
+function getEventIdFromLocation(): string | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+  return id && id.trim() ? id.trim() : null;
+}
+
 const ROUTE_PATHS: Record<Route, string> = {
   login: "/login",
   register: "/register",
   forgot: "/forgot",
+  search: "/search",
+  events: "/events",
+  event: "/event",
   profile: "/profile",
   me: "/me",
   partners: "/partners",
@@ -448,6 +590,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     createAccount: "Neues Konto erstellen",
     backToLogin: "Zurück zum Login",
     backButton: "Zurück",
+    guestButton: "Als Gast fortfahren",
     loadingLabel: "Wird geprüft...",
     successLogin: "Erfolgreich angemeldet.",
     successRegister: "Konto erstellt.",
@@ -460,6 +603,51 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     privacyButton: "Datenschutz",
     impressumButton: "Impressum",
     termsButton: "Nutzungsbedingungen",
+    searchButton: "Suche",
+    searchTitle: "Suche",
+    searchSubtitle: "Finde Veranstaltungen, Organisatoren und Nutzer.",
+    searchPlaceholder: "Suche nach Namen, Beschreibung oder Stichwort...",
+    searchCityLabel: "Stadt",
+    searchLanguageLabel: "Sprache",
+    searchDateLabel: "Datum",
+    searchLevelLabel: "Niveau",
+    searchApply: "Suchen",
+    searchClear: "Zurücksetzen",
+    searchSectionEvents: "Veranstaltungen",
+    searchSectionOrganizers: "Organisatoren",
+    searchSectionUsers: "Nutzer",
+    searchEmpty: "Keine Ergebnisse gefunden.",
+    eventsButton: "Events",
+    eventsTitle: "Events",
+    eventsSubtitle: "Erstelle und verwalte deine Veranstaltungen.",
+    eventCreateTitle: "Neues Event",
+    eventNameLabel: "Titel",
+    eventDescriptionLabel: "Beschreibung",
+    eventFormatLabel: "Format",
+    eventFormatOnline: "Online",
+    eventFormatOffline: "Vor Ort",
+    eventImageLabel: "Eventbild",
+    eventImageHint: "Optional. PNG/JPG bis 5 MB.",
+    eventOnlineLabel: "Online-Link",
+    eventAddressLabel: "Adresse",
+    eventJoin: "Teilnehmen",
+    eventInterested: "Interessiert",
+    eventOrganizerLabel: "Organisator",
+    eventDetailsTitle: "Event",
+    eventEdit: "Bearbeiten",
+    eventUpdate: "Event aktualisieren",
+    eventDelete: "Löschen",
+    eventDeleteConfirm: "Event wirklich löschen?",
+    eventImageRemove: "Bild entfernen",
+    eventCancelEdit: "Bearbeitung abbrechen",
+    eventView: "Ansehen",
+    eventParticipantsTitle: "Teilnehmer",
+    eventGoingLabel: "Zusagen",
+    eventInterestedLabel: "Interessiert",
+    eventSave: "Event speichern",
+    eventSaved: "Event gespeichert.",
+    eventListTitle: "Deine Events",
+    eventEmpty: "Noch keine Events.",
     partnersTitle: "Unsere Partner",
     profileTitle: "Profil vervollständigen",
     profileSubtitle: "Erzählen Sie kurz etwas über sich.",
@@ -470,6 +658,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "Follower",
     userStatsFollowing: "Folge ich",
     userActionFollow: "Folgen",
+    userActionUnfollow: "Entfolgen",
     userActionMessage: "Nachricht",
     userActionOrganizer: "Organisator werden",
     userTabAbout: "Über",
@@ -535,6 +724,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     createAccount: "Create new account",
     backToLogin: "Back to sign in",
     backButton: "Back",
+    guestButton: "Continue as guest",
     loadingLabel: "Checking...",
     successLogin: "Signed in successfully.",
     successRegister: "Account created.",
@@ -547,6 +737,51 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     privacyButton: "Privacy",
     impressumButton: "Imprint",
     termsButton: "Terms of Service",
+    searchButton: "Search",
+    searchTitle: "Search",
+    searchSubtitle: "Find events, organizers, and users.",
+    searchPlaceholder: "Search by name, description, or keyword...",
+    searchCityLabel: "City",
+    searchLanguageLabel: "Language",
+    searchDateLabel: "Date",
+    searchLevelLabel: "Level",
+    searchApply: "Search",
+    searchClear: "Clear",
+    searchSectionEvents: "Events",
+    searchSectionOrganizers: "Organizers",
+    searchSectionUsers: "Users",
+    searchEmpty: "No results found.",
+    eventsButton: "Events",
+    eventsTitle: "Events",
+    eventsSubtitle: "Create and manage your events.",
+    eventCreateTitle: "New event",
+    eventNameLabel: "Title",
+    eventDescriptionLabel: "Description",
+    eventFormatLabel: "Format",
+    eventFormatOnline: "Online",
+    eventFormatOffline: "In person",
+    eventImageLabel: "Event image",
+    eventImageHint: "Optional. PNG/JPG up to 5 MB.",
+    eventOnlineLabel: "Online link",
+    eventAddressLabel: "Address",
+    eventJoin: "Join",
+    eventInterested: "Interested",
+    eventOrganizerLabel: "Organizer",
+    eventDetailsTitle: "Event",
+    eventEdit: "Edit",
+    eventUpdate: "Update event",
+    eventDelete: "Delete",
+    eventDeleteConfirm: "Delete this event?",
+    eventImageRemove: "Remove image",
+    eventCancelEdit: "Cancel edit",
+    eventView: "View",
+    eventParticipantsTitle: "Participants",
+    eventGoingLabel: "Going",
+    eventInterestedLabel: "Interested",
+    eventSave: "Save event",
+    eventSaved: "Event saved.",
+    eventListTitle: "Your events",
+    eventEmpty: "No events yet.",
     partnersTitle: "Our partners",
     profileTitle: "Complete your profile",
     profileSubtitle: "Tell us a bit about yourself.",
@@ -557,6 +792,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "Followers",
     userStatsFollowing: "Following",
     userActionFollow: "Follow",
+    userActionUnfollow: "Unfollow",
     userActionMessage: "Message",
     userActionOrganizer: "Become organizer",
     userTabAbout: "About",
@@ -622,6 +858,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     createAccount: "Создать новый аккаунт",
     backToLogin: "Вернуться ко входу",
     backButton: "Назад",
+    guestButton: "Продолжить как гость",
     loadingLabel: "Проверяем...",
     successLogin: "Успешный вход.",
     successRegister: "Аккаунт создан.",
@@ -634,6 +871,51 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     privacyButton: "Политика конфиденциальности",
     impressumButton: "Выходные данные",
     termsButton: "Условия использования",
+    searchButton: "Поиск",
+    searchTitle: "Поиск",
+    searchSubtitle: "Найдите события, организаторов и пользователей.",
+    searchPlaceholder: "Поиск по имени, описанию или ключевому слову...",
+    searchCityLabel: "Город",
+    searchLanguageLabel: "Язык",
+    searchDateLabel: "Дата",
+    searchLevelLabel: "Уровень",
+    searchApply: "Найти",
+    searchClear: "Сбросить",
+    searchSectionEvents: "События",
+    searchSectionOrganizers: "Организаторы",
+    searchSectionUsers: "Пользователи",
+    searchEmpty: "Ничего не найдено.",
+    eventsButton: "События",
+    eventsTitle: "События",
+    eventsSubtitle: "Создавайте и управляйте своими событиями.",
+    eventCreateTitle: "Новое событие",
+    eventNameLabel: "Название",
+    eventDescriptionLabel: "Описание",
+    eventFormatLabel: "Формат",
+    eventFormatOnline: "Онлайн",
+    eventFormatOffline: "Офлайн",
+    eventImageLabel: "Фото события",
+    eventImageHint: "Необязательно. PNG/JPG до 5 МБ.",
+    eventOnlineLabel: "Ссылка онлайн",
+    eventAddressLabel: "Адрес",
+    eventJoin: "Записаться",
+    eventInterested: "Интересуюсь",
+    eventOrganizerLabel: "Организатор",
+    eventDetailsTitle: "Событие",
+    eventEdit: "Редактировать",
+    eventUpdate: "Обновить событие",
+    eventDelete: "Удалить",
+    eventDeleteConfirm: "Удалить это событие?",
+    eventImageRemove: "Удалить фото",
+    eventCancelEdit: "????????",
+    eventView: "Открыть",
+    eventParticipantsTitle: "Участники",
+    eventGoingLabel: "Идут",
+    eventInterestedLabel: "Интересуются",
+    eventSave: "Сохранить событие",
+    eventSaved: "Событие сохранено.",
+    eventListTitle: "Ваши события",
+    eventEmpty: "Событий пока нет.",
     partnersTitle: "Наши партнеры",
     profileTitle: "Заполните профиль",
     profileSubtitle: "Расскажите немного о себе.",
@@ -644,6 +926,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "Подписчики",
     userStatsFollowing: "Подписки",
     userActionFollow: "Подписаться",
+    userActionUnfollow: "??????????",
     userActionMessage: "Сообщение",
     userActionOrganizer: "Стать организатором",
     userTabAbout: "Обо мне",
@@ -709,6 +992,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     createAccount: "Створити новий акаунт",
     backToLogin: "Повернутися до входу",
     backButton: "Назад",
+    guestButton: "Продовжити як гість",
     loadingLabel: "Перевіряємо...",
     successLogin: "Успішний вхід.",
     successRegister: "Акаунт створено.",
@@ -721,6 +1005,51 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     privacyButton: "Політика конфіденційності",
     impressumButton: "Вихідні дані",
     termsButton: "Умови користування",
+    searchButton: "Пошук",
+    searchTitle: "Пошук",
+    searchSubtitle: "Знайдіть події, організаторів і користувачів.",
+    searchPlaceholder: "Пошук за ім'ям, описом чи ключовим словом...",
+    searchCityLabel: "Місто",
+    searchLanguageLabel: "Мова",
+    searchDateLabel: "Дата",
+    searchLevelLabel: "Рівень",
+    searchApply: "Знайти",
+    searchClear: "Скинути",
+    searchSectionEvents: "Події",
+    searchSectionOrganizers: "Організатори",
+    searchSectionUsers: "Користувачі",
+    searchEmpty: "Нічого не знайдено.",
+    eventsButton: "Події",
+    eventsTitle: "Події",
+    eventsSubtitle: "Створюйте та керуйте своїми подіями.",
+    eventCreateTitle: "Нова подія",
+    eventNameLabel: "Назва",
+    eventDescriptionLabel: "Опис",
+    eventFormatLabel: "Формат",
+    eventFormatOnline: "Онлайн",
+    eventFormatOffline: "Офлайн",
+    eventImageLabel: "Фото події",
+    eventImageHint: "Необов’язково. PNG/JPG до 5 МБ.",
+    eventOnlineLabel: "Онлайн-посилання",
+    eventAddressLabel: "Адреса",
+    eventJoin: "Записатися",
+    eventInterested: "Цікавлюсь",
+    eventOrganizerLabel: "Організатор",
+    eventDetailsTitle: "Подія",
+    eventEdit: "Редагувати",
+    eventUpdate: "Оновити подію",
+    eventDelete: "Видалити",
+    eventDeleteConfirm: "Видалити цю подію?",
+    eventImageRemove: "Видалити фото",
+    eventCancelEdit: "?????????",
+    eventView: "Відкрити",
+    eventParticipantsTitle: "Учасники",
+    eventGoingLabel: "Йдуть",
+    eventInterestedLabel: "Цікавляться",
+    eventSave: "Зберегти подію",
+    eventSaved: "Подію збережено.",
+    eventListTitle: "Ваші події",
+    eventEmpty: "Подій поки немає.",
     partnersTitle: "Наші партнери",
     profileTitle: "Заповніть профіль",
     profileSubtitle: "Розкажіть трохи про себе.",
@@ -731,6 +1060,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "Підписники",
     userStatsFollowing: "Підписки",
     userActionFollow: "Підписатися",
+    userActionUnfollow: "???????????",
     userActionMessage: "Повідомлення",
     userActionOrganizer: "Стати організатором",
     userTabAbout: "Про мене",
@@ -796,6 +1126,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     createAccount: "ایجاد حساب جدید",
     backToLogin: "بازگشت به ورود",
     backButton: "بازگشت",
+    guestButton: "ادامه به‌عنوان مهمان",
     loadingLabel: "در حال بررسی...",
     successLogin: "ورود با موفقیت انجام شد.",
     successRegister: "حساب ایجاد شد.",
@@ -808,6 +1139,51 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     privacyButton: "حریم خصوصی",
     impressumButton: "اطلاعات حقوقی",
     termsButton: "شرایط استفاده",
+    searchButton: "جستجو",
+    searchTitle: "جستجو",
+    searchSubtitle: "رویدادها، برگزارکنندگان و کاربران را پیدا کنید.",
+    searchPlaceholder: "جستجو بر اساس نام، توضیح یا کلیدواژه...",
+    searchCityLabel: "شهر",
+    searchLanguageLabel: "زبان",
+    searchDateLabel: "تاریخ",
+    searchLevelLabel: "سطح",
+    searchApply: "جستجو",
+    searchClear: "پاک کردن",
+    searchSectionEvents: "رویدادها",
+    searchSectionOrganizers: "برگزارکنندگان",
+    searchSectionUsers: "کاربران",
+    searchEmpty: "نتیجه‌ای یافت نشد.",
+    eventsButton: "رویدادها",
+    eventsTitle: "رویدادها",
+    eventsSubtitle: "رویدادهای خود را بسازید و مدیریت کنید.",
+    eventCreateTitle: "رویداد جدید",
+    eventNameLabel: "عنوان",
+    eventDescriptionLabel: "توضیحات",
+    eventFormatLabel: "فرمت",
+    eventFormatOnline: "آنلاین",
+    eventFormatOffline: "حضوری",
+    eventImageLabel: "تصویر رویداد",
+    eventImageHint: "اختیاری. PNG/JPG تا ۵ مگابایت.",
+    eventOnlineLabel: "لینک آنلاین",
+    eventAddressLabel: "آدرس",
+    eventJoin: "ثبت‌نام",
+    eventInterested: "علاقه‌مندم",
+    eventOrganizerLabel: "برگزارکننده",
+    eventDetailsTitle: "رویداد",
+    eventEdit: "ویرایش",
+    eventUpdate: "به‌روزرسانی رویداد",
+    eventDelete: "حذف",
+    eventDeleteConfirm: "این رویداد حذف شود؟",
+    eventImageRemove: "حذف تصویر",
+    eventCancelEdit: "??? ??????",
+    eventView: "مشاهده",
+    eventParticipantsTitle: "شرکت‌کنندگان",
+    eventGoingLabel: "می‌آیند",
+    eventInterestedLabel: "علاقه‌مند",
+    eventSave: "ذخیره رویداد",
+    eventSaved: "رویداد ذخیره شد.",
+    eventListTitle: "رویدادهای شما",
+    eventEmpty: "هنوز رویدادی نیست.",
     partnersTitle: "شرکای ما",
     profileTitle: "تکمیل پروفایل",
     profileSubtitle: "کمی درباره خودتان بگویید.",
@@ -818,6 +1194,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "دنبال‌کننده‌ها",
     userStatsFollowing: "دنبال‌می‌کنم",
     userActionFollow: "دنبال کردن",
+    userActionUnfollow: "??? ????? ????",
     userActionMessage: "پیام",
     userActionOrganizer: "تبدیل به برگزارکننده",
     userTabAbout: "درباره",
@@ -883,6 +1260,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     createAccount: "إنشاء حساب جديد",
     backToLogin: "العودة لتسجيل الدخول",
     backButton: "رجوع",
+    guestButton: "المتابعة كضيف",
     loadingLabel: "جارٍ التحقق...",
     successLogin: "تم تسجيل الدخول بنجاح.",
     successRegister: "تم إنشاء الحساب.",
@@ -895,6 +1273,51 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     privacyButton: "الخصوصية",
     impressumButton: "الإفصاح القانوني",
     termsButton: "شروط الاستخدام",
+    searchButton: "بحث",
+    searchTitle: "بحث",
+    searchSubtitle: "ابحث عن الفعاليات والمنظمين والمستخدمين.",
+    searchPlaceholder: "ابحث بالاسم أو الوصف أو كلمة مفتاحية...",
+    searchCityLabel: "المدينة",
+    searchLanguageLabel: "اللغة",
+    searchDateLabel: "التاريخ",
+    searchLevelLabel: "المستوى",
+    searchApply: "بحث",
+    searchClear: "مسح",
+    searchSectionEvents: "الفعاليات",
+    searchSectionOrganizers: "المنظمون",
+    searchSectionUsers: "المستخدمون",
+    searchEmpty: "لا توجد نتائج.",
+    eventsButton: "الفعاليات",
+    eventsTitle: "الفعاليات",
+    eventsSubtitle: "أنشئ فعالياتك وأدرها.",
+    eventCreateTitle: "فعالية جديدة",
+    eventNameLabel: "العنوان",
+    eventDescriptionLabel: "الوصف",
+    eventFormatLabel: "الصيغة",
+    eventFormatOnline: "عبر الإنترنت",
+    eventFormatOffline: "حضوري",
+    eventImageLabel: "صورة الفعالية",
+    eventImageHint: "اختياري. PNG/JPG حتى 5 ميغابايت.",
+    eventOnlineLabel: "رابط عبر الإنترنت",
+    eventAddressLabel: "العنوان",
+    eventJoin: "سأشارك",
+    eventInterested: "مهتم",
+    eventOrganizerLabel: "المنظم",
+    eventDetailsTitle: "الفعالية",
+    eventEdit: "تعديل",
+    eventUpdate: "تحديث الفعالية",
+    eventDelete: "حذف",
+    eventDeleteConfirm: "هل تريد حذف هذه الفعالية؟",
+    eventImageRemove: "إزالة الصورة",
+    eventCancelEdit: "????? ???????",
+    eventView: "عرض",
+    eventParticipantsTitle: "المشاركون",
+    eventGoingLabel: "سيحضرون",
+    eventInterestedLabel: "مهتمون",
+    eventSave: "حفظ الفعالية",
+    eventSaved: "تم حفظ الفعالية.",
+    eventListTitle: "فعالياتك",
+    eventEmpty: "لا توجد فعاليات بعد.",
     partnersTitle: "شركاؤنا",
     profileTitle: "أكمل ملفك الشخصي",
     profileSubtitle: "أخبرنا قليلاً عنك.",
@@ -905,6 +1328,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "المتابعون",
     userStatsFollowing: "المتابَعون",
     userActionFollow: "متابعة",
+    userActionUnfollow: "????? ????????",
     userActionMessage: "رسالة",
     userActionOrganizer: "كن منظماً",
     userTabAbout: "نبذة",
@@ -970,6 +1394,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     createAccount: "Krijo llogari të re",
     backToLogin: "Kthehu te hyrja",
     backButton: "Kthehu",
+    guestButton: "Vazhdo si mysafir",
     loadingLabel: "Duke kontrolluar...",
     successLogin: "Hyrja u krye me sukses.",
     successRegister: "Llogaria u krijua.",
@@ -982,6 +1407,51 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     privacyButton: "Privatësia",
     impressumButton: "Njoftim ligjor",
     termsButton: "Kushtet e përdorimit",
+    searchButton: "Kërko",
+    searchTitle: "Kërkim",
+    searchSubtitle: "Gjeni evente, organizatorë dhe përdorues.",
+    searchPlaceholder: "Kërko sipas emrit, përshkrimit ose fjalëkyçit...",
+    searchCityLabel: "Qyteti",
+    searchLanguageLabel: "Gjuha",
+    searchDateLabel: "Data",
+    searchLevelLabel: "Niveli",
+    searchApply: "Kërko",
+    searchClear: "Pastro",
+    searchSectionEvents: "Evente",
+    searchSectionOrganizers: "Organizatorë",
+    searchSectionUsers: "Përdorues",
+    searchEmpty: "Nuk u gjetën rezultate.",
+    eventsButton: "Evente",
+    eventsTitle: "Evente",
+    eventsSubtitle: "Krijoni dhe menaxhoni eventet tuaja.",
+    eventCreateTitle: "Event i ri",
+    eventNameLabel: "Titulli",
+    eventDescriptionLabel: "Përshkrimi",
+    eventFormatLabel: "Formati",
+    eventFormatOnline: "Online",
+    eventFormatOffline: "Me prani",
+    eventImageLabel: "Foto e eventit",
+    eventImageHint: "Opsionale. PNG/JPG deri në 5 MB.",
+    eventOnlineLabel: "Link online",
+    eventAddressLabel: "Adresa",
+    eventJoin: "Do të marr pjesë",
+    eventInterested: "I interesuar",
+    eventOrganizerLabel: "Organizator",
+    eventDetailsTitle: "Event",
+    eventEdit: "Redakto",
+    eventUpdate: "Përditëso eventin",
+    eventDelete: "Fshi",
+    eventDeleteConfirm: "Të fshihet ky event?",
+    eventImageRemove: "Hiq foton",
+    eventCancelEdit: "Anulo",
+    eventView: "Shiko",
+    eventParticipantsTitle: "Pjesëmarrësit",
+    eventGoingLabel: "Do të vijë",
+    eventInterestedLabel: "Të interesuar",
+    eventSave: "Ruaj eventin",
+    eventSaved: "Eventi u ruajt.",
+    eventListTitle: "Eventet tuaja",
+    eventEmpty: "Ende nuk ka evente.",
     partnersTitle: "Partnerët tanë",
     profileTitle: "Plotëso profilin",
     profileSubtitle: "Na trego pak për veten.",
@@ -992,6 +1462,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "Ndjekës",
     userStatsFollowing: "Ndjekje",
     userActionFollow: "Ndiq",
+    userActionUnfollow: "Mos ndiq",
     userActionMessage: "Mesazh",
     userActionOrganizer: "Bëhu organizator",
     userTabAbout: "Rreth",
@@ -1057,6 +1528,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     createAccount: "Yeni hesap oluştur",
     backToLogin: "Girişe dön",
     backButton: "Geri",
+    guestButton: "Misafir olarak devam et",
     loadingLabel: "Kontrol ediliyor...",
     successLogin: "Başarıyla giriş yapıldı.",
     successRegister: "Hesap oluşturuldu.",
@@ -1069,6 +1541,51 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     privacyButton: "Gizlilik",
     impressumButton: "Künye",
     termsButton: "Kullanım şartları",
+    searchButton: "Ara",
+    searchTitle: "Ara",
+    searchSubtitle: "Etkinlikler, organizatörler ve kullanıcıları bulun.",
+    searchPlaceholder: "İsim, açıklama veya anahtar kelime ile ara...",
+    searchCityLabel: "Şehir",
+    searchLanguageLabel: "Dil",
+    searchDateLabel: "Tarih",
+    searchLevelLabel: "Seviye",
+    searchApply: "Ara",
+    searchClear: "Temizle",
+    searchSectionEvents: "Etkinlikler",
+    searchSectionOrganizers: "Organizatörler",
+    searchSectionUsers: "Kullanıcılar",
+    searchEmpty: "Sonuç bulunamadı.",
+    eventsButton: "Etkinlikler",
+    eventsTitle: "Etkinlikler",
+    eventsSubtitle: "Etkinliklerinizi oluşturun ve yönetin.",
+    eventCreateTitle: "Yeni etkinlik",
+    eventNameLabel: "Başlık",
+    eventDescriptionLabel: "Açıklama",
+    eventFormatLabel: "Format",
+    eventFormatOnline: "Online",
+    eventFormatOffline: "Yüz yüze",
+    eventImageLabel: "Etkinlik görseli",
+    eventImageHint: "İsteğe bağlı. PNG/JPG 5 MB'a kadar.",
+    eventOnlineLabel: "Online bağlantı",
+    eventAddressLabel: "Adres",
+    eventJoin: "Katılacağım",
+    eventInterested: "İlgileniyorum",
+    eventOrganizerLabel: "Organizatör",
+    eventDetailsTitle: "Etkinlik",
+    eventEdit: "Düzenle",
+    eventUpdate: "Etkinliği güncelle",
+    eventDelete: "Sil",
+    eventDeleteConfirm: "Bu etkinlik silinsin mi?",
+    eventImageRemove: "Görseli kaldır",
+    eventCancelEdit: "D?zenlemeyi iptal et",
+    eventView: "Görüntüle",
+    eventParticipantsTitle: "Katılımcılar",
+    eventGoingLabel: "Katılıyor",
+    eventInterestedLabel: "İlgilenenler",
+    eventSave: "Etkinliği kaydet",
+    eventSaved: "Etkinlik kaydedildi.",
+    eventListTitle: "Etkinlikleriniz",
+    eventEmpty: "Henüz etkinlik yok.",
     partnersTitle: "Ortaklarımız",
     profileTitle: "Profili tamamlayın",
     profileSubtitle: "Kendiniz hakkında biraz bilgi verin.",
@@ -1079,6 +1596,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "Takipçiler",
     userStatsFollowing: "Takip",
     userActionFollow: "Takip et",
+    userActionUnfollow: "Takibi b?rak",
     userActionMessage: "Mesaj",
     userActionOrganizer: "Organizatör ol",
     userTabAbout: "Hakkında",
@@ -1144,6 +1662,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     createAccount: "Créer un nouveau compte",
     backToLogin: "Retour à la connexion",
     backButton: "Retour",
+    guestButton: "Continuer en tant qu’invité",
     loadingLabel: "Vérification...",
     successLogin: "Connexion réussie.",
     successRegister: "Compte créé.",
@@ -1156,6 +1675,51 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     privacyButton: "Confidentialité",
     impressumButton: "Mentions légales",
     termsButton: "Conditions d'utilisation",
+    searchButton: "Recherche",
+    searchTitle: "Recherche",
+    searchSubtitle: "Trouvez des événements, des organisateurs et des utilisateurs.",
+    searchPlaceholder: "Rechercher par nom, description ou mot-clé...",
+    searchCityLabel: "Ville",
+    searchLanguageLabel: "Langue",
+    searchDateLabel: "Date",
+    searchLevelLabel: "Niveau",
+    searchApply: "Rechercher",
+    searchClear: "Réinitialiser",
+    searchSectionEvents: "Événements",
+    searchSectionOrganizers: "Organisateurs",
+    searchSectionUsers: "Utilisateurs",
+    searchEmpty: "Aucun résultat.",
+    eventsButton: "Événements",
+    eventsTitle: "Événements",
+    eventsSubtitle: "Créez et gérez vos événements.",
+    eventCreateTitle: "Nouvel événement",
+    eventNameLabel: "Titre",
+    eventDescriptionLabel: "Description",
+    eventFormatLabel: "Format",
+    eventFormatOnline: "En ligne",
+    eventFormatOffline: "En présentiel",
+    eventImageLabel: "Image de l'événement",
+    eventImageHint: "Optionnel. PNG/JPG jusqu’à 5 Mo.",
+    eventOnlineLabel: "Lien en ligne",
+    eventAddressLabel: "Adresse",
+    eventJoin: "Je participe",
+    eventInterested: "Intéressé",
+    eventOrganizerLabel: "Organisateur",
+    eventDetailsTitle: "Événement",
+    eventEdit: "Modifier",
+    eventUpdate: "Mettre à jour l'événement",
+    eventDelete: "Supprimer",
+    eventDeleteConfirm: "Supprimer cet événement ?",
+    eventImageRemove: "Supprimer l'image",
+    eventCancelEdit: "Annuler",
+    eventView: "Voir",
+    eventParticipantsTitle: "Participants",
+    eventGoingLabel: "Participants",
+    eventInterestedLabel: "Intéressés",
+    eventSave: "Enregistrer l'événement",
+    eventSaved: "Événement enregistré.",
+    eventListTitle: "Vos événements",
+    eventEmpty: "Aucun événement pour l'instant.",
     partnersTitle: "Nos partenaires",
     profileTitle: "Complétez votre profil",
     profileSubtitle: "Parlez-nous un peu de vous.",
@@ -1166,6 +1730,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "Abonnés",
     userStatsFollowing: "Abonnements",
     userActionFollow: "Suivre",
+    userActionUnfollow: "Ne plus suivre",
     userActionMessage: "Message",
     userActionOrganizer: "Devenir organisateur",
     userTabAbout: "À propos",
@@ -1231,6 +1796,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     createAccount: "Crear nueva cuenta",
     backToLogin: "Volver al inicio",
     backButton: "Atrás",
+    guestButton: "Continuar como invitado",
     loadingLabel: "Verificando...",
     successLogin: "Sesión iniciada.",
     successRegister: "Cuenta creada.",
@@ -1243,6 +1809,51 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     privacyButton: "Privacidad",
     impressumButton: "Aviso legal",
     termsButton: "Términos de uso",
+    searchButton: "Buscar",
+    searchTitle: "Buscar",
+    searchSubtitle: "Encuentra eventos, organizadores y usuarios.",
+    searchPlaceholder: "Buscar por nombre, descripción o palabra clave...",
+    searchCityLabel: "Ciudad",
+    searchLanguageLabel: "Idioma",
+    searchDateLabel: "Fecha",
+    searchLevelLabel: "Nivel",
+    searchApply: "Buscar",
+    searchClear: "Restablecer",
+    searchSectionEvents: "Eventos",
+    searchSectionOrganizers: "Organizadores",
+    searchSectionUsers: "Usuarios",
+    searchEmpty: "No se encontraron resultados.",
+    eventsButton: "Eventos",
+    eventsTitle: "Eventos",
+    eventsSubtitle: "Crea y gestiona tus eventos.",
+    eventCreateTitle: "Nuevo evento",
+    eventNameLabel: "Título",
+    eventDescriptionLabel: "Descripción",
+    eventFormatLabel: "Formato",
+    eventFormatOnline: "En línea",
+    eventFormatOffline: "Presencial",
+    eventImageLabel: "Imagen del evento",
+    eventImageHint: "Opcional. PNG/JPG hasta 5 MB.",
+    eventOnlineLabel: "Enlace en línea",
+    eventAddressLabel: "Dirección",
+    eventJoin: "Me apunto",
+    eventInterested: "Me interesa",
+    eventOrganizerLabel: "Organizador",
+    eventDetailsTitle: "Evento",
+    eventEdit: "Editar",
+    eventUpdate: "Actualizar evento",
+    eventDelete: "Eliminar",
+    eventDeleteConfirm: "¿Eliminar este evento?",
+    eventImageRemove: "Quitar imagen",
+    eventCancelEdit: "Cancelar",
+    eventView: "Ver",
+    eventParticipantsTitle: "Participantes",
+    eventGoingLabel: "Asistentes",
+    eventInterestedLabel: "Interesados",
+    eventSave: "Guardar evento",
+    eventSaved: "Evento guardado.",
+    eventListTitle: "Tus eventos",
+    eventEmpty: "Aún no hay eventos.",
     partnersTitle: "Nuestros socios",
     profileTitle: "Completa tu perfil",
     profileSubtitle: "Cuéntanos un poco sobre ti.",
@@ -1253,6 +1864,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "Seguidores",
     userStatsFollowing: "Siguiendo",
     userActionFollow: "Seguir",
+    userActionUnfollow: "Dejar de seguir",
     userActionMessage: "Mensaje",
     userActionOrganizer: "Ser organizador",
     userTabAbout: "Acerca de",
@@ -1318,6 +1930,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     createAccount: "Crea un nuovo account",
     backToLogin: "Torna al login",
     backButton: "Indietro",
+    guestButton: "Continua come ospite",
     loadingLabel: "Verifica in corso...",
     successLogin: "Accesso riuscito.",
     successRegister: "Account creato.",
@@ -1330,6 +1943,51 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     privacyButton: "Privacy",
     impressumButton: "Note legali",
     termsButton: "Termini di utilizzo",
+    searchButton: "Cerca",
+    searchTitle: "Cerca",
+    searchSubtitle: "Trova eventi, organizzatori e utenti.",
+    searchPlaceholder: "Cerca per nome, descrizione o parola chiave...",
+    searchCityLabel: "Città",
+    searchLanguageLabel: "Lingua",
+    searchDateLabel: "Data",
+    searchLevelLabel: "Livello",
+    searchApply: "Cerca",
+    searchClear: "Ripristina",
+    searchSectionEvents: "Eventi",
+    searchSectionOrganizers: "Organizzatori",
+    searchSectionUsers: "Utenti",
+    searchEmpty: "Nessun risultato.",
+    eventsButton: "Eventi",
+    eventsTitle: "Eventi",
+    eventsSubtitle: "Crea e gestisci i tuoi eventi.",
+    eventCreateTitle: "Nuovo evento",
+    eventNameLabel: "Titolo",
+    eventDescriptionLabel: "Descrizione",
+    eventFormatLabel: "Formato",
+    eventFormatOnline: "Online",
+    eventFormatOffline: "In presenza",
+    eventImageLabel: "Immagine evento",
+    eventImageHint: "Opzionale. PNG/JPG fino a 5 MB.",
+    eventOnlineLabel: "Link online",
+    eventAddressLabel: "Indirizzo",
+    eventJoin: "Partecipo",
+    eventInterested: "Interessato",
+    eventOrganizerLabel: "Organizzatore",
+    eventDetailsTitle: "Evento",
+    eventEdit: "Modifica",
+    eventUpdate: "Aggiorna evento",
+    eventDelete: "Elimina",
+    eventDeleteConfirm: "Eliminare questo evento?",
+    eventImageRemove: "Rimuovi immagine",
+    eventCancelEdit: "Annulla",
+    eventView: "Apri",
+    eventParticipantsTitle: "Partecipanti",
+    eventGoingLabel: "Partecipano",
+    eventInterestedLabel: "Interessati",
+    eventSave: "Salva evento",
+    eventSaved: "Evento salvato.",
+    eventListTitle: "I tuoi eventi",
+    eventEmpty: "Nessun evento ancora.",
     partnersTitle: "I nostri partner",
     profileTitle: "Completa il profilo",
     profileSubtitle: "Raccontaci qualcosa su di te.",
@@ -1340,6 +1998,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "Follower",
     userStatsFollowing: "Seguiti",
     userActionFollow: "Segui",
+    userActionUnfollow: "Smetti di seguire",
     userActionMessage: "Messaggio",
     userActionOrganizer: "Diventa organizzatore",
     userTabAbout: "Info",
@@ -1405,6 +2064,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     createAccount: "Utwórz nowe konto",
     backToLogin: "Wróć do logowania",
     backButton: "Wstecz",
+    guestButton: "Kontynuuj jako gość",
     loadingLabel: "Sprawdzanie...",
     successLogin: "Zalogowano pomyślnie.",
     successRegister: "Konto utworzono.",
@@ -1417,6 +2077,51 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     privacyButton: "Prywatność",
     impressumButton: "Nota prawna",
     termsButton: "Warunki korzystania",
+    searchButton: "Szukaj",
+    searchTitle: "Szukaj",
+    searchSubtitle: "Znajdź wydarzenia, organizatorów i użytkowników.",
+    searchPlaceholder: "Szukaj po nazwie, opisie lub słowie kluczowym...",
+    searchCityLabel: "Miasto",
+    searchLanguageLabel: "Język",
+    searchDateLabel: "Data",
+    searchLevelLabel: "Poziom",
+    searchApply: "Szukaj",
+    searchClear: "Wyczyść",
+    searchSectionEvents: "Wydarzenia",
+    searchSectionOrganizers: "Organizatorzy",
+    searchSectionUsers: "Użytkownicy",
+    searchEmpty: "Brak wyników.",
+    eventsButton: "Wydarzenia",
+    eventsTitle: "Wydarzenia",
+    eventsSubtitle: "Twórz i zarządzaj swoimi wydarzeniami.",
+    eventCreateTitle: "Nowe wydarzenie",
+    eventNameLabel: "Tytuł",
+    eventDescriptionLabel: "Opis",
+    eventFormatLabel: "Format",
+    eventFormatOnline: "Online",
+    eventFormatOffline: "Stacjonarnie",
+    eventImageLabel: "Zdjęcie wydarzenia",
+    eventImageHint: "Opcjonalnie. PNG/JPG do 5 MB.",
+    eventOnlineLabel: "Link online",
+    eventAddressLabel: "Adres",
+    eventJoin: "Zapisz się",
+    eventInterested: "Interesuje mnie",
+    eventOrganizerLabel: "Organizator",
+    eventDetailsTitle: "Wydarzenie",
+    eventEdit: "Edytuj",
+    eventUpdate: "Aktualizuj wydarzenie",
+    eventDelete: "Usuń",
+    eventDeleteConfirm: "Usunąć to wydarzenie?",
+    eventImageRemove: "Usuń zdjęcie",
+    eventCancelEdit: "Anuluj",
+    eventView: "Otwórz",
+    eventParticipantsTitle: "Uczestnicy",
+    eventGoingLabel: "Idą",
+    eventInterestedLabel: "Zainteresowani",
+    eventSave: "Zapisz wydarzenie",
+    eventSaved: "Wydarzenie zapisane.",
+    eventListTitle: "Twoje wydarzenia",
+    eventEmpty: "Brak wydarzeń.",
     partnersTitle: "Nasi partnerzy",
     profileTitle: "Uzupełnij profil",
     profileSubtitle: "Opowiedz nam krótko o sobie.",
@@ -1427,6 +2132,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "Obserwujący",
     userStatsFollowing: "Obserwowani",
     userActionFollow: "Obserwuj",
+    userActionUnfollow: "Przesta? obserwowa?",
     userActionMessage: "Wiadomość",
     userActionOrganizer: "Zostań organizatorem",
     userTabAbout: "O mnie",
@@ -1482,8 +2188,12 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
 
 const FALLBACK_LOCALE: Locale = "en";
 const POST_AUTH_ROUTE_KEY = "vela-post-auth-route";
+const POST_AUTH_EVENT_KEY = "vela-post-auth-event";
+const GUEST_MODE_KEY = "vela-guest-mode";
 const PROFILE_PHOTO_BUCKET = "avatars";
 const POSTS_BUCKET = "posts";
+const EVENTS_BUCKET = "events";
+const ORGANIZER_FOLLOWS_TABLE = "organizer_follows";
 const POSTS_TABLE = "posts";
 const POST_MEDIA_FOLDER = "posts";
 const LEARN_PRACTICE_EXCLUDED = new Set<Locale>([
@@ -5331,6 +6041,10 @@ export default function App() {
   const [partnerCycle, setPartnerCycle] = useState(0);
   const [route, setRoute] = useState<Route>(() => getRouteFromLocation());
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [guestMode, setGuestMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(GUEST_MODE_KEY) === "1";
+  });
   const routeRef = useRef<Route>(route);
   const [userTab, setUserTab] = useState<UserTab>("posts");
   const [userPosts, setUserPosts] = useState<UserPost[]>([]);
@@ -5343,6 +6057,72 @@ export default function App() {
   }>({ type: "idle", message: "" });
   const [postActionStatus, setPostActionStatus] = useState<{
     type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchCity, setSearchCity] = useState("");
+  const [searchLanguage, setSearchLanguage] = useState<Locale | "">("");
+  const [searchLevel, setSearchLevel] = useState<LanguageLevel>("");
+  const [searchDate, setSearchDate] = useState("");
+  const [searchResults, setSearchResults] = useState<{
+    events: EventRecord[];
+    organizers: SearchProfile[];
+    users: SearchProfile[];
+  }>({ events: [], organizers: [], users: [] });
+  const [searchEventProfiles, setSearchEventProfiles] = useState<
+    Record<string, SearchProfile>
+  >({});
+  const [searchStatus, setSearchStatus] = useState<{
+    type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [searchTouched, setSearchTouched] = useState(false);
+  const [searchFormat, setSearchFormat] = useState<"" | EventFormat>("");
+  const [organizerFollowMap, setOrganizerFollowMap] = useState<
+    Record<string, boolean>
+  >({});
+  const [organizerFollowLoading, setOrganizerFollowLoading] = useState<
+    Record<string, boolean>
+  >({});
+  const [organizerFollowerCounts, setOrganizerFollowerCounts] = useState<
+    Record<string, number>
+  >({});
+  const [eventsList, setEventsList] = useState<EventRecord[]>([]);
+  const [eventDetails, setEventDetails] = useState<EventRecord | null>(null);
+  const [eventOrganizer, setEventOrganizer] = useState<SearchProfile | null>(null);
+  const [eventDetailsStatus, setEventDetailsStatus] = useState<{
+    type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [eventRsvpStatus, setEventRsvpStatus] = useState<
+    "going" | "interested" | null
+  >(null);
+  const [eventRsvpLoading, setEventRsvpLoading] = useState(false);
+  const [eventRsvps, setEventRsvps] = useState<
+    { user_id: string; status: "going" | "interested" }[]
+  >([]);
+  const [eventRsvpProfiles, setEventRsvpProfiles] = useState<
+    Record<string, SearchProfile>
+  >({});
+  const [eventEditingId, setEventEditingId] = useState<string | null>(null);
+  const [eventExistingImageUrl, setEventExistingImageUrl] = useState<string | null>(
+    null
+  );
+  const [eventRemoveImage, setEventRemoveImage] = useState(false);
+  const [eventTitle, setEventTitle] = useState("");
+  const [eventDescription, setEventDescription] = useState("");
+  const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [eventImagePreview, setEventImagePreview] = useState<string | null>(null);
+  const [eventCity, setEventCity] = useState("");
+  const [eventCountry, setEventCountry] = useState("");
+  const [eventAddress, setEventAddress] = useState("");
+  const [eventOnlineUrl, setEventOnlineUrl] = useState("");
+  const [eventLanguage, setEventLanguage] = useState<Locale | "">("");
+  const [eventLevel, setEventLevel] = useState<LanguageLevel>("");
+  const [eventDate, setEventDate] = useState("");
+  const [eventFormat, setEventFormat] = useState<"" | EventFormat>("");
+  const [eventStatus, setEventStatus] = useState<{
+    type: "idle" | "loading" | "success" | "error";
     message: string;
   }>({ type: "idle", message: "" });
   const [email, setEmail] = useState("");
@@ -5364,6 +6144,7 @@ export default function App() {
   const [profileInterestInput, setProfileInterestInput] = useState("");
   const [profileTelegram, setProfileTelegram] = useState("");
   const [profileInstagram, setProfileInstagram] = useState("");
+  const [profileIsOrganizer, setProfileIsOrganizer] = useState(false);
   const [profileCoverPhoto, setProfileCoverPhoto] = useState<File | null>(null);
   const [profileCoverPreview, setProfileCoverPreview] = useState<string | null>(
     null
@@ -5385,6 +6166,7 @@ export default function App() {
   const profileCoverInputRef = useRef<HTMLInputElement | null>(null);
   const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
   const postFileInputRef = useRef<HTMLInputElement | null>(null);
+  const eventImageInputRef = useRef<HTMLInputElement | null>(null);
   const cropImageRef = useRef<HTMLImageElement | null>(null);
   const cropDragRef = useRef<{
     active: boolean;
@@ -5442,9 +6224,24 @@ export default function App() {
     : undefined;
   const emptyProfileValue = "-";
   const followerInitials = ["V", "E", "L", "A"];
+  const activeEventId = getEventIdFromLocation();
+  const sortedEventRsvps = [...eventRsvps].sort((a, b) => {
+    if (a.status === b.status) return 0;
+    return a.status === "going" ? -1 : 1;
+  });
+  const eventGoingCount = eventRsvps.filter(
+    (item) => item.status === "going"
+  ).length;
+  const eventInterestedCount = eventRsvps.filter(
+    (item) => item.status === "interested"
+  ).length;
+  const sessionOrganizerFollowers =
+    sessionUser?.id && profileIsOrganizer
+      ? organizerFollowerCounts[sessionUser.id] ?? 0
+      : 0;
   const userStats = [
     { label: strings.userStatsPosts, value: String(userPosts.length) },
-    { label: strings.userStatsFollowers, value: "0" },
+    { label: strings.userStatsFollowers, value: String(sessionOrganizerFollowers) },
     { label: strings.userStatsFollowing, value: "0" },
   ];
   const userTabs = [
@@ -5538,6 +6335,32 @@ export default function App() {
         }
       }
       applyRouteChange(next);
+    },
+    [applyRouteChange]
+  );
+
+  const redirectToLoginWithIntent = useCallback(
+    (intent: { route: Route; eventId?: string }) => {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(POST_AUTH_ROUTE_KEY, intent.route);
+        if (intent.eventId) {
+          window.localStorage.setItem(POST_AUTH_EVENT_KEY, intent.eventId);
+        }
+      }
+      navigate("login");
+    },
+    [navigate]
+  );
+
+  const goToEvent = useCallback(
+    (eventId: string) => {
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.pathname = ROUTE_PATHS.event;
+        url.searchParams.set("id", eventId);
+        window.history.pushState({}, "", url.toString());
+      }
+      applyRouteChange("event");
     },
     [applyRouteChange]
   );
@@ -5665,6 +6488,32 @@ export default function App() {
   }, [route]);
 
   useEffect(() => {
+    if (guestMode || !sessionUser?.id) {
+      setOrganizerFollowMap({});
+      setOrganizerFollowLoading({});
+      setOrganizerFollowerCounts({});
+    }
+  }, [guestMode, sessionUser?.id]);
+
+  useEffect(() => {
+    if (!guestMode) return;
+    const allowedRoutes: Route[] = [
+      "login",
+      "register",
+      "forgot",
+      "search",
+      "events",
+      "event",
+      "privacy",
+      "impressum",
+      "terms",
+    ];
+    if (!allowedRoutes.includes(route)) {
+      navigate("search");
+    }
+  }, [guestMode, navigate, route]);
+
+  useEffect(() => {
     if (route !== "profile") return;
     if (!profileLanguage) {
       setProfileLanguage(locale);
@@ -5684,6 +6533,13 @@ export default function App() {
       URL.revokeObjectURL(profileCoverPreview);
     };
   }, [profileCoverPreview]);
+
+  useEffect(() => {
+    if (!eventImagePreview?.startsWith("blob:")) return undefined;
+    return () => {
+      URL.revokeObjectURL(eventImagePreview);
+    };
+  }, [eventImagePreview]);
 
   useEffect(() => {
     if (!postPreviewUrl?.startsWith("blob:")) return undefined;
@@ -5725,6 +6581,10 @@ export default function App() {
 
   useEffect(() => {
     if (route !== "profile" && route !== "me") return;
+    if (guestMode) {
+      navigate("search");
+      return;
+    }
     const supabase = getSupabaseClient();
     if (!supabase) return;
     let active = true;
@@ -5740,7 +6600,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [navigate, route]);
+  }, [guestMode, navigate, route]);
 
   useEffect(() => {
     if (route !== "profile" && route !== "me") {
@@ -5767,7 +6627,7 @@ export default function App() {
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram"
+          "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram,is_organizer"
         )
         .eq("id", user.id)
         .maybeSingle();
@@ -5825,6 +6685,7 @@ export default function App() {
         setProfileInterestInput("");
         setProfileTelegram(data.telegram ?? "");
         setProfileInstagram(data.instagram ?? "");
+        setProfileIsOrganizer(Boolean(data.is_organizer));
         setProfileCoverUrl(data.cover_url ?? null);
         setProfileCoverPreview(data.cover_url ?? null);
         setProfileCoverPhoto(null);
@@ -5885,6 +6746,293 @@ export default function App() {
       active = false;
     };
   }, [getSupabaseErrorMessage, route, sessionUser?.id]);
+
+
+
+  const fetchEventRsvps = useCallback(async (eventId: string) => {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return null;
+    }
+    const { data: rsvpRows, error } = await supabase
+      .from("event_rsvps")
+      .select("user_id,status")
+      .eq("event_id", eventId);
+    if (error) {
+      return null;
+    }
+    const rsvps = (rsvpRows ?? []) as {
+      user_id: string;
+      status: "going" | "interested";
+    }[];
+    const ids = Array.from(
+      new Set(rsvps.map((row) => row.user_id).filter(Boolean))
+    ) as string[];
+    let profiles: Record<string, SearchProfile> = {};
+    if (ids.length) {
+      const { data: profileRows, error: profileError } = await supabase
+        .from("profiles")
+        .select("id,full_name,avatar_url,city,country,language,language_level,is_organizer")
+        .in("id", ids);
+      if (!profileError && profileRows) {
+        profiles = profileRows.reduce((acc, profile) => {
+          acc[profile.id] = profile as SearchProfile;
+          return acc;
+        }, {} as Record<string, SearchProfile>);
+      }
+    }
+    return { rsvps, profiles };
+  }, []);
+
+  const fetchOrganizerFollowStatus = useCallback(
+    async (organizerIds: string[]) => {
+      if (guestMode || !sessionUser?.id) {
+        return {};
+      }
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        return {};
+      }
+      if (!organizerIds.length) {
+        return {};
+      }
+      const { data, error } = await supabase
+        .from(ORGANIZER_FOLLOWS_TABLE)
+        .select("organizer_id")
+        .eq("follower_id", sessionUser.id)
+        .in("organizer_id", organizerIds);
+      if (error) {
+        return {};
+      }
+      const map: Record<string, boolean> = {};
+      organizerIds.forEach((id) => {
+        map[id] = false;
+      });
+      (data as { organizer_id: string }[] | null)?.forEach((row) => {
+        if (row.organizer_id) {
+          map[row.organizer_id] = true;
+        }
+      });
+      return map;
+    },
+    [guestMode, sessionUser?.id]
+  );
+
+  const fetchOrganizerFollowerCounts = useCallback(async (organizerIds: string[]) => {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return {};
+    }
+    if (!organizerIds.length) {
+      return {};
+    }
+    const { data, error } = await supabase.rpc("get_organizer_follow_counts", {
+      organizer_ids: organizerIds,
+    });
+    if (error) {
+      return {};
+    }
+    const map: Record<string, number> = {};
+    organizerIds.forEach((id) => {
+      map[id] = 0;
+    });
+    (data as { organizer_id: string; followers_count: number }[] | null)?.forEach(
+      (row) => {
+        if (row.organizer_id) {
+          map[row.organizer_id] = Number(row.followers_count) || 0;
+        }
+      }
+    );
+    return map;
+  }, []);
+  useEffect(() => {
+    if (route !== "events") return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setEventStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    let active = true;
+    (async () => {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (!active) return;
+      if (sessionError) {
+        setEventStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(sessionError),
+        });
+        return;
+      }
+      const user = data.session?.user;
+      if (!user) {
+        setEventsList([]);
+        return;
+      }
+      const { data: eventRows, error } = await supabase
+        .from("events")
+        .select(
+          "id,organizer_id,title,description,image_url,online_url,address,city,country,language,language_level,event_date,format,created_at"
+        )
+        .eq("organizer_id", user.id)
+        .order("event_date", { ascending: false });
+      if (!active) return;
+      if (error) {
+        setEventStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(error),
+        });
+        return;
+      }
+      setEventsList((eventRows ?? []) as EventRecord[]);
+      setEventStatus({ type: "idle", message: "" });
+    })();
+    return () => {
+      active = false;
+    };
+  }, [getSupabaseErrorMessage, route]);
+
+  useEffect(() => {
+    if (route !== "event") {
+      setEventRsvps([]);
+      setEventRsvpProfiles({});
+      setEventRsvpStatus(null);
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setEventDetailsStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    const eventId = activeEventId;
+    if (!eventId) {
+      setEventDetails(null);
+      setEventOrganizer(null);
+      setEventDetailsStatus({
+        type: "error",
+        message: strings.searchEmpty,
+      });
+      return;
+    }
+    let active = true;
+    (async () => {
+      setEventDetailsStatus({ type: "loading", message: "" });
+      const { data: eventRow, error } = await supabase
+        .from("events")
+        .select(
+          "id,organizer_id,title,description,image_url,online_url,address,city,country,language,language_level,event_date,format,created_at"
+        )
+        .eq("id", eventId)
+        .maybeSingle();
+      if (!active) return;
+      if (error || !eventRow) {
+        setEventDetailsStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(error ?? new Error("Not found")),
+        });
+        setEventDetails(null);
+        setEventOrganizer(null);
+        setEventRsvps([]);
+        setEventRsvpProfiles({});
+        return;
+      }
+      const eventData = eventRow as EventRecord;
+      setEventDetails(eventData);
+      const { data: organizerRow } = await supabase
+        .from("profiles")
+        .select(
+          "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,is_organizer,bio"
+        )
+        .eq("id", eventData.organizer_id)
+        .maybeSingle();
+      if (!active) return;
+      setEventOrganizer((organizerRow as SearchProfile) ?? null);
+
+      const rsvpResult = await fetchEventRsvps(eventId);
+      if (!active) return;
+      if (rsvpResult) {
+        setEventRsvps(rsvpResult.rsvps);
+        setEventRsvpProfiles(rsvpResult.profiles);
+      } else {
+        setEventRsvps([]);
+        setEventRsvpProfiles({});
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!active) return;
+      const user = sessionData.session?.user;
+      if (!user) {
+        setEventRsvpStatus(null);
+        setEventDetailsStatus({ type: "idle", message: "" });
+        return;
+      }
+      const { data: rsvpRow } = await supabase
+        .from("event_rsvps")
+        .select("status")
+        .eq("event_id", eventId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!active) return;
+      setEventRsvpStatus(
+        rsvpRow?.status === "going"
+          ? "going"
+          : rsvpRow?.status === "interested"
+            ? "interested"
+            : null
+      );
+      setEventDetailsStatus({ type: "idle", message: "" });
+    })();
+    return () => {
+      active = false;
+    };
+  }, [
+    activeEventId,
+    fetchEventRsvps,
+    getSupabaseErrorMessage,
+    route,
+    strings.searchEmpty,
+  ]);
+
+  useEffect(() => {
+    if (route !== "event") return;
+    const organizerId = eventOrganizer?.id;
+    if (!organizerId) return;
+    let active = true;
+    fetchOrganizerFollowStatus([organizerId]).then((map) => {
+      if (!active) return;
+      if (map[organizerId] === undefined) return;
+      setOrganizerFollowMap((prev) => ({
+        ...prev,
+        [organizerId]: map[organizerId],
+      }));
+    });
+    return () => {
+      active = false;
+    };
+  }, [eventOrganizer?.id, fetchOrganizerFollowStatus, route]);
+
+  useEffect(() => {
+    if (route !== "event") return;
+    const organizerId = eventOrganizer?.id;
+    if (!organizerId) return;
+    let active = true;
+    fetchOrganizerFollowerCounts([organizerId]).then((map) => {
+      if (!active) return;
+      if (map[organizerId] === undefined) return;
+      setOrganizerFollowerCounts((prev) => ({
+        ...prev,
+        [organizerId]: map[organizerId],
+      }));
+    });
+    return () => {
+      active = false;
+    };
+  }, [eventOrganizer?.id, fetchOrganizerFollowerCounts, route]);
 
 
   function handleLocaleSelect(next: Locale) {
@@ -6036,6 +7184,33 @@ export default function App() {
     resetProfileStatus();
   }
 
+  function handleEventImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (eventImagePreview?.startsWith("blob:")) {
+      URL.revokeObjectURL(eventImagePreview);
+    }
+    setEventImageFile(file);
+    setEventRemoveImage(false);
+    if (!file) {
+      setEventImagePreview(null);
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setEventImagePreview(previewUrl);
+  }
+
+  function handleRemoveEventImage() {
+    if (eventImagePreview?.startsWith("blob:")) {
+      URL.revokeObjectURL(eventImagePreview);
+    }
+    setEventImageFile(null);
+    setEventImagePreview(null);
+    setEventRemoveImage(true);
+    if (eventImageInputRef.current) {
+      eventImageInputRef.current.value = "";
+    }
+  }
+
   function resetPostActionStatus() {
     if (postActionStatus.type !== "idle") {
       setPostActionStatus({ type: "idle", message: "" });
@@ -6066,6 +7241,590 @@ export default function App() {
     setAuthState({ type: "error", message });
   }
 
+  function handleContinueAsGuest() {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(GUEST_MODE_KEY, "1");
+    }
+    setGuestMode(true);
+    setAuthState({ type: "idle", message: "" });
+    navigate("search");
+  }
+
+  async function handleBecomeOrganizer() {
+    if (profileIsOrganizer) return;
+    if (guestMode) {
+      redirectToLoginWithIntent({ route: "events" });
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      if (typeof window !== "undefined") {
+        window.alert("Supabase is not configured.");
+      }
+      return;
+    }
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const user = data.session?.user;
+      if (!user) {
+        redirectToLoginWithIntent({ route: "events" });
+        return;
+      }
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_organizer: true, updated_at: new Date().toISOString() })
+        .eq("id", user.id);
+      if (error) throw error;
+      setProfileIsOrganizer(true);
+    } catch (error) {
+      if (typeof window !== "undefined") {
+        window.alert(getSupabaseErrorMessage(error));
+      }
+    }
+  }
+
+  function resetEventForm() {
+    if (eventImagePreview?.startsWith("blob:")) {
+      URL.revokeObjectURL(eventImagePreview);
+    }
+    setEventEditingId(null);
+    setEventExistingImageUrl(null);
+    setEventRemoveImage(false);
+    setEventStatus({ type: "idle", message: "" });
+    setEventTitle("");
+    setEventDescription("");
+    setEventImageFile(null);
+    setEventImagePreview(null);
+    if (eventImageInputRef.current) {
+      eventImageInputRef.current.value = "";
+    }
+    setEventCity("");
+    setEventCountry("");
+    setEventAddress("");
+    setEventOnlineUrl("");
+    setEventLanguage("");
+    setEventLevel("");
+    setEventDate("");
+    setEventFormat("");
+  }
+
+  function handleEditEvent(event: EventRecord) {
+    if (eventImagePreview?.startsWith("blob:")) {
+      URL.revokeObjectURL(eventImagePreview);
+    }
+    setEventEditingId(event.id);
+    setEventTitle(event.title ?? "");
+    setEventDescription(event.description ?? "");
+    setEventCity(event.city ?? "");
+    setEventCountry(event.country ?? "");
+    setEventAddress(event.address ?? "");
+    setEventOnlineUrl(event.online_url ?? "");
+    setEventLanguage(
+      event.language && isSupportedLocale(event.language) ? event.language : ""
+    );
+    setEventLevel(isLanguageLevel(event.language_level) ? event.language_level : "");
+    setEventDate(event.event_date ?? "");
+    setEventFormat(event.format ?? "");
+    setEventExistingImageUrl(event.image_url ?? null);
+    setEventRemoveImage(false);
+    setEventImageFile(null);
+    setEventImagePreview(event.image_url ?? null);
+    if (eventImageInputRef.current) {
+      eventImageInputRef.current.value = "";
+    }
+    setEventStatus({ type: "idle", message: "" });
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  async function handleDeleteEvent(event: EventRecord) {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setEventStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(strings.eventDeleteConfirm);
+      if (!confirmed) return;
+    }
+    setEventStatus({ type: "loading", message: strings.loadingLabel });
+    try {
+      const { error } = await supabase
+        .from("events")
+        .delete()
+        .eq("id", event.id);
+      if (error) throw error;
+      if (event.image_url) {
+        const path = getStoragePathFromPublicUrl(event.image_url, EVENTS_BUCKET);
+        if (path) {
+          await supabase.storage.from(EVENTS_BUCKET).remove([path]);
+        }
+      }
+      setEventsList((prev) => prev.filter((item) => item.id !== event.id));
+      if (eventEditingId === event.id) {
+        resetEventForm();
+      }
+      setEventStatus({ type: "idle", message: "" });
+    } catch (error) {
+      setEventStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    }
+  }
+
+  async function handleSaveEvent() {
+    if (eventStatus.type === "loading") return;
+    if (!profileIsOrganizer) {
+      setEventStatus({
+        type: "error",
+        message: strings.userActionOrganizer,
+      });
+      return;
+    }
+    if (!eventTitle.trim() || !eventDate) {
+      setEventStatus({ type: "error", message: strings.errorRequired });
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setEventStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    setEventStatus({ type: "loading", message: strings.loadingLabel });
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const user = data.session?.user;
+      if (!user) {
+      setEventStatus({
+        type: "error",
+        message: strings.profileAuthRequired,
+      });
+      return;
+    }
+      const isEditing = Boolean(eventEditingId);
+      const existingImageUrl = eventExistingImageUrl ?? null;
+      let nextImageUrl = existingImageUrl;
+      if (eventImageFile) {
+        const extension =
+          eventImageFile.name.split(".").pop() ?? "jpg";
+        const fileName = `${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}.${extension}`;
+        const filePath = `${user.id}/events/${fileName}`;
+        const { error: uploadError } = await supabase.storage
+          .from(EVENTS_BUCKET)
+          .upload(filePath, eventImageFile, {
+            upsert: true,
+            contentType: eventImageFile.type || "image/jpeg",
+          });
+        if (uploadError) throw uploadError;
+        const { data: publicData } = supabase.storage
+          .from(EVENTS_BUCKET)
+          .getPublicUrl(filePath);
+        nextImageUrl = publicData.publicUrl ?? null;
+      } else if (eventRemoveImage) {
+        nextImageUrl = null;
+      }
+      const basePayload = {
+        title: eventTitle.trim(),
+        description: eventDescription.trim() || null,
+        image_url: nextImageUrl,
+        city: eventCity.trim() || null,
+        country: eventCountry.trim() || null,
+        address: eventAddress.trim() || null,
+        online_url: eventOnlineUrl.trim() || null,
+        language: eventLanguage || null,
+        language_level: eventLevel || null,
+        event_date: eventDate || null,
+        format: eventFormat || null,
+      };
+      let savedEvent: EventRecord | null = null;
+      if (isEditing && eventEditingId) {
+        const { data: updated, error } = await supabase
+          .from("events")
+          .update(basePayload)
+          .eq("id", eventEditingId)
+          .select(
+            "id,organizer_id,title,description,image_url,online_url,address,city,country,language,language_level,event_date,format,created_at"
+          )
+          .single();
+        if (error) throw error;
+        savedEvent = updated as EventRecord;
+        if (savedEvent) {
+          setEventsList((prev) =>
+            prev.map((item) => (item.id === savedEvent?.id ? savedEvent : item))
+          );
+        }
+      } else {
+        const payload = {
+          ...basePayload,
+          organizer_id: user.id,
+          created_at: new Date().toISOString(),
+        };
+        const { data: inserted, error } = await supabase
+          .from("events")
+          .insert(payload)
+          .select(
+            "id,organizer_id,title,description,image_url,online_url,address,city,country,language,language_level,event_date,format,created_at"
+          )
+          .single();
+        if (error) throw error;
+        savedEvent = inserted as EventRecord;
+        if (savedEvent) {
+          setEventsList((prev) => [savedEvent as EventRecord, ...prev]);
+        }
+      }
+      if (
+        existingImageUrl &&
+        (eventRemoveImage ||
+          (eventImageFile && existingImageUrl !== nextImageUrl))
+      ) {
+        const path = getStoragePathFromPublicUrl(
+          existingImageUrl,
+          EVENTS_BUCKET
+        );
+        if (path) {
+          await supabase.storage.from(EVENTS_BUCKET).remove([path]);
+        }
+      }
+      resetEventForm();
+      setEventStatus({ type: "success", message: strings.eventSaved });
+    } catch (error) {
+      setEventStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    }
+  }
+
+  async function handleEventRsvp(nextStatus: "going" | "interested") {
+    if (eventRsvpLoading || !eventDetails) return;
+    if (guestMode) {
+      redirectToLoginWithIntent({
+        route: "event",
+        eventId: eventDetails.id,
+      });
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      if (typeof window !== "undefined") {
+        window.alert("Supabase is not configured.");
+      }
+      return;
+    }
+    try {
+      setEventRsvpLoading(true);
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const user = sessionData.session?.user;
+      if (!user) {
+        redirectToLoginWithIntent({
+          route: "event",
+          eventId: eventDetails.id,
+        });
+        return;
+      }
+      if (eventRsvpStatus === nextStatus) {
+        const { error } = await supabase
+          .from("event_rsvps")
+          .delete()
+          .eq("event_id", eventDetails.id)
+          .eq("user_id", user.id);
+        if (error) throw error;
+        setEventRsvpStatus(null);
+      } else {
+        const { error } = await supabase
+          .from("event_rsvps")
+          .upsert(
+            {
+              event_id: eventDetails.id,
+              user_id: user.id,
+              status: nextStatus,
+            },
+            { onConflict: "event_id,user_id" }
+          );
+        if (error) throw error;
+        setEventRsvpStatus(nextStatus);
+      }
+      const rsvpResult = await fetchEventRsvps(eventDetails.id);
+      if (rsvpResult) {
+        setEventRsvps(rsvpResult.rsvps);
+        setEventRsvpProfiles(rsvpResult.profiles);
+      }
+    } catch (error) {
+      if (typeof window !== "undefined") {
+        window.alert(getSupabaseErrorMessage(error));
+      }
+    } finally {
+      setEventRsvpLoading(false);
+    }
+  }
+
+  async function handleToggleOrganizerFollow(
+    organizerId: string,
+    sourceEventId?: string | null
+  ) {
+    if (!organizerId) return;
+    if (guestMode || !sessionUser?.id) {
+      redirectToLoginWithIntent({
+        route: sourceEventId ? "event" : "search",
+        eventId: sourceEventId ?? undefined,
+      });
+      return;
+    }
+    if (sessionUser.id === organizerId) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      if (typeof window !== "undefined") {
+        window.alert("Supabase is not configured.");
+      }
+      return;
+    }
+    const isFollowing = organizerFollowMap[organizerId] === true;
+    setOrganizerFollowLoading((prev) => ({ ...prev, [organizerId]: true }));
+    try {
+      if (isFollowing) {
+        const { error } = await supabase
+          .from(ORGANIZER_FOLLOWS_TABLE)
+          .delete()
+          .eq("follower_id", sessionUser.id)
+          .eq("organizer_id", organizerId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from(ORGANIZER_FOLLOWS_TABLE)
+          .insert({
+            follower_id: sessionUser.id,
+            organizer_id: organizerId,
+            created_at: new Date().toISOString(),
+          });
+        if (error) throw error;
+      }
+      setOrganizerFollowMap((prev) => ({
+        ...prev,
+        [organizerId]: !isFollowing,
+      }));
+      setOrganizerFollowerCounts((prev) => {
+        const current = prev[organizerId];
+        if (current === undefined) return prev;
+        const next = Math.max(0, current + (isFollowing ? -1 : 1));
+        return { ...prev, [organizerId]: next };
+      });
+    } catch (error) {
+      if (typeof window !== "undefined") {
+        window.alert(getSupabaseErrorMessage(error));
+      }
+    } finally {
+      setOrganizerFollowLoading((prev) => ({
+        ...prev,
+        [organizerId]: false,
+      }));
+    }
+  }
+
+  const runSearch = useCallback(async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setSearchStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    setSearchTouched(true);
+    setSearchStatus({ type: "loading", message: "" });
+    const queryValue = searchQuery.trim();
+    const cityValue = searchCity.trim().toLowerCase();
+    const levelValue = searchLevel;
+    const languageValue = searchLanguage;
+    const dateValue = searchDate;
+    const formatValue = searchFormat;
+    try {
+      let profileQuery = supabase
+        .from("profiles")
+        .select(
+          "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,bio,is_organizer"
+        )
+        .limit(200);
+      if (queryValue) {
+        const safeQuery = queryValue.replace(/[,()]/g, " ");
+        profileQuery = profileQuery.or(
+          `full_name.ilike.%${safeQuery}%,bio.ilike.%${safeQuery}%,city.ilike.%${safeQuery}%,country.ilike.%${safeQuery}%`
+        );
+      }
+      const { data: profileRows, error: profileError } = await profileQuery;
+      if (profileError) throw profileError;
+      const profiles = (profileRows ?? []) as SearchProfile[];
+      const filteredProfiles = profiles.filter((profile) => {
+        if (cityValue) {
+          const profileCity = profile.city?.toLowerCase() ?? "";
+          if (!profileCity.includes(cityValue)) return false;
+        }
+        if (levelValue && profile.language_level !== levelValue) return false;
+        if (languageValue && !profileMatchesLanguage(profile, languageValue)) {
+          return false;
+        }
+        return true;
+      });
+      const organizers = filteredProfiles.filter((profile) => profile.is_organizer);
+      const users = filteredProfiles.filter((profile) => !profile.is_organizer);
+
+      let eventsQuery = supabase
+        .from("events")
+        .select(
+          "id,organizer_id,title,description,image_url,online_url,address,city,country,language,language_level,event_date,format,created_at"
+        )
+        .order("event_date", { ascending: true })
+        .limit(200);
+      if (queryValue) {
+        const safeQuery = queryValue.replace(/[,()]/g, " ");
+        eventsQuery = eventsQuery.or(
+          `title.ilike.%${safeQuery}%,description.ilike.%${safeQuery}%`
+        );
+      }
+      if (dateValue) {
+        eventsQuery = eventsQuery.eq("event_date", dateValue);
+      }
+      if (cityValue) {
+        eventsQuery = eventsQuery.ilike("city", `%${cityValue}%`);
+      }
+      if (languageValue) {
+        eventsQuery = eventsQuery.eq("language", languageValue);
+      }
+      if (levelValue) {
+        eventsQuery = eventsQuery.eq("language_level", levelValue);
+      }
+      if (formatValue) {
+        eventsQuery = eventsQuery.eq("format", formatValue);
+      }
+      const { data: eventsRows, error: eventsError } = await eventsQuery;
+      if (eventsError) throw eventsError;
+      const events = (eventsRows ?? []) as EventRecord[];
+      const organizerIds = Array.from(
+        new Set(events.map((event) => event.organizer_id).filter(Boolean))
+      ) as string[];
+      let eventProfiles: Record<string, SearchProfile> = {};
+      if (organizerIds.length) {
+        const { data: eventProfilesRows, error: eventProfilesError } =
+          await supabase
+            .from("profiles")
+            .select(
+              "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,is_organizer"
+            )
+            .in("id", organizerIds);
+        if (eventProfilesError) throw eventProfilesError;
+        eventProfiles = (eventProfilesRows ?? []).reduce(
+          (acc, profile) => {
+            acc[profile.id] = profile as SearchProfile;
+            return acc;
+          },
+          {} as Record<string, SearchProfile>
+        );
+      }
+
+      setSearchResults({
+        events,
+        organizers,
+        users,
+      });
+      setSearchEventProfiles(eventProfiles);
+      setSearchStatus({ type: "idle", message: "" });
+    } catch (error) {
+      setSearchStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    }
+  }, [
+    searchCity,
+    searchDate,
+    searchLanguage,
+    searchLevel,
+    searchQuery,
+    searchFormat,
+    getSupabaseErrorMessage,
+  ]);
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery("");
+    setSearchCity("");
+    setSearchLanguage("");
+    setSearchLevel("");
+    setSearchDate("");
+    setSearchFormat("");
+    setSearchResults({ events: [], organizers: [], users: [] });
+    setSearchEventProfiles({});
+    setSearchStatus({ type: "idle", message: "" });
+    setSearchTouched(false);
+  }, []);
+
+  useEffect(() => {
+    if (route !== "search") return;
+    void runSearch();
+  }, [route, runSearch]);
+
+  useEffect(() => {
+    if (route !== "search") return;
+    const organizerIds = searchResults.organizers
+      .map((profile) => profile.id)
+      .filter(Boolean);
+    if (!organizerIds.length) return;
+    let active = true;
+    fetchOrganizerFollowStatus(organizerIds).then((map) => {
+      if (!active) return;
+      if (Object.keys(map).length === 0) return;
+      setOrganizerFollowMap((prev) => ({ ...prev, ...map }));
+    });
+    return () => {
+      active = false;
+    };
+  }, [fetchOrganizerFollowStatus, route, searchResults.organizers]);
+
+  useEffect(() => {
+    if (route !== "search") return;
+    const organizerIds = searchResults.organizers
+      .map((profile) => profile.id)
+      .filter(Boolean);
+    if (!organizerIds.length) return;
+    let active = true;
+    fetchOrganizerFollowerCounts(organizerIds).then((map) => {
+      if (!active) return;
+      if (Object.keys(map).length === 0) return;
+      setOrganizerFollowerCounts((prev) => ({ ...prev, ...map }));
+    });
+    return () => {
+      active = false;
+    };
+  }, [fetchOrganizerFollowerCounts, route, searchResults.organizers]);
+
+  useEffect(() => {
+    if (!sessionUser?.id || !profileIsOrganizer) return;
+    let active = true;
+    fetchOrganizerFollowerCounts([sessionUser.id]).then((map) => {
+      if (!active) return;
+      if (map[sessionUser.id] === undefined) return;
+      setOrganizerFollowerCounts((prev) => ({
+        ...prev,
+        [sessionUser.id]: map[sessionUser.id],
+      }));
+    });
+    return () => {
+      active = false;
+    };
+  }, [fetchOrganizerFollowerCounts, profileIsOrganizer, sessionUser?.id]);
+
   const handlePostAuthRedirect = useCallback(
     async (user: SessionUser) => {
       const supabase = getSupabaseClient();
@@ -6086,6 +7845,7 @@ export default function App() {
 
       const complete = isProfileComplete(profileData);
       let preferredRoute: Route | null = null;
+      let storedEventId: string | null = null;
       if (typeof window !== "undefined") {
         const storedRoute = window.localStorage.getItem(POST_AUTH_ROUTE_KEY);
         if (storedRoute) {
@@ -6100,6 +7860,10 @@ export default function App() {
             preferredRoute = resolved;
           }
         }
+        storedEventId = window.localStorage.getItem(POST_AUTH_EVENT_KEY);
+        if (storedEventId) {
+          window.localStorage.removeItem(POST_AUTH_EVENT_KEY);
+        }
       }
 
       if (!complete) {
@@ -6107,9 +7871,14 @@ export default function App() {
         return;
       }
 
+      if (preferredRoute === "event" && storedEventId) {
+        goToEvent(storedEventId);
+        return;
+      }
+
       navigate(preferredRoute ?? "me");
     },
-    [navigate]
+    [goToEvent, navigate]
   );
 
   const upsertProfile = useCallback(
@@ -6139,6 +7908,12 @@ export default function App() {
       if (!active) return;
       setSessionUser(session?.user ?? null);
       if (!session?.user) return;
+      if (guestMode) {
+        setGuestMode(false);
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem(GUEST_MODE_KEY);
+        }
+      }
       void upsertProfile(session.user);
       setAuthState({ type: "success", message: strings.successLogin });
       const currentRoute = routeRef.current;
@@ -6154,7 +7929,7 @@ export default function App() {
       active = false;
       data.subscription.unsubscribe();
     };
-  }, [handlePostAuthRedirect, strings.successLogin, upsertProfile]);
+  }, [guestMode, handlePostAuthRedirect, strings.successLogin, upsertProfile]);
 
   async function handlePrimaryAction() {
     if (authState.type === "loading") return;
@@ -6715,13 +8490,18 @@ export default function App() {
   const isPrivacyRoute = route === "privacy";
   const isImpressumRoute = route === "impressum";
   const isTermsRoute = route === "terms";
+  const isSearchRoute = route === "search";
+  const isEventsRoute = route === "events";
+  const isEventRoute = route === "event";
   const isProfileRoute = route === "profile";
   const isUserRoute = route === "me";
   const isAuthRoute = route === "login" || route === "register" || route === "forgot";
   const showPassword = isAuthRoute && route !== "forgot";
   const showConfirm = isAuthRoute && route === "register";
   const showBackButton = !isAuthRoute;
-  const showUserQuickActions = isUserRoute;
+  const showSearchButton = !isAuthRoute;
+  const showEventsButton = !isAuthRoute;
+  const showUserQuickActions = isUserRoute && !guestMode;
   const primaryLabel =
     route === "login"
       ? strings.loginButton
@@ -6783,6 +8563,24 @@ export default function App() {
                 ) : null}
               </div>
               <div className="topbarActions">
+                {showSearchButton ? (
+                  <button
+                    className={`btn${isSearchRoute ? " btnActive" : ""}`}
+                    type="button"
+                    onClick={() => navigate("search")}
+                  >
+                    {strings.searchButton}
+                  </button>
+                ) : null}
+                {showEventsButton ? (
+                  <button
+                    className={`btn${isEventsRoute ? " btnActive" : ""}`}
+                    type="button"
+                    onClick={() => navigate("events")}
+                  >
+                    {strings.eventsButton}
+                  </button>
+                ) : null}
                 {showUserQuickActions ? (
                   <>
                     <button
@@ -6792,7 +8590,12 @@ export default function App() {
                     >
                       {strings.profileEditButton}
                     </button>
-                    <button className="userAction" type="button">
+                    <button
+                      className="userAction"
+                      type="button"
+                      onClick={handleBecomeOrganizer}
+                      disabled={profileIsOrganizer}
+                    >
                       {strings.userActionOrganizer}
                     </button>
                   </>
@@ -6821,6 +8624,965 @@ export default function App() {
             ) : isTermsRoute ? (
               <div className="privacyPage" dir={legalDir}>
                 {renderLegalContent(termsContent.title, termsContent.sections)}
+              </div>
+            ) : isSearchRoute ? (
+              <div className="searchPage">
+                <div className="searchHeader">
+                  <div className="searchTitle">{strings.searchTitle}</div>
+                  <div className="searchSubtitle">{strings.searchSubtitle}</div>
+                </div>
+                <div className="searchCard">
+                  <div className="searchInputRow">
+                    <input
+                      className="input"
+                      type="search"
+                      placeholder={strings.searchPlaceholder}
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                    />
+                    <button
+                      className="searchApply"
+                      type="button"
+                      onClick={runSearch}
+                      disabled={searchStatus.type === "loading"}
+                    >
+                      {strings.searchApply}
+                    </button>
+                  </div>
+                  <div className="searchFiltersGrid">
+                    <div className="field">
+                      <label className="label" htmlFor="searchCity">
+                        {strings.searchCityLabel}
+                      </label>
+                      <input
+                        className="input"
+                        id="searchCity"
+                        type="text"
+                        value={searchCity}
+                        onChange={(event) => setSearchCity(event.target.value)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label className="label" htmlFor="searchLanguage">
+                        {strings.searchLanguageLabel}
+                      </label>
+                      <select
+                        className="input"
+                        id="searchLanguage"
+                        value={searchLanguage}
+                        onChange={(event) =>
+                          setSearchLanguage(event.target.value as Locale | "")
+                        }
+                      >
+                        <option value="">
+                          {strings.profileLanguagePlaceholder}
+                        </option>
+                        {LANGUAGE_LIST.map((lang) => {
+                          const translatedLabel =
+                            languageLabels[lang.locale] ?? lang.label;
+                          return (
+                            <option key={lang.locale} value={lang.locale}>
+                              {translatedLabel}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label className="label" htmlFor="searchLevel">
+                        {strings.searchLevelLabel}
+                      </label>
+                      <select
+                        className="input"
+                        id="searchLevel"
+                        value={searchLevel}
+                        onChange={(event) =>
+                          setSearchLevel(event.target.value as LanguageLevel)
+                        }
+                      >
+                        <option value="">
+                          {strings.searchLevelLabel}
+                        </option>
+                        {LANGUAGE_LEVELS.map((level) => (
+                          <option key={level} value={level}>
+                            {level}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label className="label" htmlFor="searchDate">
+                        {strings.searchDateLabel}
+                      </label>
+                      <input
+                        className="input"
+                        id="searchDate"
+                        type="date"
+                        value={searchDate}
+                        onChange={(event) => setSearchDate(event.target.value)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label className="label" htmlFor="searchFormat">
+                        {strings.eventFormatLabel}
+                      </label>
+                      <select
+                        className="input"
+                        id="searchFormat"
+                        value={searchFormat}
+                        onChange={(event) =>
+                          setSearchFormat(event.target.value as "" | EventFormat)
+                        }
+                      >
+                        <option value="">{strings.eventFormatLabel}</option>
+                        <option value="online">{strings.eventFormatOnline}</option>
+                        <option value="offline">{strings.eventFormatOffline}</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="searchActions">
+                    <button className="btn" type="button" onClick={clearSearch}>
+                      {strings.searchClear}
+                    </button>
+                  </div>
+                </div>
+                {searchStatus.type === "loading" ? (
+                  <div
+                    className="authStatus authStatus--loading"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {strings.loadingLabel}
+                  </div>
+                ) : null}
+                {searchStatus.type === "error" ? (
+                  <div
+                    className="authStatus authStatus--error"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {searchStatus.message}
+                  </div>
+                ) : null}
+                {searchTouched ? (
+                  <div className="searchResults">
+                    <div className="searchSection">
+                      <div className="searchSectionTitle">
+                        {strings.searchSectionEvents}
+                      </div>
+                      {searchResults.events.length === 0 ? (
+                        <div className="searchEmpty">{strings.searchEmpty}</div>
+                      ) : (
+                        <div className="searchEventList">
+                        {searchResults.events.map((event) => {
+                            const organizer =
+                              event.organizer_id && searchEventProfiles[event.organizer_id]
+                                ? searchEventProfiles[event.organizer_id]
+                                : null;
+                            const organizerName =
+                              organizer?.full_name || strings.profileHeaderNameFallback;
+                            const organizerCity = organizer?.city ?? "";
+                            const eventLanguage =
+                              event.language && isSupportedLocale(event.language)
+                                ? languageLabels[event.language] ?? event.language
+                                : event.language ?? "";
+                            const eventMeta = [
+                              event.event_date
+                                ? formatDate(event.event_date, locale)
+                                : "",
+                              organizerName,
+                              event.city || organizerCity,
+                              eventLanguage,
+                              event.language_level ?? "",
+                              event.format === "online"
+                                ? strings.eventFormatOnline
+                                : event.format === "offline"
+                                  ? strings.eventFormatOffline
+                                  : "",
+                            ].filter(Boolean);
+                            return (
+                              <button
+                                key={event.id}
+                                className="searchEventCard"
+                                type="button"
+                                onClick={() => goToEvent(event.id)}
+                              >
+                                <div className="searchEventMedia">
+                                  {event.image_url ? (
+                                    <img
+                                      src={event.image_url}
+                                      alt={event.title}
+                                    />
+                                  ) : (
+                                    <div className="searchEventPlaceholder" />
+                                  )}
+                                </div>
+                                <div className="searchEventInfo">
+                                  <div className="searchEventTitle">
+                                    {event.title}
+                                  </div>
+                                  {eventMeta.length ? (
+                                    <div className="searchEventMeta">
+                                      {eventMeta.join(" • ")}
+                                    </div>
+                                  ) : null}
+                                  {event.description ? (
+                                    <div className="searchEventDesc">
+                                      {event.description}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div className="searchSection">
+                      <div className="searchSectionTitle">
+                        {strings.searchSectionOrganizers}
+                      </div>
+                      {searchResults.organizers.length === 0 ? (
+                        <div className="searchEmpty">{strings.searchEmpty}</div>
+                      ) : (
+                        <div className="searchProfileGrid">
+                          {searchResults.organizers.map((profile) => {
+                            const profileLanguage =
+                              profile.language &&
+                              isSupportedLocale(profile.language)
+                                ? languageLabels[profile.language] ??
+                                  profile.language
+                                : profile.language ?? "";
+                            const meta = [
+                              profile.city,
+                              profileLanguage,
+                              profile.language_level,
+                            ].filter(Boolean);
+                            const canFollowOrganizer =
+                              Boolean(profile.id) &&
+                              profile.id !== sessionUser?.id;
+                            const isFollowing =
+                              organizerFollowMap[profile.id] === true;
+                            const isFollowLoading =
+                              organizerFollowLoading[profile.id] === true;
+                            const followersCount =
+                              organizerFollowerCounts[profile.id] ?? 0;
+                            return (
+                              <div key={profile.id} className="searchProfileCard">
+                                <div className="searchProfileAvatar">
+                                  {profile.avatar_url ? (
+                                    <img
+                                      src={profile.avatar_url}
+                                      alt={profile.full_name ?? ""}
+                                    />
+                                  ) : (
+                                    <span>
+                                      {(profile.full_name ?? "?")
+                                        .trim()
+                                        .charAt(0)
+                                        .toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="searchProfileInfo">
+                                  <div className="searchProfileName">
+                                    {profile.full_name ??
+                                      strings.profileHeaderNameFallback}
+                                  </div>
+                                  {meta.length ? (
+                                    <div className="searchProfileMeta">
+                                      {meta.join(" • ")}
+                                    </div>
+                                  ) : null}
+                                  <div className="searchProfileFollowers">
+                                    {strings.userStatsFollowers}: {followersCount}
+                                  </div>
+                                  {profile.bio ? (
+                                    <div className="searchProfileBio">
+                                      {profile.bio}
+                                    </div>
+                                  ) : null}
+                                </div>
+                                {canFollowOrganizer ? (
+                                  <div className="searchProfileActions">
+                                    <button
+                                      className={`btn${
+                                        isFollowing ? " btnActive" : ""
+                                      }`}
+                                      type="button"
+                                      onClick={() =>
+                                        handleToggleOrganizerFollow(profile.id)
+                                      }
+                                      disabled={isFollowLoading}
+                                    >
+                                      {isFollowing
+                                        ? strings.userActionUnfollow
+                                        : strings.userActionFollow}
+                                    </button>
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    {!guestMode ? (
+                      <div className="searchSection">
+                      <div className="searchSectionTitle">
+                        {strings.searchSectionUsers}
+                      </div>
+                      {searchResults.users.length === 0 ? (
+                        <div className="searchEmpty">{strings.searchEmpty}</div>
+                      ) : (
+                        <div className="searchProfileGrid">
+                          {searchResults.users.map((profile) => {
+                            const profileLanguage =
+                              profile.language &&
+                              isSupportedLocale(profile.language)
+                                ? languageLabels[profile.language] ??
+                                  profile.language
+                                : profile.language ?? "";
+                            const meta = [
+                              profile.city,
+                              profileLanguage,
+                              profile.language_level,
+                            ].filter(Boolean);
+                            return (
+                              <div key={profile.id} className="searchProfileCard">
+                                <div className="searchProfileAvatar">
+                                  {profile.avatar_url ? (
+                                    <img
+                                      src={profile.avatar_url}
+                                      alt={profile.full_name ?? ""}
+                                    />
+                                  ) : (
+                                    <span>
+                                      {(profile.full_name ?? "?")
+                                        .trim()
+                                        .charAt(0)
+                                        .toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="searchProfileInfo">
+                                  <div className="searchProfileName">
+                                    {profile.full_name ??
+                                      strings.profileHeaderNameFallback}
+                                  </div>
+                                  {meta.length ? (
+                                    <div className="searchProfileMeta">
+                                      {meta.join(" • ")}
+                                    </div>
+                                  ) : null}
+                                  {profile.bio ? (
+                                    <div className="searchProfileBio">
+                                      {profile.bio}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : isEventsRoute ? (
+              <div className="eventsPage">
+                <div className="eventsHeader">
+                  <div className="eventsTitle">{strings.eventsTitle}</div>
+                  <div className="eventsSubtitle">{strings.eventsSubtitle}</div>
+                </div>
+                {!profileIsOrganizer ? (
+                  <div className="eventsHint">
+                    <div className="eventsHintText">
+                      {strings.userActionOrganizer}
+                    </div>
+                    <button className="btn" type="button" onClick={handleBecomeOrganizer}>
+                      {strings.userActionOrganizer}
+                    </button>
+                  </div>
+                ) : null}
+                <div className="eventsCard">
+                  <div className="eventsCardTitle">
+                    {eventEditingId ? strings.eventEdit : strings.eventCreateTitle}
+                  </div>
+                  <div className="eventsForm">
+                    <div className="field">
+                      <label className="label" htmlFor="eventTitle">
+                        {strings.eventNameLabel}
+                      </label>
+                      <input
+                        className="input"
+                        id="eventTitle"
+                        type="text"
+                        value={eventTitle}
+                        onChange={(event) => setEventTitle(event.target.value)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label className="label" htmlFor="eventDescription">
+                        {strings.eventDescriptionLabel}
+                      </label>
+                      <textarea
+                        className="input eventsTextarea"
+                        id="eventDescription"
+                        value={eventDescription}
+                        onChange={(event) => setEventDescription(event.target.value)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label className="label" htmlFor="eventImage">
+                        {strings.eventImageLabel}
+                      </label>
+                      <input
+                        ref={eventImageInputRef}
+                        className="input"
+                        id="eventImage"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleEventImageChange}
+                      />
+                      <span className="fieldHint">{strings.eventImageHint}</span>
+                      {eventImagePreview ? (
+                        <div className="eventImageWrap">
+                          <img
+                            className="eventImagePreview"
+                            src={eventImagePreview}
+                            alt={strings.eventImageLabel}
+                          />
+                          <button
+                            className="btn btnGhost eventImageRemove"
+                            type="button"
+                            onClick={handleRemoveEventImage}
+                          >
+                            {strings.eventImageRemove}
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="eventsGrid">
+                      <div className="field">
+                        <label className="label" htmlFor="eventDate">
+                          {strings.searchDateLabel}
+                        </label>
+                        <input
+                          className="input"
+                          id="eventDate"
+                          type="date"
+                          value={eventDate}
+                          onChange={(event) => setEventDate(event.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label className="label" htmlFor="eventFormat">
+                          {strings.eventFormatLabel}
+                        </label>
+                        <select
+                          className="input"
+                          id="eventFormat"
+                          value={eventFormat}
+                          onChange={(event) =>
+                            setEventFormat(event.target.value as "" | EventFormat)
+                          }
+                        >
+                          <option value="">{strings.eventFormatLabel}</option>
+                          <option value="online">
+                            {strings.eventFormatOnline}
+                          </option>
+                          <option value="offline">
+                            {strings.eventFormatOffline}
+                          </option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label className="label" htmlFor="eventCity">
+                          {strings.profileCityLabel}
+                        </label>
+                        <input
+                          className="input"
+                          id="eventCity"
+                          type="text"
+                          value={eventCity}
+                          onChange={(event) => setEventCity(event.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label className="label" htmlFor="eventAddress">
+                          {strings.eventAddressLabel}
+                        </label>
+                        <input
+                          className="input"
+                          id="eventAddress"
+                          type="text"
+                          value={eventAddress}
+                          onChange={(event) => setEventAddress(event.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label className="label" htmlFor="eventCountry">
+                          {strings.profileCountryLabel}
+                        </label>
+                        <input
+                          className="input"
+                          id="eventCountry"
+                          type="text"
+                          value={eventCountry}
+                          onChange={(event) => setEventCountry(event.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label className="label" htmlFor="eventLanguage">
+                          {strings.profileLanguageLabel}
+                        </label>
+                        <select
+                          className="input"
+                          id="eventLanguage"
+                          value={eventLanguage}
+                          onChange={(event) =>
+                            setEventLanguage(event.target.value as Locale | "")
+                          }
+                        >
+                          <option value="">
+                            {strings.profileLanguagePlaceholder}
+                          </option>
+                          {LANGUAGE_LIST.map((lang) => {
+                            const translatedLabel =
+                              languageLabels[lang.locale] ?? lang.label;
+                            return (
+                              <option key={lang.locale} value={lang.locale}>
+                                {translatedLabel}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label className="label" htmlFor="eventLevel">
+                          {strings.profileLevelLabel}
+                        </label>
+                        <select
+                          className="input"
+                          id="eventLevel"
+                          value={eventLevel}
+                          onChange={(event) =>
+                            setEventLevel(event.target.value as LanguageLevel)
+                          }
+                        >
+                          <option value="">
+                            {strings.profileLevelLabel}
+                          </option>
+                          {LANGUAGE_LEVELS.map((level) => (
+                            <option key={level} value={level}>
+                              {level}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label className="label" htmlFor="eventOnlineUrl">
+                          {strings.eventOnlineLabel}
+                        </label>
+                        <input
+                          className="input"
+                          id="eventOnlineUrl"
+                          type="url"
+                          value={eventOnlineUrl}
+                          onChange={(event) => setEventOnlineUrl(event.target.value)}
+                        />
+                      </div>
+                    </div>
+                    {eventStatus.type !== "idle" ? (
+                      <div
+                        className={`authStatus authStatus--${eventStatus.type}`}
+                        role="status"
+                        aria-live="polite"
+                      >
+                        {eventStatus.type === "success"
+                          ? strings.eventSaved
+                          : eventStatus.message}
+                      </div>
+                    ) : null}
+                    <div className="eventsActions">
+                      <button
+                        className="eventsSave"
+                        type="button"
+                        onClick={handleSaveEvent}
+                        disabled={eventStatus.type === "loading" || !profileIsOrganizer}
+                      >
+                        {eventStatus.type === "loading"
+                          ? strings.loadingLabel
+                          : eventEditingId
+                            ? strings.eventUpdate
+                            : strings.eventSave}
+                      </button>
+                      {eventEditingId ? (
+                        <button
+                          className="btn btnGhost eventsCancel"
+                          type="button"
+                          onClick={resetEventForm}
+                          disabled={eventStatus.type === "loading"}
+                        >
+                          {strings.eventCancelEdit}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+                <div className="eventsList">
+                  <div className="eventsListTitle">{strings.eventListTitle}</div>
+                  {eventsList.length === 0 ? (
+                    <div className="searchEmpty">{strings.eventEmpty}</div>
+                  ) : (
+                    <div className="eventsGridList">
+                      {eventsList.map((event) => {
+                        const meta = [
+                          event.event_date
+                            ? formatDate(event.event_date, locale)
+                            : "",
+                          event.city,
+                          event.language && isSupportedLocale(event.language)
+                            ? languageLabels[event.language] ?? event.language
+                            : event.language ?? "",
+                          event.language_level ?? "",
+                          event.format === "online"
+                            ? strings.eventFormatOnline
+                            : event.format === "offline"
+                              ? strings.eventFormatOffline
+                              : "",
+                        ].filter(Boolean);
+                        const details = [
+                          event.address
+                            ? {
+                                label: strings.eventAddressLabel,
+                                value: event.address,
+                                isLink: false,
+                              }
+                            : null,
+                          event.online_url
+                            ? {
+                                label: strings.eventOnlineLabel,
+                                value: event.online_url,
+                                isLink: true,
+                              }
+                            : null,
+                        ].filter(Boolean) as {
+                          label: string;
+                          value: string;
+                          isLink: boolean;
+                        }[];
+                        return (
+                          <div
+                            key={event.id}
+                            className={`eventCard${
+                              eventEditingId === event.id
+                                ? " eventCard--editing"
+                                : ""
+                            }`}
+                          >
+                            <div className="eventCardMedia">
+                              {event.image_url ? (
+                                <img
+                                  src={event.image_url}
+                                  alt={event.title}
+                                />
+                              ) : (
+                                <div className="eventCardPlaceholder" />
+                              )}
+                            </div>
+                            <div className="eventCardBody">
+                              <div className="eventCardTitle">{event.title}</div>
+                              {meta.length ? (
+                                <div className="eventCardMeta">
+                                  {meta.join(" • ")}
+                                </div>
+                              ) : null}
+                              {event.description ? (
+                                <div className="eventCardDesc">
+                                  {event.description}
+                                </div>
+                              ) : null}
+                              {details.length ? (
+                                <div className="eventCardDetails">
+                                  {details.map((detail) => (
+                                    <div
+                                      key={`${detail.label}-${detail.value}`}
+                                      className="eventCardDetail"
+                                    >
+                                      <span className="eventCardDetailLabel">
+                                        {detail.label}:
+                                      </span>
+                                      {detail.isLink ? (
+                                        <a
+                                          className="eventCardLink"
+                                          href={detail.value}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                        >
+                                          {detail.value}
+                                        </a>
+                                      ) : (
+                                        <span className="eventCardDetailValue">
+                                          {detail.value}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+                              <div className="eventCardActions">
+                                <button
+                                  className="btn"
+                                  type="button"
+                                  onClick={() => goToEvent(event.id)}
+                                >
+                                  {strings.eventView}
+                                </button>
+                                <button
+                                  className="btn"
+                                  type="button"
+                                  onClick={() => handleEditEvent(event)}
+                                >
+                                  {strings.eventEdit}
+                                </button>
+                                <button
+                                  className="btnDanger"
+                                  type="button"
+                                  onClick={() => handleDeleteEvent(event)}
+                                >
+                                  {strings.eventDelete}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : isEventRoute ? (
+              <div className="eventDetailPage">
+                <div className="eventDetailHeader">
+                  <div className="eventDetailTitle">
+                    {strings.eventDetailsTitle}
+                  </div>
+                </div>
+                {eventDetailsStatus.type === "loading" ? (
+                  <div
+                    className="authStatus authStatus--loading"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {strings.loadingLabel}
+                  </div>
+                ) : null}
+                {eventDetailsStatus.type === "error" ? (
+                  <div
+                    className="authStatus authStatus--error"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {eventDetailsStatus.message}
+                  </div>
+                ) : null}
+                {eventDetails ? (
+                  <div className="eventDetailCard">
+                    <div className="eventDetailMedia">
+                      {eventDetails.image_url ? (
+                        <img
+                          src={eventDetails.image_url}
+                          alt={eventDetails.title}
+                        />
+                      ) : (
+                        <div className="searchEventPlaceholder" />
+                      )}
+                    </div>
+                    <div className="eventDetailBody">
+                      <div className="eventDetailHeadline">
+                        {eventDetails.title}
+                      </div>
+                      <div className="eventDetailMeta">
+                        {[
+                          eventDetails.event_date
+                            ? formatDate(eventDetails.event_date, locale)
+                            : "",
+                          eventDetails.city,
+                          eventDetails.language &&
+                          isSupportedLocale(eventDetails.language)
+                            ? languageLabels[eventDetails.language] ??
+                              eventDetails.language
+                            : eventDetails.language ?? "",
+                          eventDetails.language_level ?? "",
+                          eventDetails.format === "online"
+                            ? strings.eventFormatOnline
+                            : eventDetails.format === "offline"
+                              ? strings.eventFormatOffline
+                              : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" • ")}
+                      </div>
+                      {eventDetails.description ? (
+                        <div className="eventDetailDescription">
+                          {eventDetails.description}
+                        </div>
+                      ) : null}
+                      <div className="eventDetailInfo">
+                        <div className="eventDetailInfoRow">
+                          <span className="eventDetailInfoLabel">
+                            {strings.eventOrganizerLabel}
+                          </span>
+                          <span className="eventDetailInfoValue">
+                            {eventOrganizer?.full_name ??
+                              strings.profileHeaderNameFallback}
+                          </span>
+                        </div>
+                        {eventOrganizer?.id ? (
+                          <div className="eventDetailInfoRow">
+                            <span className="eventDetailInfoLabel">
+                              {strings.userStatsFollowers}
+                            </span>
+                            <span className="eventDetailInfoValue">
+                              {organizerFollowerCounts[eventOrganizer.id] ?? 0}
+                            </span>
+                          </div>
+                        ) : null}
+                        {eventDetails.address ? (
+                          <div className="eventDetailInfoRow">
+                            <span className="eventDetailInfoLabel">
+                              {strings.eventAddressLabel}
+                            </span>
+                            <span className="eventDetailInfoValue">
+                              {eventDetails.address}
+                            </span>
+                          </div>
+                        ) : null}
+                        {eventDetails.online_url ? (
+                          <div className="eventDetailInfoRow">
+                            <span className="eventDetailInfoLabel">
+                              {strings.eventOnlineLabel}
+                            </span>
+                            <a
+                              className="eventDetailInfoValue eventDetailLink"
+                              href={eventDetails.online_url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {eventDetails.online_url}
+                            </a>
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="eventDetailActions">
+                        <button
+                          className={`btn${
+                            eventRsvpStatus === "going" ? " btnActive" : ""
+                          }`}
+                          type="button"
+                          onClick={() => handleEventRsvp("going")}
+                          disabled={eventRsvpLoading}
+                        >
+                          {strings.eventJoin}
+                        </button>
+                        <button
+                          className={`btn${
+                            eventRsvpStatus === "interested" ? " btnActive" : ""
+                          }`}
+                          type="button"
+                          onClick={() => handleEventRsvp("interested")}
+                          disabled={eventRsvpLoading}
+                        >
+                          {strings.eventInterested}
+                        </button>
+                        {eventOrganizer?.id &&
+                        eventOrganizer.id !== sessionUser?.id ? (
+                          <button
+                            className={`btn${
+                              organizerFollowMap[eventOrganizer.id]
+                                ? " btnActive"
+                                : ""
+                            }`}
+                            type="button"
+                            onClick={() =>
+                              handleToggleOrganizerFollow(
+                                eventOrganizer.id,
+                                eventDetails?.id
+                              )
+                            }
+                            disabled={
+                              organizerFollowLoading[eventOrganizer.id] === true
+                            }
+                          >
+                            {organizerFollowMap[eventOrganizer.id]
+                              ? strings.userActionUnfollow
+                              : strings.userActionFollow}
+                          </button>
+                        ) : null}
+                      </div>
+                      <div className="eventParticipants">
+                        <div className="eventParticipantsHeader">
+                          <div className="eventParticipantsTitle">
+                            {strings.eventParticipantsTitle}
+                          </div>
+                          <div className="eventParticipantsStats">
+                            <span className="eventParticipantsBadge">
+                              {strings.eventGoingLabel}: {eventGoingCount}
+                            </span>
+                            <span className="eventParticipantsBadge">
+                              {strings.eventInterestedLabel}: {eventInterestedCount}
+                            </span>
+                          </div>
+                        </div>
+                        {sortedEventRsvps.length ? (
+                          <div className="eventParticipantsGrid">
+                            {sortedEventRsvps.map((rsvp) => {
+                              const profile = eventRsvpProfiles[rsvp.user_id];
+                              const name =
+                                profile?.full_name ??
+                                strings.profileHeaderNameFallback;
+                              const statusLabel =
+                                rsvp.status === "going"
+                                  ? strings.eventGoingLabel
+                                  : strings.eventInterestedLabel;
+                              return (
+                                <div
+                                  key={`${rsvp.user_id}-${rsvp.status}`}
+                                  className="eventParticipantCard"
+                                >
+                                  <div className="eventParticipantAvatar">
+                                    {profile?.avatar_url ? (
+                                      <img
+                                        src={profile.avatar_url}
+                                        alt={name}
+                                      />
+                                    ) : (
+                                      <span>{name.trim().charAt(0).toUpperCase()}</span>
+                                    )}
+                                  </div>
+                                  <div className="eventParticipantInfo">
+                                    <div className="eventParticipantName">
+                                      {name}
+                                    </div>
+                                    <div className="eventParticipantStatus">
+                                      {statusLabel}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="searchEmpty">{strings.searchEmpty}</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : isUserRoute ? (
               <div className="userPage">
@@ -7787,7 +10549,7 @@ export default function App() {
                       </p>
                     </div>
                   ) : null}
-                  {route === "login" ? (
+                    {route === "login" ? (
                     <>
                       <div className="authSocial">
                         <button
@@ -7844,6 +10606,13 @@ export default function App() {
                             </svg>
                           </span>
                           <span>{strings.gmailButton}</span>
+                        </button>
+                        <button
+                          className="authGuest"
+                          type="button"
+                          onClick={handleContinueAsGuest}
+                        >
+                          {strings.guestButton}
                         </button>
                       </div>
                       <button
