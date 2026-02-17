@@ -335,6 +335,7 @@ type MessageKey =
   | "searchSectionUsers"
   | "searchEmpty"
   | "eventsButton"
+  | "logoutButton"
   | "adminButton"
   | "adminTitle"
   | "adminSubtitle"
@@ -654,6 +655,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Nutzer",
     searchEmpty: "Keine Ergebnisse gefunden.",
     eventsButton: "Events",
+    logoutButton: "Sign out",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -806,6 +808,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Users",
     searchEmpty: "No results found.",
     eventsButton: "Events",
+    logoutButton: "Sign out",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -958,6 +961,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Пользователи",
     searchEmpty: "Ничего не найдено.",
     eventsButton: "События",
+    logoutButton: "?????",
     adminButton: "?????",
     adminTitle: "?????? ??????????????",
     adminSubtitle: "?????????? ??????????????, ????????? ? ???????.",
@@ -1110,6 +1114,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Користувачі",
     searchEmpty: "Нічого не знайдено.",
     eventsButton: "Події",
+    logoutButton: "Sign out",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -1262,6 +1267,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "کاربران",
     searchEmpty: "نتیجه‌ای یافت نشد.",
     eventsButton: "رویدادها",
+    logoutButton: "Sign out",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -1414,6 +1420,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "المستخدمون",
     searchEmpty: "لا توجد نتائج.",
     eventsButton: "الفعاليات",
+    logoutButton: "Sign out",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -1566,6 +1573,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Përdorues",
     searchEmpty: "Nuk u gjetën rezultate.",
     eventsButton: "Evente",
+    logoutButton: "Sign out",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -1718,6 +1726,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Kullanıcılar",
     searchEmpty: "Sonuç bulunamadı.",
     eventsButton: "Etkinlikler",
+    logoutButton: "Sign out",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -1870,6 +1879,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Utilisateurs",
     searchEmpty: "Aucun résultat.",
     eventsButton: "Événements",
+    logoutButton: "Sign out",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -2022,6 +2032,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Usuarios",
     searchEmpty: "No se encontraron resultados.",
     eventsButton: "Eventos",
+    logoutButton: "Sign out",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -2174,6 +2185,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Utenti",
     searchEmpty: "Nessun risultato.",
     eventsButton: "Eventi",
+    logoutButton: "Sign out",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -2326,6 +2338,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Użytkownicy",
     searchEmpty: "Brak wyników.",
     eventsButton: "Wydarzenia",
+    logoutButton: "Sign out",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -8753,6 +8766,29 @@ export default function App() {
     }
   }
 
+  async function handleLogout() {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      if (typeof window !== "undefined") {
+        window.alert("Supabase is not configured.");
+      }
+      return;
+    }
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      setSessionUser(null);
+      setProfileIsOrganizer(false);
+      setProfileIsAdmin(false);
+      profileLoaded.current = false;
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(GUEST_MODE_KEY);
+      }
+      setGuestMode(false);
+      navigate("login");
+    }
+  }
+
   async function handlePostPublish() {
     if (postActionStatus.type === "loading") return;
     const supabase = getSupabaseClient();
@@ -9314,6 +9350,7 @@ export default function App() {
   const showSearchButton = !isAuthRoute;
   const showEventsButton = !isAuthRoute;
   const showAdminButton = !isAuthRoute && profileIsAdmin && !guestMode;
+  const showLogoutButton = !isAuthRoute && !guestMode && Boolean(sessionUser?.id);
   const showUserQuickActions = isUserRoute && !guestMode;
   const canManageEvents = profileIsOrganizer || (profileIsAdmin && isAdminRoute);
   const adminUserMap = useMemo(() => {
@@ -9775,6 +9812,15 @@ export default function App() {
                     onClick={() => navigate("admin")}
                   >
                     {strings.adminButton}
+                  </button>
+                ) : null}
+                {showLogoutButton ? (
+                  <button
+                    className="btn"
+                    type="button"
+                    onClick={handleLogout}
+                  >
+                    {strings.logoutButton}
                   </button>
                 ) : null}
                 {showUserQuickActions ? (
