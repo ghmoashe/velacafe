@@ -10791,7 +10791,8 @@ export default function App() {
                         </button>
                       </div>
                     ) : null}
-                    <div className="eventsCard">
+                    {profileIsOrganizer ? (
+                      <div className="eventsCard">
                       <div className="eventsCardTitle">
                         {eventEditingId
                           ? strings.eventEdit
@@ -11061,6 +11062,7 @@ export default function App() {
                         </div>
                       </div>
                     </div>
+                    ) : null}
                     <div className="eventsList">
                       <div className="eventsListTitle">
                         {strings.eventListTitle}
@@ -11172,20 +11174,24 @@ export default function App() {
                                 >
                                   {strings.eventView}
                                 </button>
-                                <button
-                                  className="btn"
-                                  type="button"
-                                  onClick={() => handleEditEvent(event)}
-                                >
-                                  {strings.eventEdit}
-                                </button>
-                                <button
-                                  className="btnDanger"
-                                  type="button"
-                                  onClick={() => handleDeleteEvent(event)}
-                                >
-                                  {strings.eventDelete}
-                                </button>
+                                {profileIsOrganizer ? (
+                                  <>
+                                    <button
+                                      className="btn"
+                                      type="button"
+                                      onClick={() => handleEditEvent(event)}
+                                    >
+                                      {strings.eventEdit}
+                                    </button>
+                                    <button
+                                      className="btnDanger"
+                                      type="button"
+                                      onClick={() => handleDeleteEvent(event)}
+                                    >
+                                      {strings.eventDelete}
+                                    </button>
+                                  </>
+                                ) : null}
                               </div>
                             </div>
                           </div>
