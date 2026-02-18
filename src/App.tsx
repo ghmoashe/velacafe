@@ -1149,7 +1149,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventDelete: "Видалити",
     eventDeleteConfirm: "Видалити цю подію?",
     eventImageRemove: "Видалити фото",
-    eventCancelEdit: "?????????",
+    eventCancelEdit: "Скасувати редагування",
     eventView: "Відкрити",
     eventParticipantsTitle: "Учасники",
     eventGoingLabel: "Йдуть",
@@ -1168,7 +1168,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "Підписники",
     userStatsFollowing: "Підписки",
     userActionFollow: "Підписатися",
-    userActionUnfollow: "???????????",
+    userActionUnfollow: "Відписатися",
     userActionMessage: "Повідомлення",
     userActionOrganizer: "Стати організатором",
     userTabAbout: "Про мене",
@@ -1176,11 +1176,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "Відео",
     userTabPosts: "Пости",
     userTabTagged: "Позначено",
-    userTabFollowing: "????????",
-    userFollowingEmpty: "????? ????????.",
-    userFollowingSearchPlaceholder: "????? ????????",
-    organizerPageTitle: "??????? ????????????",
-    organizerFollowersEmpty: "???? ????? ???????????.",
+    userTabFollowing: "Підписки",
+    userFollowingEmpty: "Поки немає підписок.",
+    userFollowingSearchPlaceholder: "Пошук за підписками",
+    organizerPageTitle: "Профіль організатора",
+    organizerFollowersEmpty: "Поки немає підписників.",
     userBioPlaceholder: "Розкажіть про себе та ваші мови.",
     userPostCaptionPlaceholder: "Напишіть щось...",
     userPostPublish: "Опублікувати",
@@ -1302,7 +1302,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventDelete: "حذف",
     eventDeleteConfirm: "این رویداد حذف شود؟",
     eventImageRemove: "حذف تصویر",
-    eventCancelEdit: "??? ??????",
+    eventCancelEdit: "لغو ویرایش",
     eventView: "مشاهده",
     eventParticipantsTitle: "شرکت‌کنندگان",
     eventGoingLabel: "می‌آیند",
@@ -1321,7 +1321,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "دنبال‌کننده‌ها",
     userStatsFollowing: "دنبال‌می‌کنم",
     userActionFollow: "دنبال کردن",
-    userActionUnfollow: "??? ????? ????",
+    userActionUnfollow: "لغو دنبال کردن",
     userActionMessage: "پیام",
     userActionOrganizer: "تبدیل به برگزارکننده",
     userTabAbout: "درباره",
@@ -1329,11 +1329,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "ویدیوها",
     userTabPosts: "پست‌ها",
     userTabTagged: "برچسب‌شده",
-    userTabFollowing: "????? ??????",
-    userFollowingEmpty: "??????? ???? ?????.",
-    userFollowingSearchPlaceholder: "?????? ????????????",
-    organizerPageTitle: "??????? ???????????",
-    organizerFollowersEmpty: "???? ?????????????? ????.",
+    userTabFollowing: "دنبال‌شده‌ها",
+    userFollowingEmpty: "هنوز دنبال نمی‌کنید.",
+    userFollowingSearchPlaceholder: "جستجو در دنبال‌شده‌ها",
+    organizerPageTitle: "پروفایل برگزارکننده",
+    organizerFollowersEmpty: "هنوز دنبال‌کننده‌ای نیست.",
     userBioPlaceholder: "کمی درباره خود و زبان‌هایتان بنویسید.",
     userPostCaptionPlaceholder: "چیزی بنویسید...",
     userPostPublish: "انتشار",
@@ -1455,7 +1455,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventDelete: "حذف",
     eventDeleteConfirm: "هل تريد حذف هذه الفعالية؟",
     eventImageRemove: "إزالة الصورة",
-    eventCancelEdit: "????? ???????",
+    eventCancelEdit: "إلغاء التعديل",
     eventView: "عرض",
     eventParticipantsTitle: "المشاركون",
     eventGoingLabel: "سيحضرون",
@@ -1474,7 +1474,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userStatsFollowers: "المتابعون",
     userStatsFollowing: "المتابَعون",
     userActionFollow: "متابعة",
-    userActionUnfollow: "????? ????????",
+    userActionUnfollow: "إلغاء المتابعة",
     userActionMessage: "رسالة",
     userActionOrganizer: "كن منظماً",
     userTabAbout: "نبذة",
@@ -1482,11 +1482,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userTabVideos: "الفيديو",
     userTabPosts: "المنشورات",
     userTabTagged: "المُشار إليه",
-    userTabFollowing: "??????????",
-    userFollowingEmpty: "?? ???? ????????.",
-    userFollowingSearchPlaceholder: "????? ?? ??????????",
-    organizerPageTitle: "??? ???????",
-    organizerFollowersEmpty: "?? ???? ??????? ???.",
+    userTabFollowing: "المتابعة",
+    userFollowingEmpty: "لا توجد متابعات بعد.",
+    userFollowingSearchPlaceholder: "ابحث في المتابعات",
+    organizerPageTitle: "ملف المنظم",
+    organizerFollowersEmpty: "لا يوجد متابعون بعد.",
     userBioPlaceholder: "عرّف بنفسك وباللغات التي تتحدثها.",
     userPostCaptionPlaceholder: "اكتب شيئًا...",
     userPostPublish: "نشر",
@@ -6362,6 +6362,9 @@ export default function App() {
   const [adminPostEditId, setAdminPostEditId] = useState<string | null>(null);
   const [adminPostCaption, setAdminPostCaption] = useState("");
   const [adminEventOrganizerId, setAdminEventOrganizerId] = useState("");
+  const [adminPinOpen, setAdminPinOpen] = useState(false);
+  const [adminPinValue, setAdminPinValue] = useState("");
+  const [adminPinError, setAdminPinError] = useState("");
   const [searchTouched, setSearchTouched] = useState(false);
   const [searchFormat, setSearchFormat] = useState<"" | EventFormat>("");
   const [organizerFollowMap, setOrganizerFollowMap] = useState<
@@ -9349,19 +9352,76 @@ export default function App() {
   const showBackButton = !isAuthRoute;
   const showSearchButton = !isAuthRoute;
   const showEventsButton = !isAuthRoute;
-  const showAdminButton = !isAuthRoute && profileIsAdmin && !guestMode;
   const showLogoutButton = !isAuthRoute && !guestMode && Boolean(sessionUser?.id);
   const showUserQuickActions = isUserRoute && !guestMode;
   const canManageEvents = profileIsOrganizer || (profileIsAdmin && isAdminRoute);
   const adminUserMap = useMemo(() => {
     return new Map(adminUsers.map((profile) => [profile.id, profile]));
   }, [adminUsers]);
+  const logoTapCountRef = useRef(0);
+  const logoTapTimeRef = useRef<number | null>(null);
+  const adminPinTitle =
+    locale === "ru"
+      ? "Введите PIN администратора"
+      : locale === "uk"
+        ? "Введіть PIN адміністратора"
+        : "Enter admin PIN";
   const primaryLabel =
     route === "login"
       ? strings.loginButton
       : route === "register"
         ? strings.registerButton
         : strings.resetButton;
+
+  function handleLogoClick() {
+    if (typeof window === "undefined") return;
+    const now = Date.now();
+    if (logoTapTimeRef.current && now - logoTapTimeRef.current > 4000) {
+      logoTapCountRef.current = 0;
+    }
+    logoTapTimeRef.current = now;
+    logoTapCountRef.current += 1;
+    if (logoTapCountRef.current < 10) return;
+    logoTapCountRef.current = 0;
+    setAdminPinValue("");
+    setAdminPinError("");
+    setAdminPinOpen(true);
+  }
+
+  function handleAdminPinClose() {
+    setAdminPinOpen(false);
+    setAdminPinValue("");
+    setAdminPinError("");
+  }
+
+  function handleAdminPinSubmit() {
+    const pinValue = adminPinValue.trim();
+    if (!pinValue) {
+      setAdminPinError(locale === "ru" ? "Введите PIN" : "Enter PIN");
+      return;
+    }
+    if (pinValue !== "2266") {
+      setAdminPinError(locale === "ru" ? "Неверный PIN" : "Invalid PIN");
+      return;
+    }
+    if (!sessionUser?.id || guestMode) {
+      handleAdminPinClose();
+      if (typeof window !== "undefined") {
+        window.alert(strings.profileAuthRequired);
+      }
+      navigate("login");
+      return;
+    }
+    if (!profileIsAdmin) {
+      handleAdminPinClose();
+      if (typeof window !== "undefined") {
+        window.alert(strings.adminAccessDenied);
+      }
+      return;
+    }
+    handleAdminPinClose();
+    navigate("admin");
+  }
 
   const renderEventsManager = (options: {
     showOrganizerHint: boolean;
@@ -9747,6 +9807,7 @@ export default function App() {
                 className="brandLogo"
                 src="/logo.svg"
                 alt="Vela Sprachcafe"
+                onClick={handleLogoClick}
                 onError={(event) => {
                   const target = event.currentTarget;
                   if (target.dataset.fallback === "1") return;
@@ -9805,15 +9866,6 @@ export default function App() {
                     {strings.eventsButton}
                   </button>
                 ) : null}
-                {showAdminButton ? (
-                  <button
-                    className={`btn${isAdminRoute ? " btnActive" : ""}`}
-                    type="button"
-                    onClick={() => navigate("admin")}
-                  >
-                    {strings.adminButton}
-                  </button>
-                ) : null}
                 {showLogoutButton ? (
                   <button
                     className="btn"
@@ -9844,6 +9896,57 @@ export default function App() {
                 ) : null}
               </div>
             </div>
+            {adminPinOpen ? (
+              <div className="adminPinOverlay" role="dialog" aria-modal="true">
+                <div
+                  className="adminPinModal"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="adminPinTitle">{adminPinTitle}</div>
+                  <input
+                    className="input adminPinInput"
+                    type="password"
+                    inputMode="numeric"
+                    placeholder="PIN"
+                    value={adminPinValue}
+                    onChange={(event) => {
+                      setAdminPinValue(event.target.value);
+                      if (adminPinError) setAdminPinError("");
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        handleAdminPinSubmit();
+                      }
+                    }}
+                  />
+                  {adminPinError ? (
+                    <div
+                      className="authStatus authStatus--error"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {adminPinError}
+                    </div>
+                  ) : null}
+                  <div className="adminPinActions">
+                    <button
+                      className="btn btnGhost"
+                      type="button"
+                      onClick={handleAdminPinClose}
+                    >
+                      {strings.backButton}
+                    </button>
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={handleAdminPinSubmit}
+                    >
+                      {strings.loginButton}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {isPartnersRoute ? (
               <div className="partnersPage">
                 <div className="partnersPageTitle">{strings.partnersTitle}</div>

@@ -2259,6 +2259,46 @@ button:focus-visible {
   min-height: 90px;
 }
 
+.adminPinOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(29, 21, 15, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 100;
+}
+
+.adminPinModal {
+  width: min(420px, 100%);
+  background: #fffaf6;
+  border: 1px solid rgba(200, 170, 140, 0.35);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 24px 60px rgba(31, 23, 16, 0.25);
+  display: grid;
+  gap: 14px;
+}
+
+.adminPinTitle {
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.adminPinInput {
+  text-align: center;
+  letter-spacing: 4px;
+  font-size: 18px;
+}
+
+.adminPinActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .cityListExpanded {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
