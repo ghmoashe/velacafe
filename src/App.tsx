@@ -9397,6 +9397,7 @@ export default function App() {
   const showLogoutButton = !isAuthRoute && !guestMode && Boolean(sessionUser?.id);
   const showUserQuickActions = isUserRoute && !guestMode;
   const canManageEvents = profileIsOrganizer || (profileIsAdmin && isAdminRoute);
+  const adminUsersBusy = adminUsersStatus.type === "loading";
   const adminUserMap = useMemo(() => {
     return new Map(adminUsers.map((profile) => [profile.id, profile]));
   }, [adminUsers]);
@@ -10119,7 +10120,7 @@ export default function App() {
                                 }}
                                 disabled={
                                   !adminSelectedUserId ||
-                                  adminUsersStatus.type === "loading" ||
+                                  adminUsersBusy ||
                                   Boolean(adminSelectedUser?.is_organizer)
                                 }
                               >
@@ -10206,7 +10207,7 @@ export default function App() {
                                           is_organizer: !isOrganizer,
                                         })
                                       }
-                                      disabled={adminUsersStatus.type === "loading"}
+                                      disabled={adminUsersBusy}
                                     >
                                       {strings.adminRoleOrganizer}
                                     </button>
@@ -10219,7 +10220,7 @@ export default function App() {
                                         })
                                       }
                                       disabled={
-                                        adminUsersStatus.type === "loading" || isSelf
+                                        adminUsersBusy || isSelf
                                       }
                                     >
                                       {strings.adminRoleAdmin}
