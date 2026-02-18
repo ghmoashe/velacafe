@@ -344,6 +344,9 @@ type MessageKey =
   | "adminTabPosts"
   | "adminRoleOrganizer"
   | "adminRoleAdmin"
+  | "adminSelectUserLabel"
+  | "adminSelectUserEmpty"
+  | "adminMakeOrganizer"
   | "adminOrganizerIdLabel"
   | "adminAccessDenied"
   | "adminUsersEmpty"
@@ -664,6 +667,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminTabPosts: "Posts",
     adminRoleOrganizer: "Organizer",
     adminRoleAdmin: "Admin",
+    adminSelectUserLabel: "Ausgewählter Nutzer",
+    adminSelectUserEmpty: "Nutzer auswählen",
+    adminMakeOrganizer: "Zum Organisator machen",
     adminOrganizerIdLabel: "Organizer ID",
     adminAccessDenied: "Admin access required.",
     adminUsersEmpty: "No users found.",
@@ -817,6 +823,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminTabPosts: "Posts",
     adminRoleOrganizer: "Organizer",
     adminRoleAdmin: "Admin",
+    adminSelectUserLabel: "Selected user",
+    adminSelectUserEmpty: "Select a user",
+    adminMakeOrganizer: "Make organizer",
     adminOrganizerIdLabel: "Organizer ID",
     adminAccessDenied: "Admin access required.",
     adminUsersEmpty: "No users found.",
@@ -970,6 +979,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminTabPosts: "Посты",
     adminRoleOrganizer: "Организатор",
     adminRoleAdmin: "Админ",
+    adminSelectUserLabel: "Выбран пользователь",
+    adminSelectUserEmpty: "Выберите пользователя",
+    adminMakeOrganizer: "Сделать организатором",
     adminOrganizerIdLabel: "ID организатора",
     adminAccessDenied: "Доступ только для администратора.",
     adminUsersEmpty: "Пользователи не найдены.",
@@ -1123,6 +1135,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminTabPosts: "Posts",
     adminRoleOrganizer: "Organizer",
     adminRoleAdmin: "Admin",
+    adminSelectUserLabel: "Обраний користувач",
+    adminSelectUserEmpty: "Виберіть користувача",
+    adminMakeOrganizer: "Зробити організатором",
     adminOrganizerIdLabel: "Organizer ID",
     adminAccessDenied: "Admin access required.",
     adminUsersEmpty: "No users found.",
@@ -1276,6 +1291,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminTabPosts: "Posts",
     adminRoleOrganizer: "Organizer",
     adminRoleAdmin: "Admin",
+    adminSelectUserLabel: "کاربر انتخاب‌شده",
+    adminSelectUserEmpty: "یک کاربر انتخاب کنید",
+    adminMakeOrganizer: "سازمان‌دهنده کنید",
     adminOrganizerIdLabel: "Organizer ID",
     adminAccessDenied: "Admin access required.",
     adminUsersEmpty: "No users found.",
@@ -1429,6 +1447,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminTabPosts: "Posts",
     adminRoleOrganizer: "Organizer",
     adminRoleAdmin: "Admin",
+    adminSelectUserLabel: "المستخدم المحدد",
+    adminSelectUserEmpty: "اختر مستخدمًا",
+    adminMakeOrganizer: "اجعل منظّمًا",
     adminOrganizerIdLabel: "Organizer ID",
     adminAccessDenied: "Admin access required.",
     adminUsersEmpty: "No users found.",
@@ -1582,6 +1603,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminTabPosts: "Posts",
     adminRoleOrganizer: "Organizer",
     adminRoleAdmin: "Admin",
+    adminSelectUserLabel: "Përdoruesi i zgjedhur",
+    adminSelectUserEmpty: "Zgjidh një përdorues",
+    adminMakeOrganizer: "Bëje organizator",
     adminOrganizerIdLabel: "Organizer ID",
     adminAccessDenied: "Admin access required.",
     adminUsersEmpty: "No users found.",
@@ -1735,6 +1759,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminTabPosts: "Posts",
     adminRoleOrganizer: "Organizer",
     adminRoleAdmin: "Admin",
+    adminSelectUserLabel: "Seçilen kullanıcı",
+    adminSelectUserEmpty: "Bir kullanıcı seç",
+    adminMakeOrganizer: "Organizatör yap",
     adminOrganizerIdLabel: "Organizer ID",
     adminAccessDenied: "Admin access required.",
     adminUsersEmpty: "No users found.",
@@ -1888,6 +1915,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminTabPosts: "Posts",
     adminRoleOrganizer: "Organizer",
     adminRoleAdmin: "Admin",
+    adminSelectUserLabel: "Utilisateur sélectionné",
+    adminSelectUserEmpty: "Sélectionner un utilisateur",
+    adminMakeOrganizer: "Faire organisateur",
     adminOrganizerIdLabel: "Organizer ID",
     adminAccessDenied: "Admin access required.",
     adminUsersEmpty: "No users found.",
@@ -2041,6 +2071,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminTabPosts: "Posts",
     adminRoleOrganizer: "Organizer",
     adminRoleAdmin: "Admin",
+    adminSelectUserLabel: "Usuario seleccionado",
+    adminSelectUserEmpty: "Selecciona un usuario",
+    adminMakeOrganizer: "Hacer organizador",
     adminOrganizerIdLabel: "Organizer ID",
     adminAccessDenied: "Admin access required.",
     adminUsersEmpty: "No users found.",
@@ -2194,6 +2227,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminTabPosts: "Posts",
     adminRoleOrganizer: "Organizer",
     adminRoleAdmin: "Admin",
+    adminSelectUserLabel: "Utente selezionato",
+    adminSelectUserEmpty: "Seleziona un utente",
+    adminMakeOrganizer: "Rendi organizzatore",
     adminOrganizerIdLabel: "Organizer ID",
     adminAccessDenied: "Admin access required.",
     adminUsersEmpty: "No users found.",
@@ -2347,6 +2383,9 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminTabPosts: "Posts",
     adminRoleOrganizer: "Organizer",
     adminRoleAdmin: "Admin",
+    adminSelectUserLabel: "Wybrany użytkownik",
+    adminSelectUserEmpty: "Wybierz użytkownika",
+    adminMakeOrganizer: "Uczyń organizatorem",
     adminOrganizerIdLabel: "Organizer ID",
     adminAccessDenied: "Admin access required.",
     adminUsersEmpty: "No users found.",
@@ -6350,6 +6389,9 @@ export default function App() {
     type: "idle" | "loading" | "error";
     message: string;
   }>({ type: "idle", message: "" });
+  const [adminSelectedUserId, setAdminSelectedUserId] = useState<string | null>(
+    null
+  );
   const [adminPosts, setAdminPosts] = useState<UserPost[]>([]);
   const [adminPostsStatus, setAdminPostsStatus] = useState<{
     type: "idle" | "loading" | "error";
@@ -9358,6 +9400,25 @@ export default function App() {
   const adminUserMap = useMemo(() => {
     return new Map(adminUsers.map((profile) => [profile.id, profile]));
   }, [adminUsers]);
+  const adminSelectedUser = useMemo(() => {
+    return adminSelectedUserId
+      ? adminUsers.find((profile) => profile.id === adminSelectedUserId) ?? null
+      : null;
+  }, [adminSelectedUserId, adminUsers]);
+  useEffect(() => {
+    if (adminTab !== "users") {
+      setAdminSelectedUserId(null);
+    }
+  }, [adminTab]);
+  useEffect(() => {
+    if (!adminSelectedUserId) return;
+    const exists = adminUsers.some(
+      (profile) => profile.id === adminSelectedUserId
+    );
+    if (!exists) {
+      setAdminSelectedUserId(null);
+    }
+  }, [adminSelectedUserId, adminUsers]);
   const logoTapCountRef = useRef(0);
   const logoTapTimeRef = useRef<number | null>(null);
   const adminPinTitle =
@@ -10032,7 +10093,40 @@ export default function App() {
                             {strings.adminUsersEmpty}
                           </div>
                         ) : (
-                          <div className="searchProfileGrid adminUsersGrid">
+                          <>
+                            <div className="adminUserToolbar">
+                              <div className="adminUserSelection">
+                                <span className="adminUserSelectionLabel">
+                                  {strings.adminSelectUserLabel}
+                                </span>
+                                <span className="adminUserSelectionValue">
+                                  {adminSelectedUser
+                                    ? adminSelectedUser.full_name ??
+                                      strings.profileHeaderNameFallback
+                                    : strings.adminSelectUserEmpty}
+                                </span>
+                              </div>
+                              <button
+                                className="btn"
+                                type="button"
+                                onClick={() => {
+                                  if (adminSelectedUserId) {
+                                    handleAdminUpdateUserRole(
+                                      adminSelectedUserId,
+                                      { is_organizer: true }
+                                    );
+                                  }
+                                }}
+                                disabled={
+                                  !adminSelectedUserId ||
+                                  adminUsersStatus.type === "loading" ||
+                                  Boolean(adminSelectedUser?.is_organizer)
+                                }
+                              >
+                                {strings.adminMakeOrganizer}
+                              </button>
+                            </div>
+                            <div className="searchProfileGrid adminUsersGrid">
                             {adminUsers.map((profile) => {
                               const profileLanguage =
                                 profile.language &&
@@ -10048,11 +10142,30 @@ export default function App() {
                               const isSelf = profile.id === sessionUser?.id;
                               const isOrganizer = Boolean(profile.is_organizer);
                               const isAdmin = Boolean(profile.is_admin);
-                              return (
-                                <div
-                                  key={profile.id}
-                                  className="searchProfileCard adminUserCard"
-                                >
+                              const isSelected =
+                                adminSelectedUserId === profile.id;
+                                return (
+                                  <div
+                                    key={profile.id}
+                                    className={`searchProfileCard adminUserCard${
+                                      isSelected ? " adminUserCard--selected" : ""
+                                    }`}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-pressed={isSelected}
+                                    onClick={() =>
+                                      setAdminSelectedUserId(profile.id)
+                                    }
+                                    onKeyDown={(event) => {
+                                      if (
+                                        event.key === "Enter" ||
+                                        event.key === " "
+                                      ) {
+                                        event.preventDefault();
+                                        setAdminSelectedUserId(profile.id);
+                                      }
+                                    }}
+                                  >
                                   <div className="searchProfileAvatar">
                                     {profile.avatar_url ? (
                                       <img
@@ -10116,6 +10229,7 @@ export default function App() {
                               );
                             })}
                           </div>
+                          </>
                         )}
                       </div>
                     ) : adminTab === "events" ? (
