@@ -258,6 +258,27 @@ type EventRecord = {
   created_at: string;
 };
 
+type OrganizerApplication = {
+  id: string;
+  user_id: string;
+  application_type: "person" | "organization";
+  full_name: string | null;
+  org_name: string | null;
+  org_id: string | null;
+  contact_name: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  city: string | null;
+  country: string | null;
+  languages: string | null;
+  experience: string | null;
+  about: string | null;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  updated_at?: string | null;
+};
+
 type ProfileRecord = {
   full_name: string | null;
   birth_date: string | null;
@@ -347,6 +368,13 @@ type MessageKey =
   | "adminSelectUserLabel"
   | "adminSelectUserEmpty"
   | "adminMakeOrganizer"
+  | "adminTabApplications"
+  | "adminApplicationsEmpty"
+  | "adminApplicationApprove"
+  | "adminApplicationReject"
+  | "adminApplicationStatusPending"
+  | "adminApplicationStatusApproved"
+  | "adminApplicationStatusRejected"
   | "adminOrganizerIdLabel"
   | "adminAccessDenied"
   | "adminUsersEmpty"
@@ -406,6 +434,25 @@ type MessageKey =
   | "organizerFollowersEmpty"
   | "userBioPlaceholder"
   | "userActionOrganizer"
+  | "organizerApplyTitle"
+  | "organizerApplySubtitle"
+  | "organizerApplyTypeLabel"
+  | "organizerApplyTypePerson"
+  | "organizerApplyTypeOrganization"
+  | "organizerApplyNameLabel"
+  | "organizerApplyOrgNameLabel"
+  | "organizerApplyOrgIdLabel"
+  | "organizerApplyContactLabel"
+  | "organizerApplyPhoneLabel"
+  | "organizerApplyEmailLabel"
+  | "organizerApplyWebsiteLabel"
+  | "organizerApplyLanguagesLabel"
+  | "organizerApplyExperienceLabel"
+  | "organizerApplyAboutLabel"
+  | "organizerApplySubmit"
+  | "organizerApplyCancel"
+  | "organizerApplyRequired"
+  | "organizerApplySuccess"
   | "userPostCaptionPlaceholder"
   | "userPostPublish"
   | "userPostFileHint"
@@ -675,6 +722,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminUsersEmpty: "No users found.",
     adminEventsEmpty: "No events found.",
     adminPostsEmpty: "No posts found.",
+    adminTabApplications: "Antr?ge",
+    adminApplicationsEmpty: "Keine Antr?ge.",
+    adminApplicationApprove: "Genehmigen",
+    adminApplicationReject: "Ablehnen",
+    adminApplicationStatusPending: "Offen",
+    adminApplicationStatusApproved: "Genehmigt",
+    adminApplicationStatusRejected: "Abgelehnt",
     eventsTitle: "Events",
     eventsSubtitle: "Erstelle und verwalte deine Veranstaltungen.",
     eventCreateTitle: "Neues Event",
@@ -718,6 +772,25 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userActionUnfollow: "Entfolgen",
     userActionMessage: "Nachricht",
     userActionOrganizer: "Organisator werden",
+    organizerApplyTitle: "Antrag als Organisator",
+    organizerApplySubtitle: "Bitte f?llen Sie das Formular aus.",
+    organizerApplyTypeLabel: "Antragstyp",
+    organizerApplyTypePerson: "Person",
+    organizerApplyTypeOrganization: "Organisation",
+    organizerApplyNameLabel: "Vollst?ndiger Name",
+    organizerApplyOrgNameLabel: "Name der Organisation",
+    organizerApplyOrgIdLabel: "Registrierungsnummer",
+    organizerApplyContactLabel: "Kontaktperson",
+    organizerApplyPhoneLabel: "Telefon",
+    organizerApplyEmailLabel: "E-Mail",
+    organizerApplyWebsiteLabel: "Webseite",
+    organizerApplyLanguagesLabel: "Sprachen, die Sie anbieten",
+    organizerApplyExperienceLabel: "Erfahrung",
+    organizerApplyAboutLabel: "?ber Sie / die Organisation",
+    organizerApplySubmit: "Antrag senden",
+    organizerApplyCancel: "Abbrechen",
+    organizerApplyRequired: "Bitte Pflichtfelder ausf?llen.",
+    organizerApplySuccess: "Antrag wurde gesendet.",
     userTabAbout: "Über",
     userTabPhotos: "Fotos",
     userTabVideos: "Videos",
@@ -831,6 +904,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminUsersEmpty: "No users found.",
     adminEventsEmpty: "No events found.",
     adminPostsEmpty: "No posts found.",
+    adminTabApplications: "Applications",
+    adminApplicationsEmpty: "No applications.",
+    adminApplicationApprove: "Approve",
+    adminApplicationReject: "Reject",
+    adminApplicationStatusPending: "Pending",
+    adminApplicationStatusApproved: "Approved",
+    adminApplicationStatusRejected: "Rejected",
     eventsTitle: "Events",
     eventsSubtitle: "Create and manage your events.",
     eventCreateTitle: "New event",
@@ -874,6 +954,25 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userActionUnfollow: "Unfollow",
     userActionMessage: "Message",
     userActionOrganizer: "Become organizer",
+    organizerApplyTitle: "Organizer application",
+    organizerApplySubtitle: "Choose the type and fill in the form.",
+    organizerApplyTypeLabel: "Application type",
+    organizerApplyTypePerson: "Person",
+    organizerApplyTypeOrganization: "Organization",
+    organizerApplyNameLabel: "Full name",
+    organizerApplyOrgNameLabel: "Organization name",
+    organizerApplyOrgIdLabel: "Registration ID",
+    organizerApplyContactLabel: "Contact person",
+    organizerApplyPhoneLabel: "Phone",
+    organizerApplyEmailLabel: "Email",
+    organizerApplyWebsiteLabel: "Website",
+    organizerApplyLanguagesLabel: "Languages you plan to host",
+    organizerApplyExperienceLabel: "Experience",
+    organizerApplyAboutLabel: "About",
+    organizerApplySubmit: "Send application",
+    organizerApplyCancel: "Cancel",
+    organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplySuccess: "Application submitted.",
     userTabAbout: "About",
     userTabPhotos: "Photos",
     userTabVideos: "Videos",
@@ -987,6 +1086,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminUsersEmpty: "Пользователи не найдены.",
     adminEventsEmpty: "События не найдены.",
     adminPostsEmpty: "Посты не найдены.",
+    adminTabApplications: "Заявки",
+    adminApplicationsEmpty: "Заявок нет.",
+    adminApplicationApprove: "Одобрить",
+    adminApplicationReject: "Отклонить",
+    adminApplicationStatusPending: "На рассмотрении",
+    adminApplicationStatusApproved: "Одобрено",
+    adminApplicationStatusRejected: "Отклонено",
     eventsTitle: "События",
     eventsSubtitle: "Создавайте и управляйте своими событиями.",
     eventCreateTitle: "Новое событие",
@@ -1030,6 +1136,25 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userActionUnfollow: "Отписаться",
     userActionMessage: "Сообщение",
     userActionOrganizer: "Стать организатором",
+    organizerApplyTitle: "Заявка на организатора",
+    organizerApplySubtitle: "Выберите тип и заполните форму.",
+    organizerApplyTypeLabel: "Тип заявки",
+    organizerApplyTypePerson: "Частное лицо",
+    organizerApplyTypeOrganization: "Организация",
+    organizerApplyNameLabel: "Полное имя",
+    organizerApplyOrgNameLabel: "Название организации",
+    organizerApplyOrgIdLabel: "Регистрационный номер",
+    organizerApplyContactLabel: "Контактное лицо",
+    organizerApplyPhoneLabel: "Телефон",
+    organizerApplyEmailLabel: "Email",
+    organizerApplyWebsiteLabel: "Сайт",
+    organizerApplyLanguagesLabel: "Языки, которые вы планируете вести",
+    organizerApplyExperienceLabel: "Опыт",
+    organizerApplyAboutLabel: "О себе / об организации",
+    organizerApplySubmit: "Отправить заявку",
+    organizerApplyCancel: "Отменить",
+    organizerApplyRequired: "Заполните обязательные поля.",
+    organizerApplySuccess: "Заявка отправлена.",
     userTabAbout: "Обо мне",
     userTabPhotos: "Фото",
     userTabVideos: "Видео",
@@ -1143,6 +1268,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminUsersEmpty: "No users found.",
     adminEventsEmpty: "No events found.",
     adminPostsEmpty: "No posts found.",
+    adminTabApplications: "Заяви",
+    adminApplicationsEmpty: "Заяв немає.",
+    adminApplicationApprove: "Схвалити",
+    adminApplicationReject: "Відхилити",
+    adminApplicationStatusPending: "На розгляді",
+    adminApplicationStatusApproved: "Схвалено",
+    adminApplicationStatusRejected: "Відхилено",
     eventsTitle: "Події",
     eventsSubtitle: "Створюйте та керуйте своїми подіями.",
     eventCreateTitle: "Нова подія",
@@ -1186,6 +1318,25 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userActionUnfollow: "Відписатися",
     userActionMessage: "Повідомлення",
     userActionOrganizer: "Стати організатором",
+    organizerApplyTitle: "Заява на організатора",
+    organizerApplySubtitle: "Оберіть тип і заповніть форму.",
+    organizerApplyTypeLabel: "Тип заяви",
+    organizerApplyTypePerson: "Особа",
+    organizerApplyTypeOrganization: "Організація",
+    organizerApplyNameLabel: "Повне ім'я",
+    organizerApplyOrgNameLabel: "Назва організації",
+    organizerApplyOrgIdLabel: "Реєстраційний номер",
+    organizerApplyContactLabel: "Контактна особа",
+    organizerApplyPhoneLabel: "Телефон",
+    organizerApplyEmailLabel: "Email",
+    organizerApplyWebsiteLabel: "Сайт",
+    organizerApplyLanguagesLabel: "Мови, які ви плануєте проводити",
+    organizerApplyExperienceLabel: "Досвід",
+    organizerApplyAboutLabel: "Про себе / про організацію",
+    organizerApplySubmit: "Надіслати заяву",
+    organizerApplyCancel: "Скасувати",
+    organizerApplyRequired: "Заповніть обов'язкові поля.",
+    organizerApplySuccess: "Заяву надіслано.",
     userTabAbout: "Про мене",
     userTabPhotos: "Фото",
     userTabVideos: "Відео",
@@ -1299,6 +1450,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminUsersEmpty: "No users found.",
     adminEventsEmpty: "No events found.",
     adminPostsEmpty: "No posts found.",
+    adminTabApplications: "Applications",
+    adminApplicationsEmpty: "No applications.",
+    adminApplicationApprove: "Approve",
+    adminApplicationReject: "Reject",
+    adminApplicationStatusPending: "Pending",
+    adminApplicationStatusApproved: "Approved",
+    adminApplicationStatusRejected: "Rejected",
     eventsTitle: "رویدادها",
     eventsSubtitle: "رویدادهای خود را بسازید و مدیریت کنید.",
     eventCreateTitle: "رویداد جدید",
@@ -1342,6 +1500,25 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userActionUnfollow: "لغو دنبال کردن",
     userActionMessage: "پیام",
     userActionOrganizer: "تبدیل به برگزارکننده",
+    organizerApplyTitle: "Organizer application",
+    organizerApplySubtitle: "Choose the type and fill in the form.",
+    organizerApplyTypeLabel: "Application type",
+    organizerApplyTypePerson: "Person",
+    organizerApplyTypeOrganization: "Organization",
+    organizerApplyNameLabel: "Full name",
+    organizerApplyOrgNameLabel: "Organization name",
+    organizerApplyOrgIdLabel: "Registration ID",
+    organizerApplyContactLabel: "Contact person",
+    organizerApplyPhoneLabel: "Phone",
+    organizerApplyEmailLabel: "Email",
+    organizerApplyWebsiteLabel: "Website",
+    organizerApplyLanguagesLabel: "Languages you plan to host",
+    organizerApplyExperienceLabel: "Experience",
+    organizerApplyAboutLabel: "About",
+    organizerApplySubmit: "Send application",
+    organizerApplyCancel: "Cancel",
+    organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplySuccess: "Application submitted.",
     userTabAbout: "درباره",
     userTabPhotos: "عکس‌ها",
     userTabVideos: "ویدیوها",
@@ -1455,6 +1632,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminUsersEmpty: "No users found.",
     adminEventsEmpty: "No events found.",
     adminPostsEmpty: "No posts found.",
+    adminTabApplications: "Applications",
+    adminApplicationsEmpty: "No applications.",
+    adminApplicationApprove: "Approve",
+    adminApplicationReject: "Reject",
+    adminApplicationStatusPending: "Pending",
+    adminApplicationStatusApproved: "Approved",
+    adminApplicationStatusRejected: "Rejected",
     eventsTitle: "الفعاليات",
     eventsSubtitle: "أنشئ فعالياتك وأدرها.",
     eventCreateTitle: "فعالية جديدة",
@@ -1498,6 +1682,25 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userActionUnfollow: "إلغاء المتابعة",
     userActionMessage: "رسالة",
     userActionOrganizer: "كن منظماً",
+    organizerApplyTitle: "Organizer application",
+    organizerApplySubtitle: "Choose the type and fill in the form.",
+    organizerApplyTypeLabel: "Application type",
+    organizerApplyTypePerson: "Person",
+    organizerApplyTypeOrganization: "Organization",
+    organizerApplyNameLabel: "Full name",
+    organizerApplyOrgNameLabel: "Organization name",
+    organizerApplyOrgIdLabel: "Registration ID",
+    organizerApplyContactLabel: "Contact person",
+    organizerApplyPhoneLabel: "Phone",
+    organizerApplyEmailLabel: "Email",
+    organizerApplyWebsiteLabel: "Website",
+    organizerApplyLanguagesLabel: "Languages you plan to host",
+    organizerApplyExperienceLabel: "Experience",
+    organizerApplyAboutLabel: "About",
+    organizerApplySubmit: "Send application",
+    organizerApplyCancel: "Cancel",
+    organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplySuccess: "Application submitted.",
     userTabAbout: "نبذة",
     userTabPhotos: "الصور",
     userTabVideos: "الفيديو",
@@ -1611,6 +1814,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminUsersEmpty: "No users found.",
     adminEventsEmpty: "No events found.",
     adminPostsEmpty: "No posts found.",
+    adminTabApplications: "Applications",
+    adminApplicationsEmpty: "No applications.",
+    adminApplicationApprove: "Approve",
+    adminApplicationReject: "Reject",
+    adminApplicationStatusPending: "Pending",
+    adminApplicationStatusApproved: "Approved",
+    adminApplicationStatusRejected: "Rejected",
     eventsTitle: "Evente",
     eventsSubtitle: "Krijoni dhe menaxhoni eventet tuaja.",
     eventCreateTitle: "Event i ri",
@@ -1654,6 +1864,25 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userActionUnfollow: "Mos ndiq",
     userActionMessage: "Mesazh",
     userActionOrganizer: "Bëhu organizator",
+    organizerApplyTitle: "Organizer application",
+    organizerApplySubtitle: "Choose the type and fill in the form.",
+    organizerApplyTypeLabel: "Application type",
+    organizerApplyTypePerson: "Person",
+    organizerApplyTypeOrganization: "Organization",
+    organizerApplyNameLabel: "Full name",
+    organizerApplyOrgNameLabel: "Organization name",
+    organizerApplyOrgIdLabel: "Registration ID",
+    organizerApplyContactLabel: "Contact person",
+    organizerApplyPhoneLabel: "Phone",
+    organizerApplyEmailLabel: "Email",
+    organizerApplyWebsiteLabel: "Website",
+    organizerApplyLanguagesLabel: "Languages you plan to host",
+    organizerApplyExperienceLabel: "Experience",
+    organizerApplyAboutLabel: "About",
+    organizerApplySubmit: "Send application",
+    organizerApplyCancel: "Cancel",
+    organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplySuccess: "Application submitted.",
     userTabAbout: "Rreth",
     userTabPhotos: "Foto",
     userTabVideos: "Video",
@@ -1767,6 +1996,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminUsersEmpty: "No users found.",
     adminEventsEmpty: "No events found.",
     adminPostsEmpty: "No posts found.",
+    adminTabApplications: "Applications",
+    adminApplicationsEmpty: "No applications.",
+    adminApplicationApprove: "Approve",
+    adminApplicationReject: "Reject",
+    adminApplicationStatusPending: "Pending",
+    adminApplicationStatusApproved: "Approved",
+    adminApplicationStatusRejected: "Rejected",
     eventsTitle: "Etkinlikler",
     eventsSubtitle: "Etkinliklerinizi oluşturun ve yönetin.",
     eventCreateTitle: "Yeni etkinlik",
@@ -1810,6 +2046,25 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userActionUnfollow: "Takibi b?rak",
     userActionMessage: "Mesaj",
     userActionOrganizer: "Organizatör ol",
+    organizerApplyTitle: "Organizer application",
+    organizerApplySubtitle: "Choose the type and fill in the form.",
+    organizerApplyTypeLabel: "Application type",
+    organizerApplyTypePerson: "Person",
+    organizerApplyTypeOrganization: "Organization",
+    organizerApplyNameLabel: "Full name",
+    organizerApplyOrgNameLabel: "Organization name",
+    organizerApplyOrgIdLabel: "Registration ID",
+    organizerApplyContactLabel: "Contact person",
+    organizerApplyPhoneLabel: "Phone",
+    organizerApplyEmailLabel: "Email",
+    organizerApplyWebsiteLabel: "Website",
+    organizerApplyLanguagesLabel: "Languages you plan to host",
+    organizerApplyExperienceLabel: "Experience",
+    organizerApplyAboutLabel: "About",
+    organizerApplySubmit: "Send application",
+    organizerApplyCancel: "Cancel",
+    organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplySuccess: "Application submitted.",
     userTabAbout: "Hakkında",
     userTabPhotos: "Fotoğraflar",
     userTabVideos: "Videolar",
@@ -1923,6 +2178,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminUsersEmpty: "No users found.",
     adminEventsEmpty: "No events found.",
     adminPostsEmpty: "No posts found.",
+    adminTabApplications: "Applications",
+    adminApplicationsEmpty: "No applications.",
+    adminApplicationApprove: "Approve",
+    adminApplicationReject: "Reject",
+    adminApplicationStatusPending: "Pending",
+    adminApplicationStatusApproved: "Approved",
+    adminApplicationStatusRejected: "Rejected",
     eventsTitle: "Événements",
     eventsSubtitle: "Créez et gérez vos événements.",
     eventCreateTitle: "Nouvel événement",
@@ -1966,6 +2228,25 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userActionUnfollow: "Ne plus suivre",
     userActionMessage: "Message",
     userActionOrganizer: "Devenir organisateur",
+    organizerApplyTitle: "Organizer application",
+    organizerApplySubtitle: "Choose the type and fill in the form.",
+    organizerApplyTypeLabel: "Application type",
+    organizerApplyTypePerson: "Person",
+    organizerApplyTypeOrganization: "Organization",
+    organizerApplyNameLabel: "Full name",
+    organizerApplyOrgNameLabel: "Organization name",
+    organizerApplyOrgIdLabel: "Registration ID",
+    organizerApplyContactLabel: "Contact person",
+    organizerApplyPhoneLabel: "Phone",
+    organizerApplyEmailLabel: "Email",
+    organizerApplyWebsiteLabel: "Website",
+    organizerApplyLanguagesLabel: "Languages you plan to host",
+    organizerApplyExperienceLabel: "Experience",
+    organizerApplyAboutLabel: "About",
+    organizerApplySubmit: "Send application",
+    organizerApplyCancel: "Cancel",
+    organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplySuccess: "Application submitted.",
     userTabAbout: "À propos",
     userTabPhotos: "Photos",
     userTabVideos: "Vidéos",
@@ -2079,6 +2360,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminUsersEmpty: "No users found.",
     adminEventsEmpty: "No events found.",
     adminPostsEmpty: "No posts found.",
+    adminTabApplications: "Applications",
+    adminApplicationsEmpty: "No applications.",
+    adminApplicationApprove: "Approve",
+    adminApplicationReject: "Reject",
+    adminApplicationStatusPending: "Pending",
+    adminApplicationStatusApproved: "Approved",
+    adminApplicationStatusRejected: "Rejected",
     eventsTitle: "Eventos",
     eventsSubtitle: "Crea y gestiona tus eventos.",
     eventCreateTitle: "Nuevo evento",
@@ -2122,6 +2410,25 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userActionUnfollow: "Dejar de seguir",
     userActionMessage: "Mensaje",
     userActionOrganizer: "Ser organizador",
+    organizerApplyTitle: "Organizer application",
+    organizerApplySubtitle: "Choose the type and fill in the form.",
+    organizerApplyTypeLabel: "Application type",
+    organizerApplyTypePerson: "Person",
+    organizerApplyTypeOrganization: "Organization",
+    organizerApplyNameLabel: "Full name",
+    organizerApplyOrgNameLabel: "Organization name",
+    organizerApplyOrgIdLabel: "Registration ID",
+    organizerApplyContactLabel: "Contact person",
+    organizerApplyPhoneLabel: "Phone",
+    organizerApplyEmailLabel: "Email",
+    organizerApplyWebsiteLabel: "Website",
+    organizerApplyLanguagesLabel: "Languages you plan to host",
+    organizerApplyExperienceLabel: "Experience",
+    organizerApplyAboutLabel: "About",
+    organizerApplySubmit: "Send application",
+    organizerApplyCancel: "Cancel",
+    organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplySuccess: "Application submitted.",
     userTabAbout: "Acerca de",
     userTabPhotos: "Fotos",
     userTabVideos: "Videos",
@@ -2235,6 +2542,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminUsersEmpty: "No users found.",
     adminEventsEmpty: "No events found.",
     adminPostsEmpty: "No posts found.",
+    adminTabApplications: "Applications",
+    adminApplicationsEmpty: "No applications.",
+    adminApplicationApprove: "Approve",
+    adminApplicationReject: "Reject",
+    adminApplicationStatusPending: "Pending",
+    adminApplicationStatusApproved: "Approved",
+    adminApplicationStatusRejected: "Rejected",
     eventsTitle: "Eventi",
     eventsSubtitle: "Crea e gestisci i tuoi eventi.",
     eventCreateTitle: "Nuovo evento",
@@ -2278,6 +2592,25 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userActionUnfollow: "Smetti di seguire",
     userActionMessage: "Messaggio",
     userActionOrganizer: "Diventa organizzatore",
+    organizerApplyTitle: "Organizer application",
+    organizerApplySubtitle: "Choose the type and fill in the form.",
+    organizerApplyTypeLabel: "Application type",
+    organizerApplyTypePerson: "Person",
+    organizerApplyTypeOrganization: "Organization",
+    organizerApplyNameLabel: "Full name",
+    organizerApplyOrgNameLabel: "Organization name",
+    organizerApplyOrgIdLabel: "Registration ID",
+    organizerApplyContactLabel: "Contact person",
+    organizerApplyPhoneLabel: "Phone",
+    organizerApplyEmailLabel: "Email",
+    organizerApplyWebsiteLabel: "Website",
+    organizerApplyLanguagesLabel: "Languages you plan to host",
+    organizerApplyExperienceLabel: "Experience",
+    organizerApplyAboutLabel: "About",
+    organizerApplySubmit: "Send application",
+    organizerApplyCancel: "Cancel",
+    organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplySuccess: "Application submitted.",
     userTabAbout: "Info",
     userTabPhotos: "Foto",
     userTabVideos: "Video",
@@ -2391,6 +2724,13 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     adminUsersEmpty: "No users found.",
     adminEventsEmpty: "No events found.",
     adminPostsEmpty: "No posts found.",
+    adminTabApplications: "Applications",
+    adminApplicationsEmpty: "No applications.",
+    adminApplicationApprove: "Approve",
+    adminApplicationReject: "Reject",
+    adminApplicationStatusPending: "Pending",
+    adminApplicationStatusApproved: "Approved",
+    adminApplicationStatusRejected: "Rejected",
     eventsTitle: "Wydarzenia",
     eventsSubtitle: "Twórz i zarządzaj swoimi wydarzeniami.",
     eventCreateTitle: "Nowe wydarzenie",
@@ -2434,6 +2774,25 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userActionUnfollow: "Przesta? obserwowa?",
     userActionMessage: "Wiadomość",
     userActionOrganizer: "Zostań organizatorem",
+    organizerApplyTitle: "Organizer application",
+    organizerApplySubtitle: "Choose the type and fill in the form.",
+    organizerApplyTypeLabel: "Application type",
+    organizerApplyTypePerson: "Person",
+    organizerApplyTypeOrganization: "Organization",
+    organizerApplyNameLabel: "Full name",
+    organizerApplyOrgNameLabel: "Organization name",
+    organizerApplyOrgIdLabel: "Registration ID",
+    organizerApplyContactLabel: "Contact person",
+    organizerApplyPhoneLabel: "Phone",
+    organizerApplyEmailLabel: "Email",
+    organizerApplyWebsiteLabel: "Website",
+    organizerApplyLanguagesLabel: "Languages you plan to host",
+    organizerApplyExperienceLabel: "Experience",
+    organizerApplyAboutLabel: "About",
+    organizerApplySubmit: "Send application",
+    organizerApplyCancel: "Cancel",
+    organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplySuccess: "Application submitted.",
     userTabAbout: "O mnie",
     userTabPhotos: "Zdjęcia",
     userTabVideos: "Wideo",
@@ -2500,6 +2859,7 @@ const POSTS_BUCKET = "posts";
 const EVENTS_BUCKET = "events";
 const ORGANIZER_FOLLOWS_TABLE = "organizer_follows";
 const POSTS_TABLE = "posts";
+const ORGANIZER_APPLICATIONS_TABLE = "organizer_applications";
 const POST_MEDIA_FOLDER = "posts";
 const LEARN_PRACTICE_EXCLUDED = new Set<Locale>([
   "ru",
@@ -6381,11 +6741,20 @@ export default function App() {
     type: "idle" | "loading" | "error";
     message: string;
   }>({ type: "idle", message: "" });
-  const [adminTab, setAdminTab] = useState<"users" | "events" | "posts">(
+  const [adminTab, setAdminTab] = useState<
+    "users" | "events" | "posts" | "applications"
+  >(
     "users"
   );
   const [adminUsers, setAdminUsers] = useState<SearchProfile[]>([]);
   const [adminUsersStatus, setAdminUsersStatus] = useState<{
+    type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [adminApplications, setAdminApplications] = useState<
+    OrganizerApplication[]
+  >([]);
+  const [adminApplicationsStatus, setAdminApplicationsStatus] = useState<{
     type: "idle" | "loading" | "error";
     message: string;
   }>({ type: "idle", message: "" });
@@ -6500,6 +6869,26 @@ export default function App() {
   const [profileInstagram, setProfileInstagram] = useState("");
   const [profileIsOrganizer, setProfileIsOrganizer] = useState(false);
   const [profileIsAdmin, setProfileIsAdmin] = useState(false);
+  const [organizerApplyOpen, setOrganizerApplyOpen] = useState(false);
+  const [organizerApplyType, setOrganizerApplyType] = useState<
+    "" | "person" | "organization"
+  >("");
+  const [organizerApplyName, setOrganizerApplyName] = useState("");
+  const [organizerApplyOrgName, setOrganizerApplyOrgName] = useState("");
+  const [organizerApplyOrgId, setOrganizerApplyOrgId] = useState("");
+  const [organizerApplyContactName, setOrganizerApplyContactName] = useState("");
+  const [organizerApplyPhone, setOrganizerApplyPhone] = useState("");
+  const [organizerApplyEmail, setOrganizerApplyEmail] = useState("");
+  const [organizerApplyWebsite, setOrganizerApplyWebsite] = useState("");
+  const [organizerApplyCity, setOrganizerApplyCity] = useState("");
+  const [organizerApplyCountry, setOrganizerApplyCountry] = useState("");
+  const [organizerApplyLanguages, setOrganizerApplyLanguages] = useState("");
+  const [organizerApplyExperience, setOrganizerApplyExperience] = useState("");
+  const [organizerApplyAbout, setOrganizerApplyAbout] = useState("");
+  const [organizerApplyStatus, setOrganizerApplyStatus] = useState<{
+    type: "idle" | "loading" | "success" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
   const [profileCoverPhoto, setProfileCoverPhoto] = useState<File | null>(null);
   const [profileCoverPreview, setProfileCoverPreview] = useState<string | null>(
     null
@@ -7365,16 +7754,22 @@ export default function App() {
   useEffect(() => {
     if (route !== "admin") {
       setAdminUsers([]);
+      setAdminApplications([]);
       setAdminPosts([]);
       setAdminPostEditId(null);
       setAdminPostCaption("");
       setAdminUsersStatus({ type: "idle", message: "" });
+      setAdminApplicationsStatus({ type: "idle", message: "" });
       setAdminPostsStatus({ type: "idle", message: "" });
       setAdminEventsStatus({ type: "idle", message: "" });
       return;
     }
     if (guestMode) {
       setAdminUsersStatus({
+        type: "error",
+        message: strings.adminAccessDenied,
+      });
+      setAdminApplicationsStatus({
         type: "error",
         message: strings.adminAccessDenied,
       });
@@ -7394,6 +7789,10 @@ export default function App() {
         type: "error",
         message: strings.adminAccessDenied,
       });
+      setAdminApplicationsStatus({
+        type: "error",
+        message: strings.adminAccessDenied,
+      });
       setAdminPostsStatus({
         type: "error",
         message: strings.adminAccessDenied,
@@ -7410,6 +7809,10 @@ export default function App() {
         type: "error",
         message: "Supabase is not configured.",
       });
+      setAdminApplicationsStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
       setAdminPostsStatus({
         type: "error",
         message: "Supabase is not configured.",
@@ -7423,9 +7826,11 @@ export default function App() {
     let active = true;
     (async () => {
       setAdminUsersStatus({ type: "loading", message: "" });
+      setAdminApplicationsStatus({ type: "loading", message: "" });
       setAdminPostsStatus({ type: "loading", message: "" });
       setAdminEventsStatus({ type: "loading", message: "" });
-      const [usersResult, eventsResult, postsResult] = await Promise.all([
+      const [usersResult, eventsResult, postsResult, applicationsResult] =
+        await Promise.all([
         supabase
           .from("profiles")
           .select(
@@ -7441,6 +7846,12 @@ export default function App() {
         supabase
           .from(POSTS_TABLE)
           .select("id,user_id,media_url,media_type,caption,created_at")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from(ORGANIZER_APPLICATIONS_TABLE)
+          .select(
+            "id,user_id,application_type,full_name,org_name,org_id,contact_name,phone,email,website,city,country,languages,experience,about,status,created_at,updated_at"
+          )
           .order("created_at", { ascending: false }),
       ]);
       if (!active) return;
@@ -7473,6 +7884,19 @@ export default function App() {
       } else {
         setAdminPosts((postsRows ?? []) as UserPost[]);
         setAdminPostsStatus({ type: "idle", message: "" });
+      }
+      const { data: applicationsRows, error: applicationsError } =
+        applicationsResult;
+      if (applicationsError) {
+        setAdminApplicationsStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(applicationsError),
+        });
+      } else {
+        setAdminApplications(
+          (applicationsRows ?? []) as OrganizerApplication[]
+        );
+        setAdminApplicationsStatus({ type: "idle", message: "" });
       }
     })();
     return () => {
@@ -7966,13 +8390,72 @@ export default function App() {
       redirectToLoginWithIntent({ route: "events" });
       return;
     }
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      if (typeof window !== "undefined") {
-        window.alert("Supabase is not configured.");
-      }
+    const userName =
+      profileName ||
+      (typeof sessionUser?.user_metadata?.full_name === "string"
+        ? sessionUser.user_metadata.full_name
+        : "");
+    const defaultLanguage =
+      profileLanguage && isSupportedLocale(profileLanguage)
+        ? languageLabels[profileLanguage] ?? profileLanguage
+        : profileLanguage ?? "";
+    setOrganizerApplyType("");
+    setOrganizerApplyName(userName);
+    setOrganizerApplyOrgName("");
+    setOrganizerApplyOrgId("");
+    setOrganizerApplyContactName("");
+    setOrganizerApplyPhone("");
+    setOrganizerApplyEmail(sessionUser?.email ?? "");
+    setOrganizerApplyWebsite("");
+    setOrganizerApplyCity(profileCity);
+    setOrganizerApplyCountry(profileCountry);
+    setOrganizerApplyLanguages(defaultLanguage);
+    setOrganizerApplyExperience("");
+    setOrganizerApplyAbout("");
+    setOrganizerApplyStatus({ type: "idle", message: "" });
+    setOrganizerApplyOpen(true);
+  }
+
+  function handleOrganizerApplyClose() {
+    setOrganizerApplyOpen(false);
+    setOrganizerApplyStatus({ type: "idle", message: "" });
+  }
+
+  async function handleOrganizerApplySubmit() {
+    if (organizerApplyStatus.type === "loading") return;
+    if (!organizerApplyType) {
+      setOrganizerApplyStatus({
+        type: "error",
+        message: strings.organizerApplyRequired,
+      });
       return;
     }
+    const needsPerson = organizerApplyType === "person";
+    const missing =
+      (needsPerson && !organizerApplyName.trim()) ||
+      (!needsPerson && !organizerApplyOrgName.trim()) ||
+      (!needsPerson && !organizerApplyContactName.trim()) ||
+      !organizerApplyPhone.trim() ||
+      !organizerApplyEmail.trim() ||
+      !organizerApplyAbout.trim() ||
+      !organizerApplyCity.trim() ||
+      !organizerApplyCountry.trim();
+    if (missing) {
+      setOrganizerApplyStatus({
+        type: "error",
+        message: strings.organizerApplyRequired,
+      });
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setOrganizerApplyStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    setOrganizerApplyStatus({ type: "loading", message: strings.loadingLabel });
     try {
       const { data, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) throw sessionError;
@@ -7981,16 +8464,43 @@ export default function App() {
         redirectToLoginWithIntent({ route: "events" });
         return;
       }
+      const payload = {
+        user_id: user.id,
+        application_type: organizerApplyType,
+        full_name: needsPerson ? organizerApplyName.trim() : null,
+        org_name: needsPerson ? null : organizerApplyOrgName.trim(),
+        org_id: needsPerson ? null : organizerApplyOrgId.trim(),
+        contact_name: needsPerson
+          ? organizerApplyName.trim()
+          : organizerApplyContactName.trim(),
+        phone: organizerApplyPhone.trim(),
+        email: organizerApplyEmail.trim(),
+        website: organizerApplyWebsite.trim() || null,
+        city: organizerApplyCity.trim(),
+        country: organizerApplyCountry.trim(),
+        languages: organizerApplyLanguages.trim() || null,
+        experience: organizerApplyExperience.trim() || null,
+        about: organizerApplyAbout.trim(),
+        status: "pending",
+        updated_at: new Date().toISOString(),
+      };
       const { error } = await supabase
-        .from("profiles")
-        .update({ is_organizer: true, updated_at: new Date().toISOString() })
-        .eq("id", user.id);
+        .from(ORGANIZER_APPLICATIONS_TABLE)
+        .upsert(payload, { onConflict: "user_id" });
       if (error) throw error;
-      setProfileIsOrganizer(true);
-    } catch (error) {
+      setOrganizerApplyStatus({
+        type: "success",
+        message: strings.organizerApplySuccess,
+      });
+      handleOrganizerApplyClose();
       if (typeof window !== "undefined") {
-        window.alert(getSupabaseErrorMessage(error));
+        window.alert(strings.organizerApplySuccess);
       }
+    } catch (error) {
+      setOrganizerApplyStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
     }
   }
 
@@ -8089,6 +8599,115 @@ export default function App() {
       setAdminUsersStatus({ type: "idle", message: "" });
     } catch (error) {
       setAdminUsersStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    }
+  }
+
+  async function handleAdminApproveApplication(
+    application: OrganizerApplication
+  ) {
+    if (!profileIsAdmin || adminApplicationsStatus.type === "loading") return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setAdminApplicationsStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    setAdminApplicationsStatus({ type: "loading", message: "" });
+    try {
+      const { data, error } = await supabase
+        .from(ORGANIZER_APPLICATIONS_TABLE)
+        .update({ status: "approved", updated_at: new Date().toISOString() })
+        .eq("id", application.id)
+        .select(
+          "id,user_id,application_type,full_name,org_name,org_id,contact_name,phone,email,website,city,country,languages,experience,about,status,created_at,updated_at"
+        )
+        .maybeSingle();
+      if (error) throw error;
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ is_organizer: true, updated_at: new Date().toISOString() })
+        .eq("id", application.user_id);
+      if (profileError) throw profileError;
+      if (data) {
+        setAdminApplications((prev) =>
+          prev.map((item) =>
+            item.id === data.id ? (data as OrganizerApplication) : item
+          )
+        );
+      } else {
+        setAdminApplications((prev) =>
+          prev.map((item) =>
+            item.id === application.id
+              ? { ...item, status: "approved" }
+              : item
+          )
+        );
+      }
+      setAdminUsers((prev) =>
+        prev.map((profile) =>
+          profile.id === application.user_id
+            ? { ...profile, is_organizer: true }
+            : profile
+        )
+      );
+      if (sessionUser?.id === application.user_id) {
+        setProfileIsOrganizer(true);
+      }
+      setAdminApplicationsStatus({ type: "idle", message: "" });
+    } catch (error) {
+      setAdminApplicationsStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    }
+  }
+
+  async function handleAdminRejectApplication(
+    application: OrganizerApplication
+  ) {
+    if (!profileIsAdmin || adminApplicationsStatus.type === "loading") return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setAdminApplicationsStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    setAdminApplicationsStatus({ type: "loading", message: "" });
+    try {
+      const { data, error } = await supabase
+        .from(ORGANIZER_APPLICATIONS_TABLE)
+        .update({ status: "rejected", updated_at: new Date().toISOString() })
+        .eq("id", application.id)
+        .select(
+          "id,user_id,application_type,full_name,org_name,org_id,contact_name,phone,email,website,city,country,languages,experience,about,status,created_at,updated_at"
+        )
+        .maybeSingle();
+      if (error) throw error;
+      if (data) {
+        setAdminApplications((prev) =>
+          prev.map((item) =>
+            item.id === data.id ? (data as OrganizerApplication) : item
+          )
+        );
+      } else {
+        setAdminApplications((prev) =>
+          prev.map((item) =>
+            item.id === application.id
+              ? { ...item, status: "rejected" }
+              : item
+          )
+        );
+      }
+      setAdminApplicationsStatus({ type: "idle", message: "" });
+    } catch (error) {
+      setAdminApplicationsStatus({
         type: "error",
         message: getSupabaseErrorMessage(error),
       });
@@ -9398,6 +10017,7 @@ export default function App() {
   const showUserQuickActions = isUserRoute && !guestMode;
   const canManageEvents = profileIsOrganizer || (profileIsAdmin && isAdminRoute);
   const adminUsersBusy = adminUsersStatus.type === "loading";
+  const adminApplicationsBusy = adminApplicationsStatus.type === "loading";
   const adminUserMap = useMemo(() => {
     return new Map(adminUsers.map((profile) => [profile.id, profile]));
   }, [adminUsers]);
@@ -10009,6 +10629,373 @@ export default function App() {
                 </div>
               </div>
             ) : null}
+            {organizerApplyOpen ? (
+              <div
+                className="organizerApplyOverlay"
+                role="dialog"
+                aria-modal="true"
+              >
+                <div
+                  className="organizerApplyModal"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="organizerApplyTitle">
+                    {strings.organizerApplyTitle}
+                  </div>
+                  <div className="organizerApplySubtitle">
+                    {strings.organizerApplySubtitle}
+                  </div>
+                  <div className="organizerApplyType">
+                    <div className="organizerApplyTypeLabel">
+                      {strings.organizerApplyTypeLabel}
+                    </div>
+                    <div className="organizerApplyTypeButtons">
+                      <button
+                        className={`btn${
+                          organizerApplyType === "person" ? " btnActive" : ""
+                        }`}
+                        type="button"
+                        onClick={() => setOrganizerApplyType("person")}
+                      >
+                        {strings.organizerApplyTypePerson}
+                      </button>
+                      <button
+                        className={`btn${
+                          organizerApplyType === "organization"
+                            ? " btnActive"
+                            : ""
+                        }`}
+                        type="button"
+                        onClick={() => setOrganizerApplyType("organization")}
+                      >
+                        {strings.organizerApplyTypeOrganization}
+                      </button>
+                    </div>
+                  </div>
+                  {organizerApplyType ? (
+                    <div className="organizerApplyGrid">
+                      {organizerApplyType === "person" ? (
+                        <>
+                          <div className="field">
+                            <label className="label" htmlFor="organizerApplyName">
+                              {strings.organizerApplyNameLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyName"
+                              type="text"
+                              value={organizerApplyName}
+                              onChange={(event) =>
+                                setOrganizerApplyName(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="organizerApplyPhone">
+                              {strings.organizerApplyPhoneLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyPhone"
+                              type="tel"
+                              value={organizerApplyPhone}
+                              onChange={(event) =>
+                                setOrganizerApplyPhone(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="organizerApplyEmail">
+                              {strings.organizerApplyEmailLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyEmail"
+                              type="email"
+                              value={organizerApplyEmail}
+                              onChange={(event) =>
+                                setOrganizerApplyEmail(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="organizerApplyCity">
+                              {strings.profileCityLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyCity"
+                              type="text"
+                              value={organizerApplyCity}
+                              onChange={(event) =>
+                                setOrganizerApplyCity(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="organizerApplyCountry">
+                              {strings.profileCountryLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyCountry"
+                              type="text"
+                              value={organizerApplyCountry}
+                              onChange={(event) =>
+                                setOrganizerApplyCountry(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field organizerApplyFull">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyLanguages"
+                            >
+                              {strings.organizerApplyLanguagesLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyLanguages"
+                              type="text"
+                              value={organizerApplyLanguages}
+                              onChange={(event) =>
+                                setOrganizerApplyLanguages(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field organizerApplyFull">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyExperience"
+                            >
+                              {strings.organizerApplyExperienceLabel}
+                            </label>
+                            <textarea
+                              className="input organizerApplyTextarea"
+                              id="organizerApplyExperience"
+                              value={organizerApplyExperience}
+                              onChange={(event) =>
+                                setOrganizerApplyExperience(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field organizerApplyFull">
+                            <label className="label" htmlFor="organizerApplyAbout">
+                              {strings.organizerApplyAboutLabel}
+                            </label>
+                            <textarea
+                              className="input organizerApplyTextarea"
+                              id="organizerApplyAbout"
+                              value={organizerApplyAbout}
+                              onChange={(event) =>
+                                setOrganizerApplyAbout(event.target.value)
+                              }
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyOrgName"
+                            >
+                              {strings.organizerApplyOrgNameLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyOrgName"
+                              type="text"
+                              value={organizerApplyOrgName}
+                              onChange={(event) =>
+                                setOrganizerApplyOrgName(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="organizerApplyOrgId">
+                              {strings.organizerApplyOrgIdLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyOrgId"
+                              type="text"
+                              value={organizerApplyOrgId}
+                              onChange={(event) =>
+                                setOrganizerApplyOrgId(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyContactName"
+                            >
+                              {strings.organizerApplyContactLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyContactName"
+                              type="text"
+                              value={organizerApplyContactName}
+                              onChange={(event) =>
+                                setOrganizerApplyContactName(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyPhoneOrg"
+                            >
+                              {strings.organizerApplyPhoneLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyPhoneOrg"
+                              type="tel"
+                              value={organizerApplyPhone}
+                              onChange={(event) =>
+                                setOrganizerApplyPhone(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyEmailOrg"
+                            >
+                              {strings.organizerApplyEmailLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyEmailOrg"
+                              type="email"
+                              value={organizerApplyEmail}
+                              onChange={(event) =>
+                                setOrganizerApplyEmail(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyWebsite"
+                            >
+                              {strings.organizerApplyWebsiteLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyWebsite"
+                              type="url"
+                              value={organizerApplyWebsite}
+                              onChange={(event) =>
+                                setOrganizerApplyWebsite(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyCityOrg"
+                            >
+                              {strings.profileCityLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyCityOrg"
+                              type="text"
+                              value={organizerApplyCity}
+                              onChange={(event) =>
+                                setOrganizerApplyCity(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyCountryOrg"
+                            >
+                              {strings.profileCountryLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyCountryOrg"
+                              type="text"
+                              value={organizerApplyCountry}
+                              onChange={(event) =>
+                                setOrganizerApplyCountry(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field organizerApplyFull">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyLanguagesOrg"
+                            >
+                              {strings.organizerApplyLanguagesLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyLanguagesOrg"
+                              type="text"
+                              value={organizerApplyLanguages}
+                              onChange={(event) =>
+                                setOrganizerApplyLanguages(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field organizerApplyFull">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyAboutOrg"
+                            >
+                              {strings.organizerApplyAboutLabel}
+                            </label>
+                            <textarea
+                              className="input organizerApplyTextarea"
+                              id="organizerApplyAboutOrg"
+                              value={organizerApplyAbout}
+                              onChange={(event) =>
+                                setOrganizerApplyAbout(event.target.value)
+                              }
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : null}
+                  {organizerApplyStatus.type !== "idle" ? (
+                    <div
+                      className={`authStatus authStatus--${organizerApplyStatus.type}`}
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {organizerApplyStatus.message}
+                    </div>
+                  ) : null}
+                  <div className="organizerApplyActions">
+                    <button
+                      className="btn btnGhost"
+                      type="button"
+                      onClick={handleOrganizerApplyClose}
+                    >
+                      {strings.organizerApplyCancel}
+                    </button>
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={handleOrganizerApplySubmit}
+                      disabled={organizerApplyStatus.type === "loading"}
+                    >
+                      {organizerApplyStatus.type === "loading"
+                        ? strings.loadingLabel
+                        : strings.organizerApplySubmit}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             {isPartnersRoute ? (
               <div className="partnersPage">
                 <div className="partnersPageTitle">{strings.partnersTitle}</div>
@@ -10055,6 +11042,15 @@ export default function App() {
                         onClick={() => setAdminTab("users")}
                       >
                         {strings.adminTabUsers}
+                      </button>
+                      <button
+                        className={`btn${
+                          adminTab === "applications" ? " btnActive" : ""
+                        }`}
+                        type="button"
+                        onClick={() => setAdminTab("applications")}
+                      >
+                        {strings.adminTabApplications}
                       </button>
                       <button
                         className={`btn${adminTab === "events" ? " btnActive" : ""}`}
@@ -10231,6 +11227,202 @@ export default function App() {
                             })}
                           </div>
                           </>
+                        )}
+                      </div>
+                    ) : adminTab === "applications" ? (
+                      <div className="adminSection">
+                        {adminApplicationsStatus.type === "loading" ? (
+                          <div
+                            className="authStatus authStatus--loading"
+                            role="status"
+                            aria-live="polite"
+                          >
+                            {strings.loadingLabel}
+                          </div>
+                        ) : adminApplicationsStatus.type === "error" ? (
+                          <div
+                            className="authStatus authStatus--error"
+                            role="status"
+                            aria-live="polite"
+                          >
+                            {adminApplicationsStatus.message}
+                          </div>
+                        ) : adminApplications.length === 0 ? (
+                          <div className="searchEmpty">
+                            {strings.adminApplicationsEmpty}
+                          </div>
+                        ) : (
+                          <div className="adminApplicationsGrid">
+                            {adminApplications.map((application) => {
+                              const applicant = adminUserMap.get(
+                                application.user_id
+                              );
+                              const displayName =
+                                application.application_type === "organization"
+                                  ? application.org_name ??
+                                    application.contact_name ??
+                                    strings.profileHeaderNameFallback
+                                  : application.full_name ??
+                                    application.contact_name ??
+                                    applicant?.full_name ??
+                                    strings.profileHeaderNameFallback;
+                              const typeLabel =
+                                application.application_type === "organization"
+                                  ? strings.organizerApplyTypeOrganization
+                                  : strings.organizerApplyTypePerson;
+                              const location = [
+                                application.city,
+                                application.country,
+                              ]
+                                .filter(Boolean)
+                                .join(" • ");
+                              const statusLabel =
+                                application.status === "approved"
+                                  ? strings.adminApplicationStatusApproved
+                                  : application.status === "rejected"
+                                    ? strings.adminApplicationStatusRejected
+                                    : strings.adminApplicationStatusPending;
+                              const details = [
+                                application.application_type === "organization" &&
+                                application.org_id
+                                  ? {
+                                      label: strings.organizerApplyOrgIdLabel,
+                                      value: application.org_id,
+                                    }
+                                  : null,
+                                application.application_type === "organization" &&
+                                application.contact_name
+                                  ? {
+                                      label: strings.organizerApplyContactLabel,
+                                      value: application.contact_name,
+                                    }
+                                  : null,
+                                application.phone
+                                  ? {
+                                      label: strings.organizerApplyPhoneLabel,
+                                      value: application.phone,
+                                    }
+                                  : null,
+                                application.email
+                                  ? {
+                                      label: strings.organizerApplyEmailLabel,
+                                      value: application.email,
+                                    }
+                                  : null,
+                                application.website
+                                  ? {
+                                      label: strings.organizerApplyWebsiteLabel,
+                                      value: application.website,
+                                    }
+                                  : null,
+                                application.languages
+                                  ? {
+                                      label: strings.organizerApplyLanguagesLabel,
+                                      value: application.languages,
+                                    }
+                                  : null,
+                                application.experience
+                                  ? {
+                                      label: strings.organizerApplyExperienceLabel,
+                                      value: application.experience,
+                                    }
+                                  : null,
+                                application.about
+                                  ? {
+                                      label: strings.organizerApplyAboutLabel,
+                                      value: application.about,
+                                    }
+                                  : null,
+                              ].filter(Boolean) as { label: string; value: string }[];
+                              return (
+                                <div
+                                  key={application.id}
+                                  className="adminApplicationCard"
+                                >
+                                  <div className="adminApplicationHeader">
+                                    <div className="searchProfileAvatar">
+                                      {applicant?.avatar_url ? (
+                                        <img
+                                          src={applicant.avatar_url}
+                                          alt={displayName}
+                                        />
+                                      ) : (
+                                        <span>
+                                          {(displayName ?? "?")
+                                            .trim()
+                                            .charAt(0)
+                                            .toUpperCase()}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="adminApplicationInfo">
+                                      <div className="adminApplicationName">
+                                        {displayName}
+                                      </div>
+                                      <div className="adminApplicationMeta">
+                                        {[typeLabel, location]
+                                          .filter(Boolean)
+                                          .join(" • ")}
+                                      </div>
+                                      {application.email || application.phone ? (
+                                        <div className="adminApplicationMeta">
+                                          {[application.email, application.phone]
+                                            .filter(Boolean)
+                                            .join(" • ")}
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                    <span
+                                      className={`adminApplicationStatus adminApplicationStatus--${application.status}`}
+                                    >
+                                      {statusLabel}
+                                    </span>
+                                  </div>
+                                  {details.length ? (
+                                    <div className="adminApplicationDetails">
+                                      {details.map((detail) => (
+                                        <div
+                                          key={`${application.id}-${detail.label}`}
+                                          className="adminApplicationDetail"
+                                        >
+                                          <span className="adminApplicationDetailLabel">
+                                            {detail.label}:
+                                          </span>
+                                          <span className="adminApplicationDetailValue">
+                                            {detail.value}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                  {application.status === "pending" ? (
+                                    <div className="adminApplicationActions">
+                                      <button
+                                        className="btn"
+                                        type="button"
+                                        onClick={() =>
+                                          handleAdminApproveApplication(application)
+                                        }
+                                        disabled={adminApplicationsBusy}
+                                      >
+                                        {strings.adminApplicationApprove}
+                                      </button>
+                                      <button
+                                        className="btn btnGhost"
+                                        type="button"
+                                        onClick={() =>
+                                          handleAdminRejectApplication(application)
+                                        }
+                                        disabled={adminApplicationsBusy}
+                                      >
+                                        {strings.adminApplicationReject}
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
                     ) : adminTab === "events" ? (

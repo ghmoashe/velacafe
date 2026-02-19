@@ -2305,6 +2305,91 @@ button:focus-visible {
   gap: 16px;
 }
 
+.adminApplicationsGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.adminApplicationCard {
+  background: #fff;
+  border: 1px solid rgba(223, 230, 242, 0.9);
+  border-radius: 16px;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  box-shadow: 0 8px 18px rgba(31, 27, 22, 0.08);
+}
+
+.adminApplicationHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.adminApplicationInfo {
+  display: grid;
+  gap: 4px;
+  flex: 1;
+}
+
+.adminApplicationName {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.adminApplicationMeta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.adminApplicationStatus {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.adminApplicationStatus--pending {
+  background: #fff0d8;
+  color: #9b5a14;
+}
+
+.adminApplicationStatus--approved {
+  background: #e6f6e8;
+  color: #1f7a2f;
+}
+
+.adminApplicationStatus--rejected {
+  background: #fde8e7;
+  color: #b43b2d;
+}
+
+.adminApplicationDetails {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.adminApplicationDetailLabel {
+  font-weight: 600;
+  color: #6f4b3a;
+  margin-right: 6px;
+}
+
+.adminApplicationDetailValue {
+  color: inherit;
+}
+
+.adminApplicationActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .adminPostCard {
   gap: 12px;
 }
@@ -2357,6 +2442,81 @@ button:focus-visible {
 }
 
 .adminPinActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.organizerApplyOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(29, 21, 15, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 110;
+}
+
+.organizerApplyModal {
+  width: min(760px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: #fffaf6;
+  border: 1px solid rgba(200, 170, 140, 0.35);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 24px 60px rgba(31, 23, 16, 0.25);
+  display: grid;
+  gap: 14px;
+}
+
+.organizerApplyTitle {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.organizerApplySubtitle {
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.organizerApplyType {
+  display: grid;
+  gap: 8px;
+}
+
+.organizerApplyTypeLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.organizerApplyTypeButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.organizerApplyGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.organizerApplyFull {
+  grid-column: 1 / -1;
+}
+
+.organizerApplyTextarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.organizerApplyActions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
