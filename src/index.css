@@ -890,6 +890,49 @@ button:focus-visible {
   gap: 8px;
 }
 
+.eventImageGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.eventImageItem {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(223, 230, 242, 0.9);
+  background: #fff;
+  aspect-ratio: 4 / 3;
+  box-shadow: 0 8px 18px rgba(31, 27, 22, 0.08);
+}
+
+.eventImageItem .eventImagePreview {
+  margin-top: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+  border: none;
+  box-shadow: none;
+}
+
+.eventImageRemoveOne {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(31, 27, 22, 0.75);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
 .eventImageRemove {
   justify-self: flex-start;
   font-size: 12px;
@@ -1075,6 +1118,7 @@ button:focus-visible {
 }
 
 .eventDetailMedia {
+  position: relative;
   border-radius: 16px;
   overflow: hidden;
   background: rgba(248, 244, 238, 0.8);
@@ -1087,6 +1131,64 @@ button:focus-visible {
   height: 100%;
   display: block;
   object-fit: cover;
+}
+
+.eventDetailNav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(234, 222, 211, 0.9);
+  background: rgba(255, 255, 255, 0.9);
+  color: #7a4f3a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(31, 27, 22, 0.12);
+}
+
+.eventDetailNav svg {
+  width: 18px;
+  height: 18px;
+}
+
+.eventDetailNav--prev {
+  left: 8px;
+}
+
+.eventDetailNav--next {
+  right: 8px;
+}
+
+.eventDetailDots {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(234, 222, 211, 0.9);
+}
+
+.eventDetailDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(192, 162, 139, 0.7);
+  cursor: pointer;
+  padding: 0;
+}
+
+.eventDetailDot--active {
+  background: #c66b3b;
 }
 
 .eventDetailBody {

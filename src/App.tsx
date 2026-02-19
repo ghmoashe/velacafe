@@ -27,6 +27,7 @@ const LANGUAGE_LIST = [
 ] as const;
 
 const LANGUAGE_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
+const EVENT_IMAGE_LIMIT = 3;
 
 type LanguagePref = (typeof LANGUAGE_LIST)[number];
 type Locale = LanguagePref["locale"];
@@ -247,6 +248,7 @@ type EventRecord = {
   title: string;
   description: string | null;
   image_url?: string | null;
+  image_urls?: string[] | null;
   online_url?: string | null;
   address?: string | null;
   city: string | null;
@@ -705,23 +707,23 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Nutzer",
     searchEmpty: "Keine Ergebnisse gefunden.",
     eventsButton: "Events",
-    logoutButton: "Sign out",
-    adminButton: "Admin",
-    adminTitle: "Admin panel",
-    adminSubtitle: "Manage users, events, and posts.",
-    adminTabUsers: "Users",
-    adminTabEvents: "Events",
-    adminTabPosts: "Posts",
-    adminRoleOrganizer: "Organizer",
-    adminRoleAdmin: "Admin",
+    logoutButton: "Вийти",
+    adminButton: "Адмін",
+    adminTitle: "Панель адміністратора",
+    adminSubtitle: "Керуйте користувачами, подіями та постами.",
+    adminTabUsers: "Користувачі",
+    adminTabEvents: "Події",
+    adminTabPosts: "Пости",
+    adminRoleOrganizer: "Організатор",
+    adminRoleAdmin: "Адмін",
     adminSelectUserLabel: "Ausgewählter Nutzer",
     adminSelectUserEmpty: "Nutzer auswählen",
     adminMakeOrganizer: "Zum Organisator machen",
-    adminOrganizerIdLabel: "Organizer ID",
-    adminAccessDenied: "Admin access required.",
-    adminUsersEmpty: "No users found.",
-    adminEventsEmpty: "No events found.",
-    adminPostsEmpty: "No posts found.",
+    adminOrganizerIdLabel: "ID організатора",
+    adminAccessDenied: "Доступ лише для адміністратора.",
+    adminUsersEmpty: "Користувачів не знайдено.",
+    adminEventsEmpty: "Подій не знайдено.",
+    adminPostsEmpty: "Постів не знайдено.",
     adminTabApplications: "Antr?ge",
     adminApplicationsEmpty: "Keine Antr?ge.",
     adminApplicationApprove: "Genehmigen",
@@ -1104,7 +1106,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventImageLabel: "Фото события",
     eventImageHint: "Необязательно. PNG/JPG до 5 МБ.",
     eventOnlineLabel: "Ссылка онлайн",
-    eventAddressLabel: "Адрес",
+    eventAddressLabel: "Полный адрес",
     eventJoin: "Записаться",
     eventInterested: "Интересуюсь",
     eventOrganizerLabel: "Организатор",
@@ -6803,6 +6805,7 @@ export default function App() {
     type: "idle" | "loading" | "error";
     message: string;
   }>({ type: "idle", message: "" });
+  const [eventDetailSlideIndex, setEventDetailSlideIndex] = useState(0);
   const [organizerDetails, setOrganizerDetails] = useState<SearchProfile | null>(
     null
   );
@@ -6828,14 +6831,17 @@ export default function App() {
     Record<string, SearchProfile>
   >({});
   const [eventEditingId, setEventEditingId] = useState<string | null>(null);
-  const [eventExistingImageUrl, setEventExistingImageUrl] = useState<string | null>(
-    null
+  const [eventExistingImageUrls, setEventExistingImageUrls] = useState<string[]>(
+    []
+  );
+  const [eventRemovedImageUrls, setEventRemovedImageUrls] = useState<string[]>(
+    []
   );
   const [eventRemoveImage, setEventRemoveImage] = useState(false);
   const [eventTitle, setEventTitle] = useState("");
   const [eventDescription, setEventDescription] = useState("");
-  const [eventImageFile, setEventImageFile] = useState<File | null>(null);
-  const [eventImagePreview, setEventImagePreview] = useState<string | null>(null);
+  const [eventImageFiles, setEventImageFiles] = useState<File[]>([]);
+  const [eventImagePreviews, setEventImagePreviews] = useState<string[]>([]);
   const [eventCity, setEventCity] = useState("");
   const [eventCountry, setEventCountry] = useState("");
   const [eventAddress, setEventAddress] = useState("");
@@ -6970,6 +6976,9 @@ export default function App() {
   const followerInitials = ["V", "E", "L", "A"];
   const activeEventId = getEventIdFromLocation();
   const activeOrganizerId = getOrganizerIdFromLocation();
+  const eventDetailImages = eventDetails ? getEventImageUrls(eventDetails) : [];
+  const eventDetailImageUrl =
+    eventDetailImages[eventDetailSlideIndex] ?? null;
   const sortedEventRsvps = [...eventRsvps].sort((a, b) => {
     if (a.status === b.status) return 0;
     return a.status === "going" ? -1 : 1;
@@ -7309,6 +7318,10 @@ export default function App() {
   }, [route, locale, profileLanguage]);
 
   useEffect(() => {
+    setEventDetailSlideIndex(0);
+  }, [eventDetails?.id]);
+
+  useEffect(() => {
     if (!profilePhotoPreview?.startsWith("blob:")) return undefined;
     return () => {
       URL.revokeObjectURL(profilePhotoPreview);
@@ -7323,11 +7336,13 @@ export default function App() {
   }, [profileCoverPreview]);
 
   useEffect(() => {
-    if (!eventImagePreview?.startsWith("blob:")) return undefined;
+    if (!eventImagePreviews.some((preview) => preview.startsWith("blob:"))) {
+      return undefined;
+    }
     return () => {
-      URL.revokeObjectURL(eventImagePreview);
+      revokeEventImagePreviews(eventImagePreviews);
     };
-  }, [eventImagePreview]);
+  }, [eventImagePreviews]);
 
   useEffect(() => {
     if (!postPreviewUrl?.startsWith("blob:")) return undefined;
@@ -7731,7 +7746,7 @@ export default function App() {
       const { data: eventRows, error } = await supabase
         .from("events")
         .select(
-          "id,organizer_id,title,description,image_url,online_url,address,city,country,language,language_level,event_date,format,created_at"
+          "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,event_date,format,created_at"
         )
         .eq("organizer_id", user.id)
         .order("event_date", { ascending: false });
@@ -7840,7 +7855,7 @@ export default function App() {
         supabase
           .from("events")
           .select(
-            "id,organizer_id,title,description,image_url,online_url,address,city,country,language,language_level,event_date,format,created_at"
+            "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,event_date,format,created_at"
           )
           .order("event_date", { ascending: false }),
         supabase
@@ -7941,7 +7956,7 @@ export default function App() {
       const { data: eventRow, error } = await supabase
         .from("events")
         .select(
-          "id,organizer_id,title,description,image_url,online_url,address,city,country,language,language_level,event_date,format,created_at"
+          "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,event_date,format,created_at"
         )
         .eq("id", eventId)
         .maybeSingle();
@@ -8318,27 +8333,83 @@ export default function App() {
     resetProfileStatus();
   }
 
-  function handleEventImageChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    if (eventImagePreview?.startsWith("blob:")) {
-      URL.revokeObjectURL(eventImagePreview);
+  function getEventImageUrls(event: EventRecord) {
+    if (Array.isArray(event.image_urls) && event.image_urls.length) {
+      return event.image_urls.filter(Boolean);
     }
-    setEventImageFile(file);
+    return event.image_url ? [event.image_url] : [];
+  }
+
+  function revokeEventImagePreviews(previews: string[]) {
+    previews.forEach((preview) => {
+      if (preview.startsWith("blob:")) {
+        URL.revokeObjectURL(preview);
+      }
+    });
+  }
+
+  function handleEventImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    const imageFiles = files
+      .filter((file) => file.type.startsWith("image/"))
+      .slice(0, EVENT_IMAGE_LIMIT);
+    revokeEventImagePreviews(eventImagePreviews);
+    setEventImageFiles(imageFiles);
     setEventRemoveImage(false);
-    if (!file) {
-      setEventImagePreview(null);
+    if (imageFiles.length === 0) {
+      setEventImagePreviews(eventExistingImageUrls);
       return;
     }
-    const previewUrl = URL.createObjectURL(file);
-    setEventImagePreview(previewUrl);
+    const previews = imageFiles.map((file) => URL.createObjectURL(file));
+    setEventImagePreviews(previews);
+  }
+
+  function handleRemoveEventImageAt(index: number) {
+    const preview = eventImagePreviews[index];
+    if (preview) {
+      revokeEventImagePreviews([preview]);
+    }
+    if (eventImageFiles.length > 0) {
+      const nextFiles = eventImageFiles.filter((_, idx) => idx !== index);
+      const nextPreviews = eventImagePreviews.filter((_, idx) => idx !== index);
+      setEventImageFiles(nextFiles);
+      if (nextFiles.length === 0) {
+        setEventImagePreviews(eventExistingImageUrls);
+        setEventRemoveImage(false);
+      } else {
+        setEventImagePreviews(nextPreviews);
+      }
+      if (eventImageInputRef.current) {
+        eventImageInputRef.current.value = "";
+      }
+      return;
+    }
+    const removedUrl = eventExistingImageUrls[index];
+    const nextExisting = eventExistingImageUrls.filter(
+      (_, idx) => idx !== index
+    );
+    if (removedUrl) {
+      setEventRemovedImageUrls((prev) =>
+        prev.includes(removedUrl) ? prev : [...prev, removedUrl]
+      );
+    }
+    setEventExistingImageUrls(nextExisting);
+    setEventImagePreviews(nextExisting);
+    setEventRemoveImage(nextExisting.length === 0);
   }
 
   function handleRemoveEventImage() {
-    if (eventImagePreview?.startsWith("blob:")) {
-      URL.revokeObjectURL(eventImagePreview);
+    revokeEventImagePreviews(eventImagePreviews);
+    setEventImageFiles([]);
+    if (eventExistingImageUrls.length) {
+      setEventRemovedImageUrls((prev) => {
+        const next = new Set(prev);
+        eventExistingImageUrls.forEach((url) => next.add(url));
+        return Array.from(next);
+      });
     }
-    setEventImageFile(null);
-    setEventImagePreview(null);
+    setEventExistingImageUrls([]);
+    setEventImagePreviews([]);
     setEventRemoveImage(true);
     if (eventImageInputRef.current) {
       eventImageInputRef.current.value = "";
@@ -8505,17 +8576,16 @@ export default function App() {
   }
 
   function resetEventForm() {
-    if (eventImagePreview?.startsWith("blob:")) {
-      URL.revokeObjectURL(eventImagePreview);
-    }
+    revokeEventImagePreviews(eventImagePreviews);
     setEventEditingId(null);
-    setEventExistingImageUrl(null);
+    setEventExistingImageUrls([]);
+    setEventRemovedImageUrls([]);
     setEventRemoveImage(false);
     setEventStatus({ type: "idle", message: "" });
     setEventTitle("");
     setEventDescription("");
-    setEventImageFile(null);
-    setEventImagePreview(null);
+    setEventImageFiles([]);
+    setEventImagePreviews([]);
     if (eventImageInputRef.current) {
       eventImageInputRef.current.value = "";
     }
@@ -8531,9 +8601,8 @@ export default function App() {
   }
 
   function handleEditEvent(event: EventRecord) {
-    if (eventImagePreview?.startsWith("blob:")) {
-      URL.revokeObjectURL(eventImagePreview);
-    }
+    revokeEventImagePreviews(eventImagePreviews);
+    const existingUrls = getEventImageUrls(event);
     setEventEditingId(event.id);
     setEventTitle(event.title ?? "");
     setEventDescription(event.description ?? "");
@@ -8547,10 +8616,11 @@ export default function App() {
     setEventLevel(isLanguageLevel(event.language_level) ? event.language_level : "");
     setEventDate(event.event_date ?? "");
     setEventFormat(event.format ?? "");
-    setEventExistingImageUrl(event.image_url ?? null);
+    setEventExistingImageUrls(existingUrls);
+    setEventRemovedImageUrls([]);
     setEventRemoveImage(false);
-    setEventImageFile(null);
-    setEventImagePreview(event.image_url ?? null);
+    setEventImageFiles([]);
+    setEventImagePreviews(existingUrls);
     if (eventImageInputRef.current) {
       eventImageInputRef.current.value = "";
     }
@@ -8734,10 +8804,13 @@ export default function App() {
         .delete()
         .eq("id", event.id);
       if (error) throw error;
-      if (event.image_url) {
-        const path = getStoragePathFromPublicUrl(event.image_url, EVENTS_BUCKET);
-        if (path) {
-          await supabase.storage.from(EVENTS_BUCKET).remove([path]);
+      const eventImages = getEventImageUrls(event);
+      if (eventImages.length) {
+        const paths = eventImages
+          .map((url) => getStoragePathFromPublicUrl(url, EVENTS_BUCKET))
+          .filter((path): path is string => Boolean(path));
+        if (paths.length) {
+          await supabase.storage.from(EVENTS_BUCKET).remove(paths);
         }
       }
       setEventsList((prev) => prev.filter((item) => item.id !== event.id));
@@ -8792,37 +8865,46 @@ export default function App() {
         ? adminEventOrganizerId.trim()
         : "";
       const isEditing = Boolean(eventEditingId);
-      const existingImageUrl = eventExistingImageUrl ?? null;
-      let nextImageUrl = existingImageUrl;
-      if (eventImageFile) {
-        const extension =
-          eventImageFile.name.split(".").pop() ?? "jpg";
-        const fileName = `${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2, 8)}.${extension}`;
-        const filePath = `${user.id}/events/${fileName}`;
-        const { error: uploadError } = await supabase.storage
-          .from(EVENTS_BUCKET)
-          .upload(filePath, eventImageFile, {
-            upsert: true,
-            contentType: eventImageFile.type || "image/jpeg",
-          });
-        if (uploadError) throw uploadError;
-        const { data: publicData } = supabase.storage
-          .from(EVENTS_BUCKET)
-          .getPublicUrl(filePath);
-        nextImageUrl = publicData.publicUrl ?? null;
+      const existingImageUrls = eventExistingImageUrls;
+      let nextImageUrls = existingImageUrls;
+      if (eventImageFiles.length > 0) {
+        const uploads: string[] = [];
+        for (const file of eventImageFiles.slice(0, EVENT_IMAGE_LIMIT)) {
+          const extension = file.name.split(".").pop() ?? "jpg";
+          const fileName = `${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2, 8)}.${extension}`;
+          const filePath = `${user.id}/events/${fileName}`;
+          const { error: uploadError } = await supabase.storage
+            .from(EVENTS_BUCKET)
+            .upload(filePath, file, {
+              upsert: true,
+              contentType: file.type || "image/jpeg",
+            });
+          if (uploadError) throw uploadError;
+          const { data: publicData } = supabase.storage
+            .from(EVENTS_BUCKET)
+            .getPublicUrl(filePath);
+          if (publicData.publicUrl) {
+            uploads.push(publicData.publicUrl);
+          }
+        }
+        nextImageUrls = uploads;
       } else if (eventRemoveImage) {
-        nextImageUrl = null;
+        nextImageUrls = [];
       }
+      const nextImageUrl = nextImageUrls[0] ?? null;
       const basePayload = {
         title: eventTitle.trim(),
         description: eventDescription.trim() || null,
         image_url: nextImageUrl,
+        image_urls: nextImageUrls.length ? nextImageUrls : null,
         city: eventCity.trim() || null,
         country: eventCountry.trim() || null,
-        address: eventAddress.trim() || null,
-        online_url: eventOnlineUrl.trim() || null,
+        address:
+          eventFormat === "offline" ? eventAddress.trim() || null : null,
+        online_url:
+          eventFormat === "online" ? eventOnlineUrl.trim() || null : null,
         language: eventLanguage || null,
         language_level: eventLevel || null,
         event_date: eventDate || null,
@@ -8839,7 +8921,7 @@ export default function App() {
           .update(updatePayload)
           .eq("id", eventEditingId)
           .select(
-            "id,organizer_id,title,description,image_url,online_url,address,city,country,language,language_level,event_date,format,created_at"
+            "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,event_date,format,created_at"
           )
           .single();
         if (error) throw error;
@@ -8859,7 +8941,7 @@ export default function App() {
           .from("events")
           .insert(payload)
           .select(
-            "id,organizer_id,title,description,image_url,online_url,address,city,country,language,language_level,event_date,format,created_at"
+            "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,event_date,format,created_at"
           )
           .single();
         if (error) throw error;
@@ -8868,17 +8950,16 @@ export default function App() {
           setEventsList((prev) => [savedEvent as EventRecord, ...prev]);
         }
       }
-      if (
-        existingImageUrl &&
-        (eventRemoveImage ||
-          (eventImageFile && existingImageUrl !== nextImageUrl))
-      ) {
-        const path = getStoragePathFromPublicUrl(
-          existingImageUrl,
-          EVENTS_BUCKET
-        );
-        if (path) {
-          await supabase.storage.from(EVENTS_BUCKET).remove([path]);
+      const urlsToDelete = new Set(eventRemovedImageUrls);
+      if (eventRemoveImage || eventImageFiles.length > 0) {
+        existingImageUrls.forEach((url) => urlsToDelete.add(url));
+      }
+      if (urlsToDelete.size > 0) {
+        const paths = Array.from(urlsToDelete)
+          .map((url) => getStoragePathFromPublicUrl(url, EVENTS_BUCKET))
+          .filter((path): path is string => Boolean(path));
+        if (paths.length) {
+          await supabase.storage.from(EVENTS_BUCKET).remove(paths);
         }
       }
       resetEventForm();
@@ -9069,7 +9150,7 @@ export default function App() {
       let eventsQuery = supabase
         .from("events")
         .select(
-          "id,organizer_id,title,description,image_url,online_url,address,city,country,language,language_level,event_date,format,created_at"
+          "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,event_date,format,created_at"
         )
         .order("event_date", { ascending: true })
         .limit(200);
@@ -10156,17 +10237,34 @@ export default function App() {
               className="input"
               id="eventImage"
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/heic,image/heif"
+              multiple
               onChange={handleEventImageChange}
             />
-            <span className="fieldHint">{strings.eventImageHint}</span>
-            {eventImagePreview ? (
+            <span className="fieldHint">
+              {strings.eventImageHint} (max {EVENT_IMAGE_LIMIT})
+            </span>
+            {eventImagePreviews.length ? (
               <div className="eventImageWrap">
-                <img
-                  className="eventImagePreview"
-                  src={eventImagePreview}
-                  alt={strings.eventImageLabel}
-                />
+                <div className="eventImageGrid">
+                  {eventImagePreviews.map((preview, index) => (
+                    <div key={`${preview}-${index}`} className="eventImageItem">
+                      <img
+                        className="eventImagePreview"
+                        src={preview}
+                        alt={strings.eventImageLabel}
+                      />
+                      <button
+                        className="eventImageRemoveOne"
+                        type="button"
+                        onClick={() => handleRemoveEventImageAt(index)}
+                        aria-label={strings.eventImageRemove}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
                 <button
                   className="btn btnGhost eventImageRemove"
                   type="button"
@@ -10178,22 +10276,6 @@ export default function App() {
             ) : null}
           </div>
           <div className="eventsGrid">
-            {isAdminRoute ? (
-              <div className="field">
-                <label className="label" htmlFor="adminEventOrganizer">
-                  {strings.adminOrganizerIdLabel}
-                </label>
-                <input
-                  className="input"
-                  id="adminEventOrganizer"
-                  type="text"
-                  value={adminEventOrganizerId}
-                  onChange={(event) =>
-                    setAdminEventOrganizerId(event.target.value)
-                  }
-                />
-              </div>
-            ) : null}
             <div className="field">
               <label className="label" htmlFor="eventDate">
                 {strings.searchDateLabel}
@@ -10235,18 +10317,20 @@ export default function App() {
                 onChange={(event) => setEventCity(event.target.value)}
               />
             </div>
-            <div className="field">
-              <label className="label" htmlFor="eventAddress">
-                {strings.eventAddressLabel}
-              </label>
-              <input
-                className="input"
-                id="eventAddress"
-                type="text"
-                value={eventAddress}
-                onChange={(event) => setEventAddress(event.target.value)}
-              />
-            </div>
+            {eventFormat === "offline" ? (
+              <div className="field">
+                <label className="label" htmlFor="eventAddress">
+                  {strings.eventAddressLabel}
+                </label>
+                <input
+                  className="input"
+                  id="eventAddress"
+                  type="text"
+                  value={eventAddress}
+                  onChange={(event) => setEventAddress(event.target.value)}
+                />
+              </div>
+            ) : null}
             <div className="field">
               <label className="label" htmlFor="eventCountry">
                 {strings.profileCountryLabel}
@@ -10261,7 +10345,7 @@ export default function App() {
             </div>
             <div className="field">
               <label className="label" htmlFor="eventLanguage">
-                {strings.profileLanguageLabel}
+                {strings.searchLanguageLabel}
               </label>
               <select
                 className="input"
@@ -10302,18 +10386,20 @@ export default function App() {
                 ))}
               </select>
             </div>
-            <div className="field">
-              <label className="label" htmlFor="eventOnlineUrl">
-                {strings.eventOnlineLabel}
-              </label>
-              <input
-                className="input"
-                id="eventOnlineUrl"
-                type="url"
-                value={eventOnlineUrl}
-                onChange={(event) => setEventOnlineUrl(event.target.value)}
-              />
-            </div>
+            {eventFormat === "online" ? (
+              <div className="field">
+                <label className="label" htmlFor="eventOnlineUrl">
+                  {strings.eventOnlineLabel}
+                </label>
+                <input
+                  className="input"
+                  id="eventOnlineUrl"
+                  type="url"
+                  value={eventOnlineUrl}
+                  onChange={(event) => setEventOnlineUrl(event.target.value)}
+                />
+              </div>
+            ) : null}
           </div>
           {eventStatus.type !== "idle" ? (
             <div
@@ -10392,6 +10478,8 @@ export default function App() {
                 value: string;
                 isLink: boolean;
               }[];
+              const eventImageUrl =
+                event.image_urls?.[0] ?? event.image_url ?? null;
               return (
                 <div
                   key={event.id}
@@ -10400,8 +10488,8 @@ export default function App() {
                   }`}
                 >
                   <div className="eventCardMedia">
-                    {event.image_url ? (
-                      <img src={event.image_url} alt={event.title} />
+                    {eventImageUrl ? (
+                      <img src={eventImageUrl} alt={event.title} />
                     ) : (
                       <div className="eventCardPlaceholder" />
                     )}
@@ -11752,6 +11840,8 @@ export default function App() {
                                   ? strings.eventFormatOffline
                                   : "",
                             ].filter(Boolean);
+                            const eventImageUrl =
+                              event.image_urls?.[0] ?? event.image_url ?? null;
                             return (
                               <button
                                 key={event.id}
@@ -11760,9 +11850,9 @@ export default function App() {
                                 onClick={() => goToEvent(event.id)}
                               >
                                 <div className="searchEventMedia">
-                                  {event.image_url ? (
+                                  {eventImageUrl ? (
                                     <img
-                                      src={event.image_url}
+                                      src={eventImageUrl}
                                       alt={event.title}
                                     />
                                   ) : (
@@ -12028,19 +12118,39 @@ export default function App() {
                             className="input"
                             id="eventImage"
                             type="file"
-                            accept="image/*"
+                            accept="image/png,image/jpeg,image/jpg,image/webp,image/heic,image/heif"
+                            multiple
                             onChange={handleEventImageChange}
                           />
                           <span className="fieldHint">
-                            {strings.eventImageHint}
+                            {strings.eventImageHint} (max {EVENT_IMAGE_LIMIT})
                           </span>
-                          {eventImagePreview ? (
+                          {eventImagePreviews.length ? (
                             <div className="eventImageWrap">
-                              <img
-                                className="eventImagePreview"
-                                src={eventImagePreview}
-                                alt={strings.eventImageLabel}
-                              />
+                              <div className="eventImageGrid">
+                                {eventImagePreviews.map((preview, index) => (
+                                  <div
+                                    key={`${preview}-${index}`}
+                                    className="eventImageItem"
+                                  >
+                                    <img
+                                      className="eventImagePreview"
+                                      src={preview}
+                                      alt={strings.eventImageLabel}
+                                    />
+                                    <button
+                                      className="eventImageRemoveOne"
+                                      type="button"
+                                      onClick={() =>
+                                        handleRemoveEventImageAt(index)
+                                      }
+                                      aria-label={strings.eventImageRemove}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
                               <button
                                 className="btn btnGhost eventImageRemove"
                                 type="button"
@@ -12052,22 +12162,6 @@ export default function App() {
                           ) : null}
                         </div>
                         <div className="eventsGrid">
-                          {isAdminRoute ? (
-                            <div className="field">
-                              <label className="label" htmlFor="adminEventOrganizer">
-                                {strings.adminOrganizerIdLabel}
-                              </label>
-                              <input
-                                className="input"
-                                id="adminEventOrganizer"
-                                type="text"
-                                value={adminEventOrganizerId}
-                                onChange={(event) =>
-                                  setAdminEventOrganizerId(event.target.value)
-                                }
-                              />
-                            </div>
-                          ) : null}
                           <div className="field">
                             <label className="label" htmlFor="eventDate">
                               {strings.searchDateLabel}
@@ -12121,20 +12215,22 @@ export default function App() {
                               }
                             />
                           </div>
-                          <div className="field">
-                            <label className="label" htmlFor="eventAddress">
-                              {strings.eventAddressLabel}
-                            </label>
-                            <input
-                              className="input"
-                              id="eventAddress"
-                              type="text"
-                              value={eventAddress}
-                              onChange={(event) =>
-                                setEventAddress(event.target.value)
-                              }
-                            />
-                          </div>
+                          {eventFormat === "offline" ? (
+                            <div className="field">
+                              <label className="label" htmlFor="eventAddress">
+                                {strings.eventAddressLabel}
+                              </label>
+                              <input
+                                className="input"
+                                id="eventAddress"
+                                type="text"
+                                value={eventAddress}
+                                onChange={(event) =>
+                                  setEventAddress(event.target.value)
+                                }
+                              />
+                            </div>
+                          ) : null}
                           <div className="field">
                             <label className="label" htmlFor="eventCountry">
                               {strings.profileCountryLabel}
@@ -12151,7 +12247,7 @@ export default function App() {
                           </div>
                           <div className="field">
                             <label className="label" htmlFor="eventLanguage">
-                              {strings.profileLanguageLabel}
+                              {strings.searchLanguageLabel}
                             </label>
                             <select
                               className="input"
@@ -12199,22 +12295,24 @@ export default function App() {
                                   {level}
                                 </option>
                               ))}
-                            </select>
+                              </select>
                           </div>
-                          <div className="field">
-                            <label className="label" htmlFor="eventOnlineUrl">
-                              {strings.eventOnlineLabel}
-                            </label>
-                            <input
-                              className="input"
-                              id="eventOnlineUrl"
-                              type="url"
-                              value={eventOnlineUrl}
-                              onChange={(event) =>
-                                setEventOnlineUrl(event.target.value)
-                              }
-                            />
-                          </div>
+                          {eventFormat === "online" ? (
+                            <div className="field">
+                              <label className="label" htmlFor="eventOnlineUrl">
+                                {strings.eventOnlineLabel}
+                              </label>
+                              <input
+                                className="input"
+                                id="eventOnlineUrl"
+                                type="url"
+                                value={eventOnlineUrl}
+                                onChange={(event) =>
+                                  setEventOnlineUrl(event.target.value)
+                                }
+                              />
+                            </div>
+                          ) : null}
                         </div>
                         {eventStatus.type !== "idle" ? (
                           <div
@@ -12300,6 +12398,8 @@ export default function App() {
                           value: string;
                           isLink: boolean;
                         }[];
+                        const eventImageUrl =
+                          event.image_urls?.[0] ?? event.image_url ?? null;
                         return (
                           <div
                             key={event.id}
@@ -12310,9 +12410,9 @@ export default function App() {
                             }`}
                           >
                             <div className="eventCardMedia">
-                              {event.image_url ? (
+                              {eventImageUrl ? (
                                 <img
-                                  src={event.image_url}
+                                  src={eventImageUrl}
                                   alt={event.title}
                                 />
                               ) : (
@@ -12424,14 +12524,79 @@ export default function App() {
                 {eventDetails ? (
                   <div className="eventDetailCard">
                     <div className="eventDetailMedia">
-                      {eventDetails.image_url ? (
+                      {eventDetailImageUrl ? (
                         <img
-                          src={eventDetails.image_url}
+                          src={eventDetailImageUrl}
                           alt={eventDetails.title}
                         />
                       ) : (
                         <div className="searchEventPlaceholder" />
                       )}
+                      {eventDetailImages.length > 1 ? (
+                        <>
+                          <button
+                            className="eventDetailNav eventDetailNav--prev"
+                            type="button"
+                            onClick={() =>
+                              setEventDetailSlideIndex((prev) =>
+                                prev === 0
+                                  ? eventDetailImages.length - 1
+                                  : prev - 1
+                              )
+                            }
+                            aria-label="Previous image"
+                          >
+                            <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                              <path
+                                d="M15 6l-6 6 6 6"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            className="eventDetailNav eventDetailNav--next"
+                            type="button"
+                            onClick={() =>
+                              setEventDetailSlideIndex((prev) =>
+                                prev === eventDetailImages.length - 1
+                                  ? 0
+                                  : prev + 1
+                              )
+                            }
+                            aria-label="Next image"
+                          >
+                            <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                              <path
+                                d="M9 6l6 6-6 6"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+                          <div className="eventDetailDots">
+                            {eventDetailImages.map((_, index) => (
+                              <button
+                                key={`event-dot-${index}`}
+                                className={`eventDetailDot${
+                                  index === eventDetailSlideIndex
+                                    ? " eventDetailDot--active"
+                                    : ""
+                                }`}
+                                type="button"
+                                onClick={() => setEventDetailSlideIndex(index)}
+                                aria-label={`Image ${index + 1}`}
+                              />
+                            ))}
+                          </div>
+                        </>
+                      ) : null}
                     </div>
                     <div className="eventDetailBody">
                       <div className="eventDetailHeadline">
