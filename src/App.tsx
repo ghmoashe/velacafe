@@ -10157,7 +10157,7 @@ export default function App() {
     setAdminPinError("");
   }
 
-  function handleAdminPinSubmit() {
+  async function handleAdminPinSubmit() {
     const pinValue = adminPinValue.trim();
     if (!pinValue) {
       setAdminPinError(locale === "ru" ? "Введите PIN" : "Enter PIN");
@@ -10175,11 +10175,29 @@ export default function App() {
       navigate("login");
       return;
     }
-    if (!profileIsAdmin) {
-      handleAdminPinClose();
-      if (typeof window !== "undefined") {
-        window.alert(strings.adminAccessDenied);
+    let isAdmin = profileIsAdmin;
+    if (!isAdmin) {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("is_admin")
+          .eq("id", sessionUser.id)
+          .maybeSingle();
+        if (!error && data?.is_admin) {
+          isAdmin = true;
+          setProfileIsAdmin(true);
+        }
       }
+    }
+    if (!isAdmin) {
+      setAdminPinError(
+        locale === "ru"
+          ? "Доступ только для администратора."
+          : locale === "uk"
+            ? "Доступ лише для адміністратора."
+            : "Admin access required."
+      );
       return;
     }
     handleAdminPinClose();
