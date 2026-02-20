@@ -1,4 +1,4 @@
-import {
+﻿import {
   useCallback,
   useEffect,
   useMemo,
@@ -676,7 +676,7 @@ function parseLevelRange(value: string | null | undefined): {
   const trimmed = value.trim();
   if (!trimmed) return { from: "", to: "" };
   const parts = trimmed
-    .split(/[-–—]/)
+    .split(/[-вЂ“вЂ”]/)
     .map((part) => part.trim())
     .filter(Boolean);
   if (parts.length >= 2) {
@@ -1302,11 +1302,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "Формат",
     eventFormatOnline: "Онлайн",
     eventFormatOffline: "Офлайн",
-    eventTimeLabel: "?????",
-    eventDurationLabel: "?????????????????",
-    eventDurationUnit: "???",
-    eventLevelFromLabel: "??????? ??",
-    eventLevelToLabel: "??????? ??",
+    eventTimeLabel: "Время",
+    eventDurationLabel: "Продолжительность",
+    eventDurationUnit: "мин",
+    eventLevelFromLabel: "Уровень от",
+    eventLevelToLabel: "Уровень до",
     eventImageLabel: "Фото события",
     eventImageHint: "Необязательно. PNG/JPG до 5 МБ.",
     eventOnlineLabel: "Ссылка онлайн (Zoom/Meet)",
@@ -1495,11 +1495,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "Формат",
     eventFormatOnline: "Онлайн",
     eventFormatOffline: "Офлайн",
-    eventTimeLabel: "???",
-    eventDurationLabel: "??????????",
-    eventDurationUnit: "??",
-    eventLevelFromLabel: "?????? ???",
-    eventLevelToLabel: "?????? ??",
+    eventTimeLabel: "Час",
+    eventDurationLabel: "Тривалість",
+    eventDurationUnit: "хв",
+    eventLevelFromLabel: "Рівень від",
+    eventLevelToLabel: "Рівень до",
     eventImageLabel: "Фото події",
     eventImageHint: "Необов’язково. PNG/JPG до 5 МБ.",
     eventOnlineLabel: "Онлайн-посилання (Zoom/Meet)",
@@ -1688,11 +1688,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "فرمت",
     eventFormatOnline: "آنلاین",
     eventFormatOffline: "حضوری",
-    eventTimeLabel: "????",
-    eventDurationLabel: "???",
-    eventDurationUnit: "?????",
-    eventLevelFromLabel: "??? ??",
-    eventLevelToLabel: "??? ??",
+    eventTimeLabel: "زمان",
+    eventDurationLabel: "مدت",
+    eventDurationUnit: "دقیقه",
+    eventLevelFromLabel: "سطح از",
+    eventLevelToLabel: "سطح تا",
     eventImageLabel: "تصویر رویداد",
     eventImageHint: "اختیاری. PNG/JPG تا ۵ مگابایت.",
     eventOnlineLabel: "لینک آنلاین (Zoom/Meet)",
@@ -1881,11 +1881,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "الصيغة",
     eventFormatOnline: "عبر الإنترنت",
     eventFormatOffline: "حضوري",
-    eventTimeLabel: "?????",
-    eventDurationLabel: "?????",
-    eventDurationUnit: "?????",
-    eventLevelFromLabel: "??????? ??",
-    eventLevelToLabel: "??????? ???",
+    eventTimeLabel: "الوقت",
+    eventDurationLabel: "المدة",
+    eventDurationUnit: "دقيقة",
+    eventLevelFromLabel: "المستوى من",
+    eventLevelToLabel: "المستوى إلى",
     eventImageLabel: "صورة الفعالية",
     eventImageHint: "اختياري. PNG/JPG حتى 5 ميغابايت.",
     eventOnlineLabel: "رابط عبر الإنترنت (Zoom/Meet)",
@@ -2075,7 +2075,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatOnline: "Online",
     eventFormatOffline: "Me prani",
     eventTimeLabel: "Ora",
-    eventDurationLabel: "Koh?zgjatja",
+    eventDurationLabel: "Kohëzgjatja",
     eventDurationUnit: "min",
     eventLevelFromLabel: "Niveli nga",
     eventLevelToLabel: "Niveli deri",
@@ -2268,10 +2268,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatOnline: "Online",
     eventFormatOffline: "Yüz yüze",
     eventTimeLabel: "Saat",
-    eventDurationLabel: "S?re",
+    eventDurationLabel: "Süre",
     eventDurationUnit: "dk",
-    eventLevelFromLabel: "Seviye ba?lang??",
-    eventLevelToLabel: "Seviye biti?",
+    eventLevelFromLabel: "Seviye başlangıç",
+    eventLevelToLabel: "Seviye bitiş",
     eventImageLabel: "Etkinlik görseli",
     eventImageHint: "İsteğe bağlı. PNG/JPG 5 MB'a kadar.",
     eventOnlineLabel: "Çevrim içi bağlantı (Zoom/Meet)",
@@ -2461,10 +2461,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatOnline: "En ligne",
     eventFormatOffline: "En présentiel",
     eventTimeLabel: "Heure",
-    eventDurationLabel: "Dur?e",
+    eventDurationLabel: "Durée",
     eventDurationUnit: "min",
     eventLevelFromLabel: "Niveau de",
-    eventLevelToLabel: "Niveau ?",
+    eventLevelToLabel: "Niveau à",
     eventImageLabel: "Image de l'événement",
     eventImageHint: "Optionnel. PNG/JPG jusqu’à 5 Mo.",
     eventOnlineLabel: "Lien en ligne (Zoom/Meet)",
@@ -2654,7 +2654,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatOnline: "En línea",
     eventFormatOffline: "Presencial",
     eventTimeLabel: "Hora",
-    eventDurationLabel: "Duraci?n",
+    eventDurationLabel: "Duración",
     eventDurationUnit: "min",
     eventLevelFromLabel: "Nivel desde",
     eventLevelToLabel: "Nivel hasta",
@@ -3161,6 +3161,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
 };
 
 const FALLBACK_LOCALE: Locale = "en";
+const LOCALE_STORAGE_KEY = "vela-locale";
 const POST_AUTH_ROUTE_KEY = "vela-post-auth-route";
 const POST_AUTH_EVENT_KEY = "vela-post-auth-event";
 const POST_AUTH_ORGANIZER_KEY = "vela-post-auth-organizer";
@@ -3185,6 +3186,45 @@ const LEARN_PRACTICE_LANGS = LANGUAGE_LIST.filter(
 );
 const AVATAR_CROP_SIZE = 180;
 const AVATAR_OUTPUT_SIZE = 512;
+
+function resolveInitialLocale(): Locale {
+  if (typeof window === "undefined") return FALLBACK_LOCALE;
+  const storedLocale = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+  if (storedLocale && isSupportedLocale(storedLocale)) {
+    return storedLocale;
+  }
+  const navigatorLanguages = [
+    window.navigator.language,
+    ...(window.navigator.languages ?? []),
+  ]
+    .map((value) => value?.trim().toLowerCase())
+    .filter((value): value is string => Boolean(value));
+  for (const candidate of navigatorLanguages) {
+    if (isSupportedLocale(candidate)) {
+      return candidate;
+    }
+    const base = candidate.split(/[-_]/)[0];
+    if (isSupportedLocale(base)) {
+      return base;
+    }
+  }
+  return FALLBACK_LOCALE;
+}
+
+const CHANGE_LANGUAGE_BUTTON_LABELS: Record<Locale, string> = {
+  de: "Sprache ändern",
+  en: "Change language",
+  ru: "Сменить язык",
+  uk: "Змінити мову",
+  fa: "تغییر زبان",
+  ar: "تغيير اللغة",
+  sq: "Ndrysho gjuhën",
+  tr: "Dili değiştir",
+  fr: "Changer la langue",
+  es: "Cambiar idioma",
+  it: "Cambia lingua",
+  pl: "Zmień język",
+};
 
 const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   de: {
@@ -7012,7 +7052,7 @@ const PARTNER_LOGOS = [
 ] as const;
 
 export default function App() {
-  const [locale, setLocale] = useState<Locale>("ru");
+  const [locale, setLocale] = useState<Locale>(() => resolveInitialLocale());
   const [partnerOffset, setPartnerOffset] = useState(0);
   const [partnerCycle, setPartnerCycle] = useState(0);
   const [route, setRoute] = useState<Route>(() => getRouteFromLocation());
@@ -7087,6 +7127,7 @@ export default function App() {
   const [adminPinOpen, setAdminPinOpen] = useState(false);
   const [adminPinValue, setAdminPinValue] = useState("");
   const [adminPinError, setAdminPinError] = useState("");
+  const [footerLanguageOpen, setFooterLanguageOpen] = useState(false);
   const [searchTouched, setSearchTouched] = useState(false);
   const [searchFormat, setSearchFormat] = useState<"" | EventFormat>("");
   const [organizerFollowMap, setOrganizerFollowMap] = useState<
@@ -7253,6 +7294,8 @@ export default function App() {
     message: string;
   }>({ type: "idle", message: "" });
   const strings = MESSAGES[locale] ?? MESSAGES[FALLBACK_LOCALE];
+  const changeLanguageButtonLabel =
+    CHANGE_LANGUAGE_BUTTON_LABELS[locale] ?? CHANGE_LANGUAGE_BUTTON_LABELS.en;
   const languageLabels =
     LANGUAGE_LABELS[locale] ?? LANGUAGE_LABELS[FALLBACK_LOCALE];
   const privacyContent =
@@ -7575,6 +7618,11 @@ export default function App() {
         void openKlaroSettings(locale);
       }
     });
+  }, [locale]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
   }, [locale]);
 
   useEffect(() => {
@@ -8503,8 +8551,12 @@ export default function App() {
 
 
   function handleLocaleSelect(next: Locale) {
-    if (next === locale) return;
+    if (next === locale) {
+      setFooterLanguageOpen(false);
+      return;
+    }
     setLocale(next);
+    setFooterLanguageOpen(false);
     setAuthState({ type: "idle", message: "" });
   }
 
@@ -10711,7 +10763,7 @@ export default function App() {
                         onClick={() => handleRemoveEventImageAt(index)}
                         aria-label={strings.eventImageRemove}
                       >
-                        ×
+                        Г—
                       </button>
                     </div>
                   ))}
@@ -11016,7 +11068,7 @@ export default function App() {
                   <div className="eventCardBody">
                     <div className="eventCardTitle">{event.title}</div>
                     {meta.length ? (
-                      <div className="eventCardMeta">{meta.join(" вЂў ")}</div>
+                      <div className="eventCardMeta">{meta.join(" • ")}</div>
                     ) : null}
                     {event.description ? (
                       <div className="eventCardDesc">{event.description}</div>
@@ -12008,7 +12060,7 @@ export default function App() {
                                     </div>
                                     {meta.length ? (
                                       <div className="searchProfileMeta">
-                                        {meta.join(" вЂў ")}
+                                        {meta.join(" • ")}
                                       </div>
                                     ) : null}
                                     <div className="adminUserId">
@@ -12919,7 +12971,7 @@ export default function App() {
                                       }
                                       aria-label={strings.eventImageRemove}
                                     >
-                                      ×
+                                      Г—
                                     </button>
                                   </div>
                                 ))}
@@ -14570,7 +14622,7 @@ export default function App() {
                               onClick={() => removeProfileInterest(interest)}
                               aria-label="Remove"
                             >
-                              ×
+                              Г—
                             </button>
                           </span>
                         ))}
@@ -15185,7 +15237,38 @@ export default function App() {
               >
                 {strings.termsButton}
               </button>
+              <button
+                className={`btn privacyBtn${
+                  footerLanguageOpen ? " btnActive" : ""
+                }`}
+                type="button"
+                onClick={() => setFooterLanguageOpen((prev) => !prev)}
+                aria-expanded={footerLanguageOpen}
+                aria-controls="footerLanguagePicker"
+              >
+                {changeLanguageButtonLabel}
+              </button>
             </div>
+            {footerLanguageOpen ? (
+              <div className="footerLanguagePicker" id="footerLanguagePicker">
+                {LANGUAGE_LIST.map((lang) => {
+                  const translatedLabel =
+                    languageLabels[lang.locale] ?? lang.label;
+                  return (
+                    <button
+                      key={`footer-locale-${lang.locale}`}
+                      className={`footerLanguageOption${
+                        locale === lang.locale ? " footerLanguageOption--active" : ""
+                      }`}
+                      type="button"
+                      onClick={() => handleLocaleSelect(lang.locale)}
+                    >
+                      {translatedLabel}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
             <div className="footerNote">© 2026 Language cafe from VELA</div>
           </div>
         </div>
@@ -15193,3 +15276,4 @@ export default function App() {
     </div>
   );
 }
+

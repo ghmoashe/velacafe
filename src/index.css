@@ -2242,6 +2242,34 @@ button:focus-visible {
   padding-bottom: 6px;
 }
 
+.footerLanguagePicker {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.footerLanguageOption {
+  border: 1px solid rgba(200, 170, 140, 0.6);
+  background: #fff;
+  color: var(--text);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.footerLanguageOption:hover {
+  background: rgba(250, 218, 196, 0.24);
+}
+
+.footerLanguageOption--active {
+  border-color: rgba(200, 106, 59, 0.7);
+  background: rgba(200, 106, 59, 0.12);
+}
+
 
 .filterBar {
   display: flex;
