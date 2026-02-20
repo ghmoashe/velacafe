@@ -654,8 +654,8 @@ function normalizeLevelRange(
   from: LanguageLevel,
   to: LanguageLevel
 ): { from: LanguageLevel; to: LanguageLevel } {
-  let start = isLanguageLevel(from) ? from : "";
-  let end = isLanguageLevel(to) ? to : "";
+  let start: LanguageLevel = isLanguageLevel(from) ? from : "";
+  let end: LanguageLevel = isLanguageLevel(to) ? to : "";
   if (!start && end) start = end;
   if (start && !end) end = start;
   if (start && end) {
