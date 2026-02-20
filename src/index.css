@@ -3185,6 +3185,13 @@ button:focus-visible {
   gap: 8px;
 }
 
+.tagFlags {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 6px;
+}
+
 .tagButton {
   padding: 8px 12px;
   border-radius: 999px;

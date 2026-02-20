@@ -271,6 +271,10 @@ type OrganizerApplication = {
   phone: string | null;
   email: string | null;
   website: string | null;
+  facebook_url: string | null;
+  instagram_url: string | null;
+  tiktok_url: string | null;
+  linkedin_url: string | null;
   city: string | null;
   country: string | null;
   languages: string | null;
@@ -448,6 +452,10 @@ type MessageKey =
   | "organizerApplyPhoneLabel"
   | "organizerApplyEmailLabel"
   | "organizerApplyWebsiteLabel"
+  | "organizerApplyFacebookLabel"
+  | "organizerApplyInstagramLabel"
+  | "organizerApplyTiktokLabel"
+  | "organizerApplyLinkedInLabel"
   | "organizerApplyLanguagesLabel"
   | "organizerApplyExperienceLabel"
   | "organizerApplyAboutLabel"
@@ -509,6 +517,26 @@ function getFlagEmoji(code: string): string {
   const first = normalized.charCodeAt(0) + base;
   const second = normalized.charCodeAt(1) + base;
   return String.fromCodePoint(first, second);
+}
+
+function resolveLanguageListValue(
+  value: string,
+  labels: Record<Locale, string>
+): string {
+  const tokens = value
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean);
+  if (!tokens.length) return value;
+  if (!tokens.every((token) => isSupportedLocale(token))) return value;
+  return tokens
+    .map(
+      (locale) =>
+        labels[locale] ??
+        LANGUAGE_LIST.find((lang) => lang.locale === locale)?.label ??
+        locale
+    )
+    .join(", ");
 }
 
 function resolveInterestLabel(value: string, locale: Locale): string {
@@ -786,6 +814,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyPhoneLabel: "Telefon",
     organizerApplyEmailLabel: "E-Mail",
     organizerApplyWebsiteLabel: "Webseite",
+    organizerApplyFacebookLabel: "Facebook-Link",
+    organizerApplyInstagramLabel: "Instagram-Link",
+    organizerApplyTiktokLabel: "TikTok-Link",
+    organizerApplyLinkedInLabel: "LinkedIn-Link",
     organizerApplyLanguagesLabel: "Sprachen, die Sie anbieten",
     organizerApplyExperienceLabel: "Erfahrung",
     organizerApplyAboutLabel: "?ber Sie / die Organisation",
@@ -968,6 +1000,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyPhoneLabel: "Phone",
     organizerApplyEmailLabel: "Email",
     organizerApplyWebsiteLabel: "Website",
+    organizerApplyFacebookLabel: "Facebook link",
+    organizerApplyInstagramLabel: "Instagram link",
+    organizerApplyTiktokLabel: "TikTok link",
+    organizerApplyLinkedInLabel: "LinkedIn link",
     organizerApplyLanguagesLabel: "Languages you plan to host",
     organizerApplyExperienceLabel: "Experience",
     organizerApplyAboutLabel: "About",
@@ -1150,6 +1186,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyPhoneLabel: "Телефон",
     organizerApplyEmailLabel: "Email",
     organizerApplyWebsiteLabel: "Сайт",
+    organizerApplyFacebookLabel: "Ссылка Facebook",
+    organizerApplyInstagramLabel: "Ссылка Instagram",
+    organizerApplyTiktokLabel: "Ссылка TikTok",
+    organizerApplyLinkedInLabel: "Ссылка LinkedIn",
     organizerApplyLanguagesLabel: "Языки, которые вы планируете вести",
     organizerApplyExperienceLabel: "Опыт",
     organizerApplyAboutLabel: "О себе / об организации",
@@ -1332,6 +1372,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyPhoneLabel: "Телефон",
     organizerApplyEmailLabel: "Email",
     organizerApplyWebsiteLabel: "Сайт",
+    organizerApplyFacebookLabel: "Посилання Facebook",
+    organizerApplyInstagramLabel: "Посилання Instagram",
+    organizerApplyTiktokLabel: "Посилання TikTok",
+    organizerApplyLinkedInLabel: "Посилання LinkedIn",
     organizerApplyLanguagesLabel: "Мови, які ви плануєте проводити",
     organizerApplyExperienceLabel: "Досвід",
     organizerApplyAboutLabel: "Про себе / про організацію",
@@ -1514,6 +1558,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyPhoneLabel: "Phone",
     organizerApplyEmailLabel: "Email",
     organizerApplyWebsiteLabel: "Website",
+    organizerApplyFacebookLabel: "Facebook",
+    organizerApplyInstagramLabel: "Instagram",
+    organizerApplyTiktokLabel: "TikTok",
+    organizerApplyLinkedInLabel: "LinkedIn",
     organizerApplyLanguagesLabel: "Languages you plan to host",
     organizerApplyExperienceLabel: "Experience",
     organizerApplyAboutLabel: "About",
@@ -1696,6 +1744,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyPhoneLabel: "Phone",
     organizerApplyEmailLabel: "Email",
     organizerApplyWebsiteLabel: "Website",
+    organizerApplyFacebookLabel: "Facebook",
+    organizerApplyInstagramLabel: "Instagram",
+    organizerApplyTiktokLabel: "TikTok",
+    organizerApplyLinkedInLabel: "LinkedIn",
     organizerApplyLanguagesLabel: "Languages you plan to host",
     organizerApplyExperienceLabel: "Experience",
     organizerApplyAboutLabel: "About",
@@ -1878,6 +1930,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyPhoneLabel: "Phone",
     organizerApplyEmailLabel: "Email",
     organizerApplyWebsiteLabel: "Website",
+    organizerApplyFacebookLabel: "Facebook",
+    organizerApplyInstagramLabel: "Instagram",
+    organizerApplyTiktokLabel: "TikTok",
+    organizerApplyLinkedInLabel: "LinkedIn",
     organizerApplyLanguagesLabel: "Languages you plan to host",
     organizerApplyExperienceLabel: "Experience",
     organizerApplyAboutLabel: "About",
@@ -2060,6 +2116,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyPhoneLabel: "Phone",
     organizerApplyEmailLabel: "Email",
     organizerApplyWebsiteLabel: "Website",
+    organizerApplyFacebookLabel: "Facebook",
+    organizerApplyInstagramLabel: "Instagram",
+    organizerApplyTiktokLabel: "TikTok",
+    organizerApplyLinkedInLabel: "LinkedIn",
     organizerApplyLanguagesLabel: "Languages you plan to host",
     organizerApplyExperienceLabel: "Experience",
     organizerApplyAboutLabel: "About",
@@ -2242,6 +2302,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyPhoneLabel: "Phone",
     organizerApplyEmailLabel: "Email",
     organizerApplyWebsiteLabel: "Website",
+    organizerApplyFacebookLabel: "Facebook",
+    organizerApplyInstagramLabel: "Instagram",
+    organizerApplyTiktokLabel: "TikTok",
+    organizerApplyLinkedInLabel: "LinkedIn",
     organizerApplyLanguagesLabel: "Languages you plan to host",
     organizerApplyExperienceLabel: "Experience",
     organizerApplyAboutLabel: "About",
@@ -2424,6 +2488,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyPhoneLabel: "Phone",
     organizerApplyEmailLabel: "Email",
     organizerApplyWebsiteLabel: "Website",
+    organizerApplyFacebookLabel: "Facebook",
+    organizerApplyInstagramLabel: "Instagram",
+    organizerApplyTiktokLabel: "TikTok",
+    organizerApplyLinkedInLabel: "LinkedIn",
     organizerApplyLanguagesLabel: "Languages you plan to host",
     organizerApplyExperienceLabel: "Experience",
     organizerApplyAboutLabel: "About",
@@ -2606,6 +2674,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyPhoneLabel: "Phone",
     organizerApplyEmailLabel: "Email",
     organizerApplyWebsiteLabel: "Website",
+    organizerApplyFacebookLabel: "Facebook",
+    organizerApplyInstagramLabel: "Instagram",
+    organizerApplyTiktokLabel: "TikTok",
+    organizerApplyLinkedInLabel: "LinkedIn",
     organizerApplyLanguagesLabel: "Languages you plan to host",
     organizerApplyExperienceLabel: "Experience",
     organizerApplyAboutLabel: "About",
@@ -2788,6 +2860,10 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyPhoneLabel: "Phone",
     organizerApplyEmailLabel: "Email",
     organizerApplyWebsiteLabel: "Website",
+    organizerApplyFacebookLabel: "Facebook",
+    organizerApplyInstagramLabel: "Instagram",
+    organizerApplyTiktokLabel: "TikTok",
+    organizerApplyLinkedInLabel: "LinkedIn",
     organizerApplyLanguagesLabel: "Languages you plan to host",
     organizerApplyExperienceLabel: "Experience",
     organizerApplyAboutLabel: "About",
@@ -6886,9 +6962,15 @@ export default function App() {
   const [organizerApplyPhone, setOrganizerApplyPhone] = useState("");
   const [organizerApplyEmail, setOrganizerApplyEmail] = useState("");
   const [organizerApplyWebsite, setOrganizerApplyWebsite] = useState("");
+  const [organizerApplyFacebook, setOrganizerApplyFacebook] = useState("");
+  const [organizerApplyInstagram, setOrganizerApplyInstagram] = useState("");
+  const [organizerApplyTiktok, setOrganizerApplyTiktok] = useState("");
+  const [organizerApplyLinkedIn, setOrganizerApplyLinkedIn] = useState("");
   const [organizerApplyCity, setOrganizerApplyCity] = useState("");
   const [organizerApplyCountry, setOrganizerApplyCountry] = useState("");
-  const [organizerApplyLanguages, setOrganizerApplyLanguages] = useState("");
+  const [organizerApplyLanguages, setOrganizerApplyLanguages] = useState<Locale[]>(
+    []
+  );
   const [organizerApplyExperience, setOrganizerApplyExperience] = useState("");
   const [organizerApplyAbout, setOrganizerApplyAbout] = useState("");
   const [organizerApplyStatus, setOrganizerApplyStatus] = useState<{
@@ -7865,7 +7947,7 @@ export default function App() {
         supabase
           .from(ORGANIZER_APPLICATIONS_TABLE)
           .select(
-            "id,user_id,application_type,full_name,org_name,org_id,contact_name,phone,email,website,city,country,languages,experience,about,status,created_at,updated_at"
+            "id,user_id,application_type,full_name,org_name,org_id,contact_name,phone,email,website,facebook_url,instagram_url,tiktok_url,linkedin_url,city,country,languages,experience,about,status,created_at,updated_at"
           )
           .order("created_at", { ascending: false }),
       ]);
@@ -8333,6 +8415,12 @@ export default function App() {
     resetProfileStatus();
   }
 
+  function toggleOrganizerApplyLanguage(lang: Locale) {
+    setOrganizerApplyLanguages((prev) =>
+      prev.includes(lang) ? prev.filter((item) => item !== lang) : [...prev, lang]
+    );
+  }
+
   function getEventImageUrls(event: EventRecord) {
     if (Array.isArray(event.image_urls) && event.image_urls.length) {
       return event.image_urls.filter(Boolean);
@@ -8468,8 +8556,8 @@ export default function App() {
         : "");
     const defaultLanguage =
       profileLanguage && isSupportedLocale(profileLanguage)
-        ? languageLabels[profileLanguage] ?? profileLanguage
-        : profileLanguage ?? "";
+        ? profileLanguage
+        : "";
     setOrganizerApplyType("");
     setOrganizerApplyName(userName);
     setOrganizerApplyOrgName("");
@@ -8478,9 +8566,13 @@ export default function App() {
     setOrganizerApplyPhone("");
     setOrganizerApplyEmail(sessionUser?.email ?? "");
     setOrganizerApplyWebsite("");
+    setOrganizerApplyFacebook("");
+    setOrganizerApplyInstagram("");
+    setOrganizerApplyTiktok("");
+    setOrganizerApplyLinkedIn("");
     setOrganizerApplyCity(profileCity);
     setOrganizerApplyCountry(profileCountry);
-    setOrganizerApplyLanguages(defaultLanguage);
+    setOrganizerApplyLanguages(defaultLanguage ? [defaultLanguage] : []);
     setOrganizerApplyExperience("");
     setOrganizerApplyAbout("");
     setOrganizerApplyStatus({ type: "idle", message: "" });
@@ -8510,7 +8602,8 @@ export default function App() {
       !organizerApplyEmail.trim() ||
       !organizerApplyAbout.trim() ||
       !organizerApplyCity.trim() ||
-      !organizerApplyCountry.trim();
+      !organizerApplyCountry.trim() ||
+      organizerApplyLanguages.length === 0;
     if (missing) {
       setOrganizerApplyStatus({
         type: "error",
@@ -8547,9 +8640,15 @@ export default function App() {
         phone: organizerApplyPhone.trim(),
         email: organizerApplyEmail.trim(),
         website: organizerApplyWebsite.trim() || null,
+        facebook_url: organizerApplyFacebook.trim() || null,
+        instagram_url: organizerApplyInstagram.trim() || null,
+        tiktok_url: organizerApplyTiktok.trim() || null,
+        linkedin_url: organizerApplyLinkedIn.trim() || null,
         city: organizerApplyCity.trim(),
         country: organizerApplyCountry.trim(),
-        languages: organizerApplyLanguages.trim() || null,
+        languages: organizerApplyLanguages.length
+          ? organizerApplyLanguages.join(",")
+          : null,
         experience: organizerApplyExperience.trim() || null,
         about: organizerApplyAbout.trim(),
         status: "pending",
@@ -10825,6 +10924,74 @@ export default function App() {
                             />
                           </div>
                           <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyFacebook"
+                            >
+                              {strings.organizerApplyFacebookLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyFacebook"
+                              type="url"
+                              value={organizerApplyFacebook}
+                              onChange={(event) =>
+                                setOrganizerApplyFacebook(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyInstagram"
+                            >
+                              {strings.organizerApplyInstagramLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyInstagram"
+                              type="url"
+                              value={organizerApplyInstagram}
+                              onChange={(event) =>
+                                setOrganizerApplyInstagram(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyTiktok"
+                            >
+                              {strings.organizerApplyTiktokLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyTiktok"
+                              type="url"
+                              value={organizerApplyTiktok}
+                              onChange={(event) =>
+                                setOrganizerApplyTiktok(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyLinkedIn"
+                            >
+                              {strings.organizerApplyLinkedInLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyLinkedIn"
+                              type="url"
+                              value={organizerApplyLinkedIn}
+                              onChange={(event) =>
+                                setOrganizerApplyLinkedIn(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
                             <label className="label" htmlFor="organizerApplyCity">
                               {strings.profileCityLabel}
                             </label>
@@ -10853,21 +11020,43 @@ export default function App() {
                             />
                           </div>
                           <div className="field organizerApplyFull">
-                            <label
-                              className="label"
-                              htmlFor="organizerApplyLanguages"
-                            >
+                            <span className="label">
                               {strings.organizerApplyLanguagesLabel}
-                            </label>
-                            <input
-                              className="input"
-                              id="organizerApplyLanguages"
-                              type="text"
-                              value={organizerApplyLanguages}
-                              onChange={(event) =>
-                                setOrganizerApplyLanguages(event.target.value)
-                              }
-                            />
+                            </span>
+                            <div className="tagGrid">
+                              {LANGUAGE_LIST.map((lang) => {
+                                const translatedLabel =
+                                  languageLabels[lang.locale] ?? lang.label;
+                                const isActive = organizerApplyLanguages.includes(
+                                  lang.locale
+                                );
+                                return (
+                                  <button
+                                    key={`apply-lang-${lang.locale}`}
+                                    className={`tagButton${
+                                      isActive ? " tagButton--active" : ""
+                                    }`}
+                                    type="button"
+                                    onClick={() =>
+                                      toggleOrganizerApplyLanguage(lang.locale)
+                                    }
+                                  >
+                                    <span className="tagFlags">
+                                      {lang.codes.map((code) => (
+                                        <span
+                                          key={`${lang.locale}-${code}`}
+                                          className="langFlag"
+                                          aria-hidden="true"
+                                        >
+                                          {getFlagEmoji(code)}
+                                        </span>
+                                      ))}
+                                    </span>
+                                    <span>{translatedLabel}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
                           <div className="field organizerApplyFull">
                             <label
@@ -11003,6 +11192,74 @@ export default function App() {
                           <div className="field">
                             <label
                               className="label"
+                              htmlFor="organizerApplyFacebookOrg"
+                            >
+                              {strings.organizerApplyFacebookLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyFacebookOrg"
+                              type="url"
+                              value={organizerApplyFacebook}
+                              onChange={(event) =>
+                                setOrganizerApplyFacebook(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyInstagramOrg"
+                            >
+                              {strings.organizerApplyInstagramLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyInstagramOrg"
+                              type="url"
+                              value={organizerApplyInstagram}
+                              onChange={(event) =>
+                                setOrganizerApplyInstagram(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyTiktokOrg"
+                            >
+                              {strings.organizerApplyTiktokLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyTiktokOrg"
+                              type="url"
+                              value={organizerApplyTiktok}
+                              onChange={(event) =>
+                                setOrganizerApplyTiktok(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyLinkedInOrg"
+                            >
+                              {strings.organizerApplyLinkedInLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyLinkedInOrg"
+                              type="url"
+                              value={organizerApplyLinkedIn}
+                              onChange={(event) =>
+                                setOrganizerApplyLinkedIn(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
                               htmlFor="organizerApplyCityOrg"
                             >
                               {strings.profileCityLabel}
@@ -11035,21 +11292,43 @@ export default function App() {
                             />
                           </div>
                           <div className="field organizerApplyFull">
-                            <label
-                              className="label"
-                              htmlFor="organizerApplyLanguagesOrg"
-                            >
+                            <span className="label">
                               {strings.organizerApplyLanguagesLabel}
-                            </label>
-                            <input
-                              className="input"
-                              id="organizerApplyLanguagesOrg"
-                              type="text"
-                              value={organizerApplyLanguages}
-                              onChange={(event) =>
-                                setOrganizerApplyLanguages(event.target.value)
-                              }
-                            />
+                            </span>
+                            <div className="tagGrid">
+                              {LANGUAGE_LIST.map((lang) => {
+                                const translatedLabel =
+                                  languageLabels[lang.locale] ?? lang.label;
+                                const isActive = organizerApplyLanguages.includes(
+                                  lang.locale
+                                );
+                                return (
+                                  <button
+                                    key={`apply-lang-org-${lang.locale}`}
+                                    className={`tagButton${
+                                      isActive ? " tagButton--active" : ""
+                                    }`}
+                                    type="button"
+                                    onClick={() =>
+                                      toggleOrganizerApplyLanguage(lang.locale)
+                                    }
+                                  >
+                                    <span className="tagFlags">
+                                      {lang.codes.map((code) => (
+                                        <span
+                                          key={`${lang.locale}-${code}`}
+                                          className="langFlag"
+                                          aria-hidden="true"
+                                        >
+                                          {getFlagEmoji(code)}
+                                        </span>
+                                      ))}
+                                    </span>
+                                    <span>{translatedLabel}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
                           <div className="field organizerApplyFull">
                             <label
@@ -11382,6 +11661,12 @@ export default function App() {
                               ]
                                 .filter(Boolean)
                                 .join(" • ");
+                              const languagesValue = application.languages
+                                ? resolveLanguageListValue(
+                                    application.languages,
+                                    languageLabels
+                                  )
+                                : null;
                               const statusLabel =
                                 application.status === "approved"
                                   ? strings.adminApplicationStatusApproved
@@ -11421,10 +11706,34 @@ export default function App() {
                                       value: application.website,
                                     }
                                   : null,
+                                application.facebook_url
+                                  ? {
+                                      label: strings.organizerApplyFacebookLabel,
+                                      value: application.facebook_url,
+                                    }
+                                  : null,
+                                application.instagram_url
+                                  ? {
+                                      label: strings.organizerApplyInstagramLabel,
+                                      value: application.instagram_url,
+                                    }
+                                  : null,
+                                application.tiktok_url
+                                  ? {
+                                      label: strings.organizerApplyTiktokLabel,
+                                      value: application.tiktok_url,
+                                    }
+                                  : null,
+                                application.linkedin_url
+                                  ? {
+                                      label: strings.organizerApplyLinkedInLabel,
+                                      value: application.linkedin_url,
+                                    }
+                                  : null,
                                 application.languages
                                   ? {
                                       label: strings.organizerApplyLanguagesLabel,
-                                      value: application.languages,
+                                      value: languagesValue ?? application.languages,
                                     }
                                   : null,
                                 application.experience
