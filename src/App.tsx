@@ -27,11 +27,13 @@ const LANGUAGE_LIST = [
 ] as const;
 
 const LANGUAGE_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
+const EVENT_DURATIONS = [60, 90, 120] as const;
 const EVENT_IMAGE_LIMIT = 3;
 
 type LanguagePref = (typeof LANGUAGE_LIST)[number];
 type Locale = LanguagePref["locale"];
 type LanguageLevel = (typeof LANGUAGE_LEVELS)[number] | "";
+type EventDuration = (typeof EVENT_DURATIONS)[number] | "";
 
 const INTEREST_PRESETS = [
   {
@@ -255,7 +257,11 @@ type EventRecord = {
   country: string | null;
   language: string | null;
   language_level: string | null;
+  language_level_min?: LanguageLevel | null;
+  language_level_max?: LanguageLevel | null;
   event_date: string | null;
+  event_time?: string | null;
+  duration_minutes?: number | null;
   format: EventFormat | null;
   created_at: string;
 };
@@ -394,6 +400,11 @@ type MessageKey =
   | "eventFormatLabel"
   | "eventFormatOnline"
   | "eventFormatOffline"
+  | "eventTimeLabel"
+  | "eventDurationLabel"
+  | "eventDurationUnit"
+  | "eventLevelFromLabel"
+  | "eventLevelToLabel"
   | "eventImageLabel"
   | "eventImageHint"
   | "eventOnlineLabel"
@@ -462,6 +473,8 @@ type MessageKey =
   | "organizerApplySubmit"
   | "organizerApplyCancel"
   | "organizerApplyRequired"
+  | "organizerApplyRequiredHint"
+  | "organizerApplyInvalidUrl"
   | "organizerApplySuccess"
   | "userPostCaptionPlaceholder"
   | "userPostPublish"
@@ -539,6 +552,36 @@ function resolveLanguageListValue(
     .join(", ");
 }
 
+function normalizeUrl(value: string): string {
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
+}
+
+function isValidUrl(value: string): boolean {
+  if (!value) return false;
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isAllowedSocialUrl(value: string, domains: string[]): boolean {
+  if (!value) return true;
+  const normalized = normalizeUrl(value);
+  if (!isValidUrl(normalized)) return false;
+  try {
+    const hostname = new URL(normalized).hostname.replace(/^www\./, "");
+    return domains.some(
+      (domain) => hostname === domain || hostname.endsWith(`.${domain}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function resolveInterestLabel(value: string, locale: Locale): string {
   const preset = INTEREST_PRESETS.find((item) => item.key === value);
   if (!preset) return value;
@@ -597,6 +640,112 @@ function isLanguageLevel(
     value &&
       LANGUAGE_LEVELS.includes(value as (typeof LANGUAGE_LEVELS)[number])
   );
+}
+
+function getLevelIndex(level: LanguageLevel | null | undefined): number {
+  if (!level) return -1;
+  const index = LANGUAGE_LEVELS.indexOf(
+    level as (typeof LANGUAGE_LEVELS)[number]
+  );
+  return index;
+}
+
+function normalizeLevelRange(
+  from: LanguageLevel,
+  to: LanguageLevel
+): { from: LanguageLevel; to: LanguageLevel } {
+  let start = isLanguageLevel(from) ? from : "";
+  let end = isLanguageLevel(to) ? to : "";
+  if (!start && end) start = end;
+  if (start && !end) end = start;
+  if (start && end) {
+    const startIndex = getLevelIndex(start);
+    const endIndex = getLevelIndex(end);
+    if (startIndex > -1 && endIndex > -1 && startIndex > endIndex) {
+      [start, end] = [end, start];
+    }
+  }
+  return { from: start, to: end };
+}
+
+function parseLevelRange(value: string | null | undefined): {
+  from: LanguageLevel;
+  to: LanguageLevel;
+} {
+  if (!value) return { from: "", to: "" };
+  const trimmed = value.trim();
+  if (!trimmed) return { from: "", to: "" };
+  const parts = trimmed
+    .split(/[-–—]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length >= 2) {
+    const from = isLanguageLevel(parts[0]) ? (parts[0] as LanguageLevel) : "";
+    const to = isLanguageLevel(parts[1]) ? (parts[1] as LanguageLevel) : "";
+    return normalizeLevelRange(from, to);
+  }
+  if (isLanguageLevel(trimmed)) {
+    return normalizeLevelRange(trimmed as LanguageLevel, "");
+  }
+  return { from: "", to: "" };
+}
+
+function formatLevelRange(from: LanguageLevel, to: LanguageLevel): string {
+  if (from && to && from !== to) return `${from}-${to}`;
+  return from || to || "";
+}
+
+function getEventLevelRange(event: EventRecord): {
+  from: LanguageLevel;
+  to: LanguageLevel;
+} {
+  const from = isLanguageLevel(event.language_level_min ?? null)
+    ? (event.language_level_min as LanguageLevel)
+    : "";
+  const to = isLanguageLevel(event.language_level_max ?? null)
+    ? (event.language_level_max as LanguageLevel)
+    : "";
+  if (from || to) {
+    return normalizeLevelRange(from, to);
+  }
+  return parseLevelRange(event.language_level);
+}
+
+function formatEventLevelRange(event: EventRecord): string {
+  const range = getEventLevelRange(event);
+  return formatLevelRange(range.from, range.to);
+}
+
+function formatEventDurationLabel(
+  duration: number | null | undefined,
+  unit: string
+): string {
+  if (!duration) return "";
+  return `${duration} ${unit}`;
+}
+
+function formatEventTime(value: string | null | undefined): string {
+  if (!value) return "";
+  return value.slice(0, 5);
+}
+
+function isEventLevelMatch(event: EventRecord, level: LanguageLevel): boolean {
+  if (!level) return true;
+  const range = getEventLevelRange(event);
+  if (range.from || range.to) {
+    const levelIndex = getLevelIndex(level);
+    if (levelIndex < 0) return false;
+    const minIndex =
+      range.from && getLevelIndex(range.from) > -1
+        ? getLevelIndex(range.from)
+        : 0;
+    const maxIndex =
+      range.to && getLevelIndex(range.to) > -1
+        ? getLevelIndex(range.to)
+        : LANGUAGE_LEVELS.length - 1;
+    return levelIndex >= minIndex && levelIndex <= maxIndex;
+  }
+  return event.language_level === level;
 }
 
 function isProfileComplete(data: ProfileRecord | null): boolean {
@@ -767,6 +916,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "Format",
     eventFormatOnline: "Online",
     eventFormatOffline: "Vor Ort",
+    eventTimeLabel: "Uhrzeit",
+    eventDurationLabel: "Dauer",
+    eventDurationUnit: "Min.",
+    eventLevelFromLabel: "Niveau von",
+    eventLevelToLabel: "Niveau bis",
     eventImageLabel: "Eventbild",
     eventImageHint: "Optional. PNG/JPG bis 5 MB.",
     eventOnlineLabel: "Online-Link (Zoom/Meet)",
@@ -824,6 +978,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplySubmit: "Antrag senden",
     organizerApplyCancel: "Abbrechen",
     organizerApplyRequired: "Bitte Pflichtfelder ausf?llen.",
+    organizerApplyRequiredHint: "Felder mit * sind erforderlich.",
+    organizerApplyInvalidUrl: "Ungültiger Link",
     organizerApplySuccess: "Antrag wurde gesendet.",
     userTabAbout: "Über",
     userTabPhotos: "Fotos",
@@ -953,6 +1109,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "Format",
     eventFormatOnline: "Online",
     eventFormatOffline: "In person",
+    eventTimeLabel: "Time",
+    eventDurationLabel: "Duration",
+    eventDurationUnit: "min",
+    eventLevelFromLabel: "Level from",
+    eventLevelToLabel: "Level to",
     eventImageLabel: "Event image",
     eventImageHint: "Optional. PNG/JPG up to 5 MB.",
     eventOnlineLabel: "Online link (Zoom/Meet)",
@@ -1010,6 +1171,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplySubmit: "Send application",
     organizerApplyCancel: "Cancel",
     organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplyRequiredHint: "Fields marked with * are required.",
+    organizerApplyInvalidUrl: "Invalid link",
     organizerApplySuccess: "Application submitted.",
     userTabAbout: "About",
     userTabPhotos: "Photos",
@@ -1139,6 +1302,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "Формат",
     eventFormatOnline: "Онлайн",
     eventFormatOffline: "Офлайн",
+    eventTimeLabel: "?????",
+    eventDurationLabel: "?????????????????",
+    eventDurationUnit: "???",
+    eventLevelFromLabel: "??????? ??",
+    eventLevelToLabel: "??????? ??",
     eventImageLabel: "Фото события",
     eventImageHint: "Необязательно. PNG/JPG до 5 МБ.",
     eventOnlineLabel: "Ссылка онлайн (Zoom/Meet)",
@@ -1185,7 +1353,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyContactLabel: "Контактное лицо",
     organizerApplyPhoneLabel: "Телефон",
     organizerApplyEmailLabel: "Email",
-    organizerApplyWebsiteLabel: "Сайт",
+    organizerApplyWebsiteLabel: "Веб-сайт",
     organizerApplyFacebookLabel: "Ссылка Facebook",
     organizerApplyInstagramLabel: "Ссылка Instagram",
     organizerApplyTiktokLabel: "Ссылка TikTok",
@@ -1196,6 +1364,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplySubmit: "Отправить заявку",
     organizerApplyCancel: "Отменить",
     organizerApplyRequired: "Заполните обязательные поля.",
+    organizerApplyRequiredHint: "Поля со * обязательны.",
+    organizerApplyInvalidUrl: "Неверная ссылка",
     organizerApplySuccess: "Заявка отправлена.",
     userTabAbout: "Обо мне",
     userTabPhotos: "Фото",
@@ -1325,6 +1495,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "Формат",
     eventFormatOnline: "Онлайн",
     eventFormatOffline: "Офлайн",
+    eventTimeLabel: "???",
+    eventDurationLabel: "??????????",
+    eventDurationUnit: "??",
+    eventLevelFromLabel: "?????? ???",
+    eventLevelToLabel: "?????? ??",
     eventImageLabel: "Фото події",
     eventImageHint: "Необов’язково. PNG/JPG до 5 МБ.",
     eventOnlineLabel: "Онлайн-посилання (Zoom/Meet)",
@@ -1371,7 +1546,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplyContactLabel: "Контактна особа",
     organizerApplyPhoneLabel: "Телефон",
     organizerApplyEmailLabel: "Email",
-    organizerApplyWebsiteLabel: "Сайт",
+    organizerApplyWebsiteLabel: "Веб-сайт",
     organizerApplyFacebookLabel: "Посилання Facebook",
     organizerApplyInstagramLabel: "Посилання Instagram",
     organizerApplyTiktokLabel: "Посилання TikTok",
@@ -1382,6 +1557,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplySubmit: "Надіслати заяву",
     organizerApplyCancel: "Скасувати",
     organizerApplyRequired: "Заповніть обов'язкові поля.",
+    organizerApplyRequiredHint: "Поля з * обов'язкові.",
+    organizerApplyInvalidUrl: "Невірне посилання",
     organizerApplySuccess: "Заяву надіслано.",
     userTabAbout: "Про мене",
     userTabPhotos: "Фото",
@@ -1511,6 +1688,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "فرمت",
     eventFormatOnline: "آنلاین",
     eventFormatOffline: "حضوری",
+    eventTimeLabel: "????",
+    eventDurationLabel: "???",
+    eventDurationUnit: "?????",
+    eventLevelFromLabel: "??? ??",
+    eventLevelToLabel: "??? ??",
     eventImageLabel: "تصویر رویداد",
     eventImageHint: "اختیاری. PNG/JPG تا ۵ مگابایت.",
     eventOnlineLabel: "لینک آنلاین (Zoom/Meet)",
@@ -1568,6 +1750,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplySubmit: "Send application",
     organizerApplyCancel: "Cancel",
     organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplyRequiredHint: "Fields marked with * are required.",
+    organizerApplyInvalidUrl: "Invalid link",
     organizerApplySuccess: "Application submitted.",
     userTabAbout: "درباره",
     userTabPhotos: "عکس‌ها",
@@ -1697,6 +1881,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "الصيغة",
     eventFormatOnline: "عبر الإنترنت",
     eventFormatOffline: "حضوري",
+    eventTimeLabel: "?????",
+    eventDurationLabel: "?????",
+    eventDurationUnit: "?????",
+    eventLevelFromLabel: "??????? ??",
+    eventLevelToLabel: "??????? ???",
     eventImageLabel: "صورة الفعالية",
     eventImageHint: "اختياري. PNG/JPG حتى 5 ميغابايت.",
     eventOnlineLabel: "رابط عبر الإنترنت (Zoom/Meet)",
@@ -1754,6 +1943,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplySubmit: "Send application",
     organizerApplyCancel: "Cancel",
     organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplyRequiredHint: "Fields marked with * are required.",
+    organizerApplyInvalidUrl: "Invalid link",
     organizerApplySuccess: "Application submitted.",
     userTabAbout: "نبذة",
     userTabPhotos: "الصور",
@@ -1883,6 +2074,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "Formati",
     eventFormatOnline: "Online",
     eventFormatOffline: "Me prani",
+    eventTimeLabel: "Ora",
+    eventDurationLabel: "Koh?zgjatja",
+    eventDurationUnit: "min",
+    eventLevelFromLabel: "Niveli nga",
+    eventLevelToLabel: "Niveli deri",
     eventImageLabel: "Foto e eventit",
     eventImageHint: "Opsionale. PNG/JPG deri në 5 MB.",
     eventOnlineLabel: "Lidhje online (Zoom/Meet)",
@@ -1940,6 +2136,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplySubmit: "Send application",
     organizerApplyCancel: "Cancel",
     organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplyRequiredHint: "Fields marked with * are required.",
+    organizerApplyInvalidUrl: "Invalid link",
     organizerApplySuccess: "Application submitted.",
     userTabAbout: "Rreth",
     userTabPhotos: "Foto",
@@ -2069,6 +2267,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "Format",
     eventFormatOnline: "Online",
     eventFormatOffline: "Yüz yüze",
+    eventTimeLabel: "Saat",
+    eventDurationLabel: "S?re",
+    eventDurationUnit: "dk",
+    eventLevelFromLabel: "Seviye ba?lang??",
+    eventLevelToLabel: "Seviye biti?",
     eventImageLabel: "Etkinlik görseli",
     eventImageHint: "İsteğe bağlı. PNG/JPG 5 MB'a kadar.",
     eventOnlineLabel: "Çevrim içi bağlantı (Zoom/Meet)",
@@ -2126,6 +2329,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplySubmit: "Send application",
     organizerApplyCancel: "Cancel",
     organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplyRequiredHint: "Fields marked with * are required.",
+    organizerApplyInvalidUrl: "Invalid link",
     organizerApplySuccess: "Application submitted.",
     userTabAbout: "Hakkında",
     userTabPhotos: "Fotoğraflar",
@@ -2255,6 +2460,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "Format",
     eventFormatOnline: "En ligne",
     eventFormatOffline: "En présentiel",
+    eventTimeLabel: "Heure",
+    eventDurationLabel: "Dur?e",
+    eventDurationUnit: "min",
+    eventLevelFromLabel: "Niveau de",
+    eventLevelToLabel: "Niveau ?",
     eventImageLabel: "Image de l'événement",
     eventImageHint: "Optionnel. PNG/JPG jusqu’à 5 Mo.",
     eventOnlineLabel: "Lien en ligne (Zoom/Meet)",
@@ -2312,6 +2522,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplySubmit: "Send application",
     organizerApplyCancel: "Cancel",
     organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplyRequiredHint: "Fields marked with * are required.",
+    organizerApplyInvalidUrl: "Invalid link",
     organizerApplySuccess: "Application submitted.",
     userTabAbout: "À propos",
     userTabPhotos: "Photos",
@@ -2441,6 +2653,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "Formato",
     eventFormatOnline: "En línea",
     eventFormatOffline: "Presencial",
+    eventTimeLabel: "Hora",
+    eventDurationLabel: "Duraci?n",
+    eventDurationUnit: "min",
+    eventLevelFromLabel: "Nivel desde",
+    eventLevelToLabel: "Nivel hasta",
     eventImageLabel: "Imagen del evento",
     eventImageHint: "Opcional. PNG/JPG hasta 5 MB.",
     eventOnlineLabel: "Enlace en línea (Zoom/Meet)",
@@ -2498,6 +2715,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplySubmit: "Send application",
     organizerApplyCancel: "Cancel",
     organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplyRequiredHint: "Fields marked with * are required.",
+    organizerApplyInvalidUrl: "Invalid link",
     organizerApplySuccess: "Application submitted.",
     userTabAbout: "Acerca de",
     userTabPhotos: "Fotos",
@@ -2627,6 +2846,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "Formato",
     eventFormatOnline: "Online",
     eventFormatOffline: "In presenza",
+    eventTimeLabel: "Orario",
+    eventDurationLabel: "Durata",
+    eventDurationUnit: "min",
+    eventLevelFromLabel: "Livello da",
+    eventLevelToLabel: "Livello a",
     eventImageLabel: "Immagine evento",
     eventImageHint: "Opzionale. PNG/JPG fino a 5 MB.",
     eventOnlineLabel: "Link online (Zoom/Meet)",
@@ -2684,6 +2908,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplySubmit: "Send application",
     organizerApplyCancel: "Cancel",
     organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplyRequiredHint: "Fields marked with * are required.",
+    organizerApplyInvalidUrl: "Invalid link",
     organizerApplySuccess: "Application submitted.",
     userTabAbout: "Info",
     userTabPhotos: "Foto",
@@ -2813,6 +3039,11 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     eventFormatLabel: "Format",
     eventFormatOnline: "Online",
     eventFormatOffline: "Stacjonarnie",
+    eventTimeLabel: "Godzina",
+    eventDurationLabel: "Czas trwania",
+    eventDurationUnit: "min",
+    eventLevelFromLabel: "Poziom od",
+    eventLevelToLabel: "Poziom do",
     eventImageLabel: "Zdjęcie wydarzenia",
     eventImageHint: "Opcjonalnie. PNG/JPG do 5 MB.",
     eventOnlineLabel: "Link online (Zoom/Meet)",
@@ -2870,6 +3101,8 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     organizerApplySubmit: "Send application",
     organizerApplyCancel: "Cancel",
     organizerApplyRequired: "Please fill in the required fields.",
+    organizerApplyRequiredHint: "Fields marked with * are required.",
+    organizerApplyInvalidUrl: "Invalid link",
     organizerApplySuccess: "Application submitted.",
     userTabAbout: "O mnie",
     userTabPhotos: "Zdjęcia",
@@ -6923,8 +7156,11 @@ export default function App() {
   const [eventAddress, setEventAddress] = useState("");
   const [eventOnlineUrl, setEventOnlineUrl] = useState("");
   const [eventLanguage, setEventLanguage] = useState<Locale | "">("");
-  const [eventLevel, setEventLevel] = useState<LanguageLevel>("");
+  const [eventLevelFrom, setEventLevelFrom] = useState<LanguageLevel>("");
+  const [eventLevelTo, setEventLevelTo] = useState<LanguageLevel>("");
   const [eventDate, setEventDate] = useState("");
+  const [eventTime, setEventTime] = useState("");
+  const [eventDuration, setEventDuration] = useState<EventDuration>("");
   const [eventFormat, setEventFormat] = useState<"" | EventFormat>("");
   const [eventStatus, setEventStatus] = useState<{
     type: "idle" | "loading" | "success" | "error";
@@ -7828,7 +8064,7 @@ export default function App() {
       const { data: eventRows, error } = await supabase
         .from("events")
         .select(
-          "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,event_date,format,created_at"
+          "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,format,created_at"
         )
         .eq("organizer_id", user.id)
         .order("event_date", { ascending: false });
@@ -7937,7 +8173,7 @@ export default function App() {
         supabase
           .from("events")
           .select(
-            "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,event_date,format,created_at"
+            "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,format,created_at"
           )
           .order("event_date", { ascending: false }),
         supabase
@@ -8038,7 +8274,7 @@ export default function App() {
       const { data: eventRow, error } = await supabase
         .from("events")
         .select(
-          "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,event_date,format,created_at"
+          "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,format,created_at"
         )
         .eq("id", eventId)
         .maybeSingle();
@@ -8598,8 +8834,9 @@ export default function App() {
       (needsPerson && !organizerApplyName.trim()) ||
       (!needsPerson && !organizerApplyOrgName.trim()) ||
       (!needsPerson && !organizerApplyContactName.trim()) ||
-      !organizerApplyPhone.trim() ||
+      (!needsPerson && !organizerApplyOrgId.trim()) ||
       !organizerApplyEmail.trim() ||
+      !organizerApplyExperience.trim() ||
       !organizerApplyAbout.trim() ||
       !organizerApplyCity.trim() ||
       !organizerApplyCountry.trim() ||
@@ -8608,6 +8845,50 @@ export default function App() {
       setOrganizerApplyStatus({
         type: "error",
         message: strings.organizerApplyRequired,
+      });
+      return;
+    }
+    const websiteValue = normalizeUrl(organizerApplyWebsite.trim());
+    const facebookValue = normalizeUrl(organizerApplyFacebook.trim());
+    const instagramValue = normalizeUrl(organizerApplyInstagram.trim());
+    const tiktokValue = normalizeUrl(organizerApplyTiktok.trim());
+    const linkedinValue = normalizeUrl(organizerApplyLinkedIn.trim());
+    if (organizerApplyWebsite.trim() && !isValidUrl(websiteValue)) {
+      setOrganizerApplyStatus({
+        type: "error",
+        message: `${strings.organizerApplyInvalidUrl}: ${strings.organizerApplyWebsiteLabel}`,
+      });
+      return;
+    }
+    const socialChecks = [
+      {
+        value: facebookValue,
+        label: strings.organizerApplyFacebookLabel,
+        domains: ["facebook.com", "fb.com"],
+      },
+      {
+        value: instagramValue,
+        label: strings.organizerApplyInstagramLabel,
+        domains: ["instagram.com"],
+      },
+      {
+        value: tiktokValue,
+        label: strings.organizerApplyTiktokLabel,
+        domains: ["tiktok.com"],
+      },
+      {
+        value: linkedinValue,
+        label: strings.organizerApplyLinkedInLabel,
+        domains: ["linkedin.com"],
+      },
+    ];
+    const invalidSocial = socialChecks.find(
+      (item) => item.value && !isAllowedSocialUrl(item.value, item.domains)
+    );
+    if (invalidSocial) {
+      setOrganizerApplyStatus({
+        type: "error",
+        message: `${strings.organizerApplyInvalidUrl}: ${invalidSocial.label}`,
       });
       return;
     }
@@ -8637,13 +8918,13 @@ export default function App() {
         contact_name: needsPerson
           ? organizerApplyName.trim()
           : organizerApplyContactName.trim(),
-        phone: organizerApplyPhone.trim(),
+        phone: organizerApplyPhone.trim() || null,
         email: organizerApplyEmail.trim(),
-        website: organizerApplyWebsite.trim() || null,
-        facebook_url: organizerApplyFacebook.trim() || null,
-        instagram_url: organizerApplyInstagram.trim() || null,
-        tiktok_url: organizerApplyTiktok.trim() || null,
-        linkedin_url: organizerApplyLinkedIn.trim() || null,
+        website: websiteValue || null,
+        facebook_url: facebookValue || null,
+        instagram_url: instagramValue || null,
+        tiktok_url: tiktokValue || null,
+        linkedin_url: linkedinValue || null,
         city: organizerApplyCity.trim(),
         country: organizerApplyCountry.trim(),
         languages: organizerApplyLanguages.length
@@ -8693,10 +8974,37 @@ export default function App() {
     setEventAddress("");
     setEventOnlineUrl("");
     setEventLanguage("");
-    setEventLevel("");
+    setEventLevelFrom("");
+    setEventLevelTo("");
     setEventDate("");
+    setEventTime("");
+    setEventDuration("");
     setEventFormat("");
     setAdminEventOrganizerId("");
+  }
+
+  function handleEventLevelFromChange(value: LanguageLevel) {
+    setEventLevelFrom(value);
+    if (!value) return;
+    if (!eventLevelTo) {
+      setEventLevelTo(value);
+      return;
+    }
+    if (getLevelIndex(value) > getLevelIndex(eventLevelTo)) {
+      setEventLevelTo(value);
+    }
+  }
+
+  function handleEventLevelToChange(value: LanguageLevel) {
+    setEventLevelTo(value);
+    if (!value) return;
+    if (!eventLevelFrom) {
+      setEventLevelFrom(value);
+      return;
+    }
+    if (getLevelIndex(value) < getLevelIndex(eventLevelFrom)) {
+      setEventLevelFrom(value);
+    }
   }
 
   function handleEditEvent(event: EventRecord) {
@@ -8712,8 +9020,25 @@ export default function App() {
     setEventLanguage(
       event.language && isSupportedLocale(event.language) ? event.language : ""
     );
-    setEventLevel(isLanguageLevel(event.language_level) ? event.language_level : "");
+    const parsedRange = parseLevelRange(event.language_level);
+    const normalizedRange = normalizeLevelRange(
+      isLanguageLevel(event.language_level_min ?? null)
+        ? (event.language_level_min as LanguageLevel)
+        : parsedRange.from,
+      isLanguageLevel(event.language_level_max ?? null)
+        ? (event.language_level_max as LanguageLevel)
+        : parsedRange.to
+    );
+    setEventLevelFrom(normalizedRange.from);
+    setEventLevelTo(normalizedRange.to);
     setEventDate(event.event_date ?? "");
+    setEventTime(event.event_time ?? "");
+    const durationValue =
+      event.duration_minutes &&
+      EVENT_DURATIONS.includes(event.duration_minutes as typeof EVENT_DURATIONS[number])
+        ? (event.duration_minutes as EventDuration)
+        : "";
+    setEventDuration(durationValue);
     setEventFormat(event.format ?? "");
     setEventExistingImageUrls(existingUrls);
     setEventRemovedImageUrls([]);
@@ -8936,7 +9261,7 @@ export default function App() {
       });
       return;
     }
-    if (!eventTitle.trim() || !eventDate) {
+    if (!eventTitle.trim() || !eventDate || !eventTime || !eventDuration) {
       setEventStatus({ type: "error", message: strings.errorRequired });
       return;
     }
@@ -8993,6 +9318,11 @@ export default function App() {
         nextImageUrls = [];
       }
       const nextImageUrl = nextImageUrls[0] ?? null;
+      const normalizedLevels = normalizeLevelRange(eventLevelFrom, eventLevelTo);
+      const levelRangeValue = formatLevelRange(
+        normalizedLevels.from,
+        normalizedLevels.to
+      );
       const basePayload = {
         title: eventTitle.trim(),
         description: eventDescription.trim() || null,
@@ -9005,8 +9335,12 @@ export default function App() {
         online_url:
           eventFormat === "online" ? eventOnlineUrl.trim() || null : null,
         language: eventLanguage || null,
-        language_level: eventLevel || null,
+        language_level: levelRangeValue || null,
+        language_level_min: normalizedLevels.from || null,
+        language_level_max: normalizedLevels.to || null,
         event_date: eventDate || null,
+        event_time: eventTime || null,
+        duration_minutes: eventDuration || null,
         format: eventFormat || null,
       };
       const updatePayload =
@@ -9020,7 +9354,7 @@ export default function App() {
           .update(updatePayload)
           .eq("id", eventEditingId)
           .select(
-            "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,event_date,format,created_at"
+            "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,format,created_at"
           )
           .single();
         if (error) throw error;
@@ -9040,7 +9374,7 @@ export default function App() {
           .from("events")
           .insert(payload)
           .select(
-            "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,event_date,format,created_at"
+            "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,format,created_at"
           )
           .single();
         if (error) throw error;
@@ -9249,7 +9583,7 @@ export default function App() {
       let eventsQuery = supabase
         .from("events")
         .select(
-          "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,event_date,format,created_at"
+          "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,format,created_at"
         )
         .order("event_date", { ascending: true })
         .limit(200);
@@ -9268,17 +9602,17 @@ export default function App() {
       if (languageValue) {
         eventsQuery = eventsQuery.eq("language", languageValue);
       }
-      if (levelValue) {
-        eventsQuery = eventsQuery.eq("language_level", levelValue);
-      }
       if (formatValue) {
         eventsQuery = eventsQuery.eq("format", formatValue);
       }
       const { data: eventsRows, error: eventsError } = await eventsQuery;
       if (eventsError) throw eventsError;
       const events = (eventsRows ?? []) as EventRecord[];
+      const filteredEvents = levelValue
+        ? events.filter((event) => isEventLevelMatch(event, levelValue))
+        : events;
       const organizerIds = Array.from(
-        new Set(events.map((event) => event.organizer_id).filter(Boolean))
+        new Set(filteredEvents.map((event) => event.organizer_id).filter(Boolean))
       ) as string[];
       let eventProfiles: Record<string, SearchProfile> = {};
       if (organizerIds.length) {
@@ -9300,7 +9634,7 @@ export default function App() {
       }
 
       setSearchResults({
-        events,
+        events: filteredEvents,
         organizers,
         users,
       });
@@ -10406,6 +10740,18 @@ export default function App() {
               />
             </div>
             <div className="field">
+              <label className="label" htmlFor="eventTime">
+                {strings.eventTimeLabel}
+              </label>
+              <input
+                className="input"
+                id="eventTime"
+                type="time"
+                value={eventTime}
+                onChange={(event) => setEventTime(event.target.value)}
+              />
+            </div>
+            <div className="field">
               <label className="label" htmlFor="eventFormat">
                 {strings.eventFormatLabel}
               </label>
@@ -10420,6 +10766,30 @@ export default function App() {
                 <option value="">{strings.eventFormatLabel}</option>
                 <option value="online">{strings.eventFormatOnline}</option>
                 <option value="offline">{strings.eventFormatOffline}</option>
+              </select>
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="eventDuration">
+                {strings.eventDurationLabel}
+              </label>
+              <select
+                className="input"
+                id="eventDuration"
+                value={eventDuration}
+                onChange={(event) =>
+                  setEventDuration(
+                    event.target.value
+                      ? (Number(event.target.value) as EventDuration)
+                      : ""
+                  )
+                }
+              >
+                <option value="">{strings.eventDurationLabel}</option>
+                {EVENT_DURATIONS.map((duration) => (
+                  <option key={duration} value={duration}>
+                    {duration} {strings.eventDurationUnit}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="field">
@@ -10484,18 +10854,42 @@ export default function App() {
               </select>
             </div>
             <div className="field">
-              <label className="label" htmlFor="eventLevel">
-                {strings.profileLevelLabel}
+              <label className="label" htmlFor="eventLevelFrom">
+                {strings.eventLevelFromLabel}
               </label>
               <select
                 className="input"
-                id="eventLevel"
-                value={eventLevel}
+                id="eventLevelFrom"
+                value={eventLevelFrom}
                 onChange={(event) =>
-                  setEventLevel(event.target.value as LanguageLevel)
+                  handleEventLevelFromChange(
+                    event.target.value as LanguageLevel
+                  )
                 }
               >
-                <option value="">{strings.profileLevelLabel}</option>
+                <option value="">{strings.eventLevelFromLabel}</option>
+                {LANGUAGE_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="eventLevelTo">
+                {strings.eventLevelToLabel}
+              </label>
+              <select
+                className="input"
+                id="eventLevelTo"
+                value={eventLevelTo}
+                onChange={(event) =>
+                  handleEventLevelToChange(
+                    event.target.value as LanguageLevel
+                  )
+                }
+              >
+                <option value="">{strings.eventLevelToLabel}</option>
                 {LANGUAGE_LEVELS.map((level) => (
                   <option key={level} value={level}>
                     {level}
@@ -10562,13 +10956,21 @@ export default function App() {
         ) : (
           <div className="eventsGridList">
             {eventsList.map((event) => {
+              const levelLabel = formatEventLevelRange(event);
+              const durationLabel = formatEventDurationLabel(
+                event.duration_minutes,
+                strings.eventDurationUnit
+              );
+              const timeLabel = formatEventTime(event.event_time);
               const meta = [
                 event.event_date ? formatDate(event.event_date, locale) : "",
+                timeLabel,
                 event.city,
                 event.language && isSupportedLocale(event.language)
                   ? languageLabels[event.language] ?? event.language
                   : event.language ?? "",
-                event.language_level ?? "",
+                levelLabel,
+                durationLabel,
                 event.format === "online"
                   ? strings.eventFormatOnline
                   : event.format === "offline"
@@ -10850,6 +11252,9 @@ export default function App() {
                   <div className="organizerApplySubtitle">
                     {strings.organizerApplySubtitle}
                   </div>
+                  <div className="organizerApplyHint">
+                    {strings.organizerApplyRequiredHint}
+                  </div>
                   <div className="organizerApplyType">
                     <div className="organizerApplyTypeLabel">
                       {strings.organizerApplyTypeLabel}
@@ -10883,7 +11288,7 @@ export default function App() {
                         <>
                           <div className="field">
                             <label className="label" htmlFor="organizerApplyName">
-                              {strings.organizerApplyNameLabel}
+                              {strings.organizerApplyNameLabel} *
                             </label>
                             <input
                               className="input"
@@ -10911,7 +11316,7 @@ export default function App() {
                           </div>
                           <div className="field">
                             <label className="label" htmlFor="organizerApplyEmail">
-                              {strings.organizerApplyEmailLabel}
+                              {strings.organizerApplyEmailLabel} *
                             </label>
                             <input
                               className="input"
@@ -10920,6 +11325,23 @@ export default function App() {
                               value={organizerApplyEmail}
                               onChange={(event) =>
                                 setOrganizerApplyEmail(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
+                            <label
+                              className="label"
+                              htmlFor="organizerApplyWebsitePerson"
+                            >
+                              {strings.organizerApplyWebsiteLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="organizerApplyWebsitePerson"
+                              type="url"
+                              value={organizerApplyWebsite}
+                              onChange={(event) =>
+                                setOrganizerApplyWebsite(event.target.value)
                               }
                             />
                           </div>
@@ -10993,7 +11415,7 @@ export default function App() {
                           </div>
                           <div className="field">
                             <label className="label" htmlFor="organizerApplyCity">
-                              {strings.profileCityLabel}
+                              {strings.profileCityLabel} *
                             </label>
                             <input
                               className="input"
@@ -11007,7 +11429,7 @@ export default function App() {
                           </div>
                           <div className="field">
                             <label className="label" htmlFor="organizerApplyCountry">
-                              {strings.profileCountryLabel}
+                              {strings.profileCountryLabel} *
                             </label>
                             <input
                               className="input"
@@ -11021,7 +11443,7 @@ export default function App() {
                           </div>
                           <div className="field organizerApplyFull">
                             <span className="label">
-                              {strings.organizerApplyLanguagesLabel}
+                              {strings.organizerApplyLanguagesLabel} *
                             </span>
                             <div className="tagGrid">
                               {LANGUAGE_LIST.map((lang) => {
@@ -11063,7 +11485,7 @@ export default function App() {
                               className="label"
                               htmlFor="organizerApplyExperience"
                             >
-                              {strings.organizerApplyExperienceLabel}
+                              {strings.organizerApplyExperienceLabel} *
                             </label>
                             <textarea
                               className="input organizerApplyTextarea"
@@ -11076,7 +11498,7 @@ export default function App() {
                           </div>
                           <div className="field organizerApplyFull">
                             <label className="label" htmlFor="organizerApplyAbout">
-                              {strings.organizerApplyAboutLabel}
+                              {strings.organizerApplyAboutLabel} *
                             </label>
                             <textarea
                               className="input organizerApplyTextarea"
@@ -11095,7 +11517,7 @@ export default function App() {
                               className="label"
                               htmlFor="organizerApplyOrgName"
                             >
-                              {strings.organizerApplyOrgNameLabel}
+                              {strings.organizerApplyOrgNameLabel} *
                             </label>
                             <input
                               className="input"
@@ -11109,7 +11531,7 @@ export default function App() {
                           </div>
                           <div className="field">
                             <label className="label" htmlFor="organizerApplyOrgId">
-                              {strings.organizerApplyOrgIdLabel}
+                              {strings.organizerApplyOrgIdLabel} *
                             </label>
                             <input
                               className="input"
@@ -11126,7 +11548,7 @@ export default function App() {
                               className="label"
                               htmlFor="organizerApplyContactName"
                             >
-                              {strings.organizerApplyContactLabel}
+                              {strings.organizerApplyContactLabel} *
                             </label>
                             <input
                               className="input"
@@ -11160,7 +11582,7 @@ export default function App() {
                               className="label"
                               htmlFor="organizerApplyEmailOrg"
                             >
-                              {strings.organizerApplyEmailLabel}
+                              {strings.organizerApplyEmailLabel} *
                             </label>
                             <input
                               className="input"
@@ -11262,7 +11684,7 @@ export default function App() {
                               className="label"
                               htmlFor="organizerApplyCityOrg"
                             >
-                              {strings.profileCityLabel}
+                              {strings.profileCityLabel} *
                             </label>
                             <input
                               className="input"
@@ -11279,7 +11701,7 @@ export default function App() {
                               className="label"
                               htmlFor="organizerApplyCountryOrg"
                             >
-                              {strings.profileCountryLabel}
+                              {strings.profileCountryLabel} *
                             </label>
                             <input
                               className="input"
@@ -11293,7 +11715,7 @@ export default function App() {
                           </div>
                           <div className="field organizerApplyFull">
                             <span className="label">
-                              {strings.organizerApplyLanguagesLabel}
+                              {strings.organizerApplyLanguagesLabel} *
                             </span>
                             <div className="tagGrid">
                               {LANGUAGE_LIST.map((lang) => {
@@ -11333,9 +11755,25 @@ export default function App() {
                           <div className="field organizerApplyFull">
                             <label
                               className="label"
+                              htmlFor="organizerApplyExperienceOrg"
+                            >
+                              {strings.organizerApplyExperienceLabel} *
+                            </label>
+                            <textarea
+                              className="input organizerApplyTextarea"
+                              id="organizerApplyExperienceOrg"
+                              value={organizerApplyExperience}
+                              onChange={(event) =>
+                                setOrganizerApplyExperience(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field organizerApplyFull">
+                            <label
+                              className="label"
                               htmlFor="organizerApplyAboutOrg"
                             >
-                              {strings.organizerApplyAboutLabel}
+                              {strings.organizerApplyAboutLabel} *
                             </label>
                             <textarea
                               className="input organizerApplyTextarea"
@@ -12153,14 +12591,22 @@ export default function App() {
                               event.language && isSupportedLocale(event.language)
                                 ? languageLabels[event.language] ?? event.language
                                 : event.language ?? "";
+                            const levelLabel = formatEventLevelRange(event);
+                            const durationLabel = formatEventDurationLabel(
+                              event.duration_minutes,
+                              strings.eventDurationUnit
+                            );
+                            const timeLabel = formatEventTime(event.event_time);
                             const eventMeta = [
                               event.event_date
                                 ? formatDate(event.event_date, locale)
                                 : "",
+                              timeLabel,
+                              durationLabel,
                               organizerName,
                               event.city || organizerCity,
                               eventLanguage,
-                              event.language_level ?? "",
+                              levelLabel,
                               event.format === "online"
                                 ? strings.eventFormatOnline
                                 : event.format === "offline"
@@ -12504,6 +12950,20 @@ export default function App() {
                             />
                           </div>
                           <div className="field">
+                            <label className="label" htmlFor="eventTime">
+                              {strings.eventTimeLabel}
+                            </label>
+                            <input
+                              className="input"
+                              id="eventTime"
+                              type="time"
+                              value={eventTime}
+                              onChange={(event) =>
+                                setEventTime(event.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field">
                             <label className="label" htmlFor="eventFormat">
                               {strings.eventFormatLabel}
                             </label>
@@ -12526,6 +12986,32 @@ export default function App() {
                               <option value="offline">
                                 {strings.eventFormatOffline}
                               </option>
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="eventDuration">
+                              {strings.eventDurationLabel}
+                            </label>
+                            <select
+                              className="input"
+                              id="eventDuration"
+                              value={eventDuration}
+                              onChange={(event) =>
+                                setEventDuration(
+                                  event.target.value
+                                    ? (Number(event.target.value) as EventDuration)
+                                    : ""
+                                )
+                              }
+                            >
+                              <option value="">
+                                {strings.eventDurationLabel}
+                              </option>
+                              {EVENT_DURATIONS.map((duration) => (
+                                <option key={duration} value={duration}>
+                                  {duration} {strings.eventDurationUnit}
+                                </option>
+                              ))}
                             </select>
                           </div>
                           <div className="field">
@@ -12601,28 +13087,52 @@ export default function App() {
                             </select>
                           </div>
                           <div className="field">
-                            <label className="label" htmlFor="eventLevel">
-                              {strings.profileLevelLabel}
+                            <label className="label" htmlFor="eventLevelFrom">
+                              {strings.eventLevelFromLabel}
                             </label>
                             <select
                               className="input"
-                              id="eventLevel"
-                              value={eventLevel}
+                              id="eventLevelFrom"
+                              value={eventLevelFrom}
                               onChange={(event) =>
-                                setEventLevel(
+                                handleEventLevelFromChange(
                                   event.target.value as LanguageLevel
                                 )
                               }
                             >
                               <option value="">
-                                {strings.profileLevelLabel}
+                                {strings.eventLevelFromLabel}
                               </option>
                               {LANGUAGE_LEVELS.map((level) => (
                                 <option key={level} value={level}>
                                   {level}
                                 </option>
                               ))}
-                              </select>
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="eventLevelTo">
+                              {strings.eventLevelToLabel}
+                            </label>
+                            <select
+                              className="input"
+                              id="eventLevelTo"
+                              value={eventLevelTo}
+                              onChange={(event) =>
+                                handleEventLevelToChange(
+                                  event.target.value as LanguageLevel
+                                )
+                              }
+                            >
+                              <option value="">
+                                {strings.eventLevelToLabel}
+                              </option>
+                              {LANGUAGE_LEVELS.map((level) => (
+                                <option key={level} value={level}>
+                                  {level}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                           {eventFormat === "online" ? (
                             <div className="field">
@@ -12690,15 +13200,23 @@ export default function App() {
                       ) : (
                         <div className="eventsGridList">
                           {eventsList.map((event) => {
+                        const levelLabel = formatEventLevelRange(event);
+                        const durationLabel = formatEventDurationLabel(
+                          event.duration_minutes,
+                          strings.eventDurationUnit
+                        );
+                        const timeLabel = formatEventTime(event.event_time);
                         const meta = [
                           event.event_date
                             ? formatDate(event.event_date, locale)
                             : "",
+                          timeLabel,
                           event.city,
                           event.language && isSupportedLocale(event.language)
                             ? languageLabels[event.language] ?? event.language
                             : event.language ?? "",
-                          event.language_level ?? "",
+                          levelLabel,
+                          durationLabel,
                           event.format === "online"
                             ? strings.eventFormatOnline
                             : event.format === "offline"
@@ -12934,13 +13452,18 @@ export default function App() {
                           eventDetails.event_date
                             ? formatDate(eventDetails.event_date, locale)
                             : "",
+                          formatEventTime(eventDetails.event_time),
+                          formatEventDurationLabel(
+                            eventDetails.duration_minutes,
+                            strings.eventDurationUnit
+                          ),
                           eventDetails.city,
                           eventDetails.language &&
                           isSupportedLocale(eventDetails.language)
                             ? languageLabels[eventDetails.language] ??
                               eventDetails.language
                             : eventDetails.language ?? "",
-                          eventDetails.language_level ?? "",
+                          formatEventLevelRange(eventDetails),
                           eventDetails.format === "online"
                             ? strings.eventFormatOnline
                             : eventDetails.format === "offline"
@@ -12976,6 +13499,29 @@ export default function App() {
                             </span>
                           )}
                         </div>
+                        {eventDetails.event_time ? (
+                          <div className="eventDetailInfoRow">
+                            <span className="eventDetailInfoLabel">
+                              {strings.eventTimeLabel}
+                            </span>
+                            <span className="eventDetailInfoValue">
+                              {formatEventTime(eventDetails.event_time)}
+                            </span>
+                          </div>
+                        ) : null}
+                        {eventDetails.duration_minutes ? (
+                          <div className="eventDetailInfoRow">
+                            <span className="eventDetailInfoLabel">
+                              {strings.eventDurationLabel}
+                            </span>
+                            <span className="eventDetailInfoValue">
+                              {formatEventDurationLabel(
+                                eventDetails.duration_minutes,
+                                strings.eventDurationUnit
+                              )}
+                            </span>
+                          </div>
+                        ) : null}
                         {eventOrganizer?.id ? (
                           <div className="eventDetailInfoRow">
                             <span className="eventDetailInfoLabel">

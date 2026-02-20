@@ -2585,6 +2585,12 @@ button:focus-visible {
   font-size: 14px;
 }
 
+.organizerApplyHint {
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .organizerApplyType {
   display: grid;
   gap: 8px;
