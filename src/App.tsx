@@ -841,6 +841,18 @@ function getEventPricingText(locale: Locale): EventPricingText {
       participantsPlaceholder: "Наприклад 20",
     };
   }
+  if (locale === "fa") {
+    return {
+      paymentTypeLabel: "نوع شرکت",
+      paymentTypePlaceholder: "نوع شرکت",
+      paymentTypeFree: "رایگان",
+      paymentTypePaid: "پولی",
+      priceLabel: "قیمت (EUR)",
+      pricePlaceholder: "مثلاً 10",
+      participantsLabel: "تعداد شرکت‌کنندگان",
+      participantsPlaceholder: "مثلاً 20",
+    };
+  }
   return {
     paymentTypeLabel: "Participation type",
     paymentTypePlaceholder: "Participation type",
@@ -900,6 +912,30 @@ function getEventCheckInText(locale: Locale): EventCheckInText {
       qrNotCheckedInBadge: "Не відмічено",
       qrMarkButton: "Відмітити",
       qrUnmarkButton: "Зняти",
+    };
+  }
+  if (locale === "fa") {
+    return {
+      myQrTitle: "QR من برای ورود",
+      myQrHint: "این QR را هنگام ورود به برگزارکننده نشان دهید.",
+      myQrCodeLabel: "کد",
+      qrCheckInTitle: "ثبت ورود شرکت‌کنندگان با QR",
+      qrCheckInHint: "QR را اسکن کنید یا کد شرکت‌کننده را وارد کنید.",
+      qrInputPlaceholder: "کد QR یا توکن را وارد کنید",
+      qrCheckInSubmit: "ثبت ورود",
+      qrScanFromPhoto: "اسکن از عکس",
+      qrNotFound: "کد QR برای این رویداد پیدا نشد.",
+      qrWrongEvent: "این کد QR مربوط به رویداد دیگری است.",
+      qrOnlyGoing: "ثبت ورود فقط برای وضعیت «می‌آیند» فعال است.",
+      qrCheckInMarked: "شرکت‌کننده ثبت ورود شد.",
+      qrCheckInUnmarked: "ثبت ورود لغو شد.",
+      qrCheckInAlready: "این شرکت‌کننده قبلاً ثبت ورود شده است.",
+      qrScannerUnsupported: "اسکنر QR در این مرورگر پشتیبانی نمی‌شود.",
+      qrScannerNoCode: "در تصویر کد QR پیدا نشد.",
+      qrCheckedInBadge: "حاضر",
+      qrNotCheckedInBadge: "ثبت نشده",
+      qrMarkButton: "ثبت",
+      qrUnmarkButton: "لغو",
     };
   }
   return {
@@ -1805,15 +1841,15 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Користувачі",
     searchEmpty: "Нічого не знайдено.",
     eventsButton: "Події",
-    logoutButton: "Sign out",
-    adminButton: "Admin",
-    adminTitle: "Admin panel",
-    adminSubtitle: "Manage users, events, and posts.",
-    adminTabUsers: "Users",
-    adminTabEvents: "Events",
-    adminTabPosts: "Posts",
-    adminRoleOrganizer: "Organizer",
-    adminRoleAdmin: "Admin",
+    logoutButton: "خروج",
+    adminButton: "ادمین",
+    adminTitle: "پنل ادمین",
+    adminSubtitle: "کاربران، رویدادها و پست‌ها را مدیریت کنید.",
+    adminTabUsers: "کاربران",
+    adminTabEvents: "رویدادها",
+    adminTabPosts: "پست‌ها",
+    adminRoleOrganizer: "برگزارکننده",
+    adminRoleAdmin: "ادمین",
     adminSelectUserLabel: "Обраний користувач",
     adminSelectUserEmpty: "Виберіть користувача",
     adminMakeOrganizer: "Зробити організатором",
@@ -1998,30 +2034,30 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "کاربران",
     searchEmpty: "نتیجه‌ای یافت نشد.",
     eventsButton: "رویدادها",
-    logoutButton: "Sign out",
-    adminButton: "Admin",
-    adminTitle: "Admin panel",
-    adminSubtitle: "Manage users, events, and posts.",
-    adminTabUsers: "Users",
-    adminTabEvents: "Events",
-    adminTabPosts: "Posts",
-    adminRoleOrganizer: "Organizer",
-    adminRoleAdmin: "Admin",
+    logoutButton: "خروج",
+    adminButton: "ادمین",
+    adminTitle: "پنل ادمین",
+    adminSubtitle: "کاربران، رویدادها و پست‌ها را مدیریت کنید.",
+    adminTabUsers: "کاربران",
+    adminTabEvents: "رویدادها",
+    adminTabPosts: "پست‌ها",
+    adminRoleOrganizer: "برگزارکننده",
+    adminRoleAdmin: "ادمین",
     adminSelectUserLabel: "کاربر انتخاب‌شده",
     adminSelectUserEmpty: "یک کاربر انتخاب کنید",
     adminMakeOrganizer: "سازمان‌دهنده کنید",
-    adminOrganizerIdLabel: "Organizer ID",
-    adminAccessDenied: "Admin access required.",
-    adminUsersEmpty: "No users found.",
-    adminEventsEmpty: "No events found.",
-    adminPostsEmpty: "No posts found.",
-    adminTabApplications: "Applications",
-    adminApplicationsEmpty: "No applications.",
-    adminApplicationApprove: "Approve",
-    adminApplicationReject: "Reject",
-    adminApplicationStatusPending: "Pending",
-    adminApplicationStatusApproved: "Approved",
-    adminApplicationStatusRejected: "Rejected",
+    adminOrganizerIdLabel: "شناسه برگزارکننده",
+    adminAccessDenied: "دسترسی فقط برای ادمین.",
+    adminUsersEmpty: "کاربری پیدا نشد.",
+    adminEventsEmpty: "رویدادی پیدا نشد.",
+    adminPostsEmpty: "پستی پیدا نشد.",
+    adminTabApplications: "درخواست‌ها",
+    adminApplicationsEmpty: "درخواستی وجود ندارد.",
+    adminApplicationApprove: "تأیید",
+    adminApplicationReject: "رد",
+    adminApplicationStatusPending: "در انتظار",
+    adminApplicationStatusApproved: "تأیید شده",
+    adminApplicationStatusRejected: "رد شده",
     eventsTitle: "رویدادها",
     eventsSubtitle: "رویدادهای خود را بسازید و مدیریت کنید.",
     eventCreateTitle: "رویداد جدید",
@@ -2070,31 +2106,31 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     userActionUnfollow: "لغو دنبال کردن",
     userActionMessage: "پیام",
     userActionOrganizer: "تبدیل به برگزارکننده",
-    organizerApplyTitle: "Organizer application",
-    organizerApplySubtitle: "Choose the type and fill in the form.",
-    organizerApplyTypeLabel: "Application type",
-    organizerApplyTypePerson: "Person",
-    organizerApplyTypeOrganization: "Organization",
-    organizerApplyNameLabel: "Full name",
-    organizerApplyOrgNameLabel: "Organization name",
-    organizerApplyOrgIdLabel: "Registration ID",
-    organizerApplyContactLabel: "Contact person",
-    organizerApplyPhoneLabel: "Phone",
-    organizerApplyEmailLabel: "Email",
-    organizerApplyWebsiteLabel: "Website",
-    organizerApplyFacebookLabel: "Facebook",
-    organizerApplyInstagramLabel: "Instagram",
-    organizerApplyTiktokLabel: "TikTok",
-    organizerApplyLinkedInLabel: "LinkedIn",
-    organizerApplyLanguagesLabel: "Languages you plan to host",
-    organizerApplyExperienceLabel: "Experience",
-    organizerApplyAboutLabel: "About",
-    organizerApplySubmit: "Send application",
-    organizerApplyCancel: "Cancel",
-    organizerApplyRequired: "Please fill in the required fields.",
-    organizerApplyRequiredHint: "Fields marked with * are required.",
-    organizerApplyInvalidUrl: "Invalid link",
-    organizerApplySuccess: "Application submitted.",
+    organizerApplyTitle: "درخواست برگزارکننده",
+    organizerApplySubtitle: "نوع درخواست را انتخاب کنید و فرم را کامل کنید.",
+    organizerApplyTypeLabel: "نوع درخواست",
+    organizerApplyTypePerson: "شخصی",
+    organizerApplyTypeOrganization: "سازمانی",
+    organizerApplyNameLabel: "نام کامل",
+    organizerApplyOrgNameLabel: "نام سازمان",
+    organizerApplyOrgIdLabel: "شماره ثبت",
+    organizerApplyContactLabel: "شخص تماس",
+    organizerApplyPhoneLabel: "تلفن",
+    organizerApplyEmailLabel: "ایمیل",
+    organizerApplyWebsiteLabel: "وب‌سایت",
+    organizerApplyFacebookLabel: "لینک فیسبوک",
+    organizerApplyInstagramLabel: "لینک اینستاگرام",
+    organizerApplyTiktokLabel: "لینک تیک‌تاک",
+    organizerApplyLinkedInLabel: "لینک لینکدین",
+    organizerApplyLanguagesLabel: "زبان‌هایی که قصد برگزاری آن‌ها را دارید",
+    organizerApplyExperienceLabel: "سابقه",
+    organizerApplyAboutLabel: "درباره شما / سازمان",
+    organizerApplySubmit: "ارسال درخواست",
+    organizerApplyCancel: "انصراف",
+    organizerApplyRequired: "لطفاً فیلدهای الزامی را کامل کنید.",
+    organizerApplyRequiredHint: "فیلدهای دارای * الزامی هستند.",
+    organizerApplyInvalidUrl: "لینک نامعتبر است",
+    organizerApplySuccess: "درخواست ارسال شد.",
     userTabAbout: "درباره",
     userTabPhotos: "عکس‌ها",
     userTabVideos: "ویدیوها",
@@ -11334,6 +11370,8 @@ export default function App() {
       ? "Введите PIN администратора"
       : locale === "uk"
         ? "Введіть PIN адміністратора"
+        : locale === "fa"
+          ? "رمز PIN ادمین را وارد کنید"
         : "Enter admin PIN";
   const primaryLabel =
     route === "login"
@@ -11366,11 +11404,19 @@ export default function App() {
   async function handleAdminPinSubmit() {
     const pinValue = adminPinValue.trim();
     if (!pinValue) {
-      setAdminPinError(locale === "ru" ? "Введите PIN" : "Enter PIN");
+      setAdminPinError(
+        locale === "ru" ? "Введите PIN" : locale === "fa" ? "PIN را وارد کنید" : "Enter PIN"
+      );
       return;
     }
     if (pinValue !== "2266") {
-      setAdminPinError(locale === "ru" ? "Неверный PIN" : "Invalid PIN");
+      setAdminPinError(
+        locale === "ru"
+          ? "Неверный PIN"
+          : locale === "fa"
+            ? "PIN نامعتبر است"
+            : "Invalid PIN"
+      );
       return;
     }
     if (!sessionUser?.id || guestMode) {
@@ -11402,6 +11448,8 @@ export default function App() {
           ? "Доступ только для администратора."
           : locale === "uk"
             ? "Доступ лише для адміністратора."
+            : locale === "fa"
+              ? "دسترسی فقط برای ادمین."
             : "Admin access required."
       );
       return;
@@ -16213,17 +16261,9 @@ export default function App() {
                     {strings.languageSubtitle}
                   </div>
                       {LANGUAGE_LIST.map((lang) => {
-                        const translatedLabel =
-                          languageLabels[lang.locale] ?? lang.label;
-                        const hasTranslation =
-                          languageLabels[lang.locale] !== undefined;
-                    const labelDir = hasTranslation
-                      ? isRtlLocale(locale)
-                        ? "rtl"
-                        : "ltr"
-                      : "dir" in lang && lang.dir
-                        ? lang.dir
-                        : "ltr";
+                        const nativeLabel = lang.label;
+                        const labelDir =
+                          "dir" in lang && lang.dir ? lang.dir : "ltr";
 
                         return (
                           <button
@@ -16233,7 +16273,7 @@ export default function App() {
                             onClick={() => handleLocaleSelect(lang.locale)}
                           >
                             <div className="cardTitle" dir={labelDir}>
-                              {translatedLabel}
+                              {nativeLabel}
                             </div>
                             <div className="cardMeta">
                               <span className="langPills">
@@ -16323,8 +16363,8 @@ export default function App() {
             {footerLanguageOpen ? (
               <div className="footerLanguagePicker" id="footerLanguagePicker">
                 {LANGUAGE_LIST.map((lang) => {
-                  const translatedLabel =
-                    languageLabels[lang.locale] ?? lang.label;
+                  const nativeLabel = lang.label;
+                  const labelDir = "dir" in lang && lang.dir ? lang.dir : "ltr";
                   return (
                     <button
                       key={`footer-locale-${lang.locale}`}
@@ -16333,8 +16373,9 @@ export default function App() {
                       }`}
                       type="button"
                       onClick={() => handleLocaleSelect(lang.locale)}
+                      dir={labelDir}
                     >
-                      {translatedLabel}
+                      {nativeLabel}
                     </button>
                   );
                 })}
