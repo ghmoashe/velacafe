@@ -8966,7 +8966,10 @@ export default function App() {
   }
 
   async function handleBecomeOrganizer() {
-    if (profileIsOrganizer) return;
+    if (profileIsOrganizer) {
+      navigate("events");
+      return;
+    }
     if (guestMode) {
       redirectToLoginWithIntent({ route: "events" });
       return;
@@ -11526,7 +11529,6 @@ export default function App() {
                       className="userAction"
                       type="button"
                       onClick={handleBecomeOrganizer}
-                      disabled={profileIsOrganizer}
                     >
                       {strings.userActionOrganizer}
                     </button>
