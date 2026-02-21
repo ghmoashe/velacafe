@@ -1194,6 +1194,7 @@ button:focus-visible {
 .eventDetailBody {
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .eventDetailHeadline {
@@ -1350,6 +1351,10 @@ button:focus-visible {
   border-radius: 14px;
   border: 1px solid rgba(223, 230, 242, 0.9);
   background: rgba(255, 255, 255, 0.82);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .eventCheckInSelfTitle,
@@ -1366,11 +1371,13 @@ button:focus-visible {
 }
 
 .eventCheckInSelfQr {
-  width: min(260px, 100%);
+  width: min(220px, 100%);
   aspect-ratio: 1 / 1;
   border-radius: 12px;
   border: 1px solid rgba(223, 230, 242, 0.9);
   background: #fff;
+  display: block;
+  margin: 0 auto;
 }
 
 .eventCheckInSelfCode {
@@ -1380,11 +1387,17 @@ button:focus-visible {
   align-items: center;
   font-size: 12px;
   color: #6f3e2b;
+  overflow-wrap: anywhere;
+}
+
+.eventCheckInSelfCode strong {
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .eventCheckInManageForm {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   align-items: center;
 }
@@ -1401,11 +1414,21 @@ button:focus-visible {
   color: #6f3e2b;
   font-size: 12px;
   cursor: pointer;
-  white-space: nowrap;
+  white-space: normal;
+  width: 100%;
+  text-align: center;
+  line-height: 1.2;
+  padding: 10px 14px;
 }
 
 .eventCheckInScanLabel input {
   display: none;
+}
+
+.eventCheckInManageForm .input,
+.eventCheckInManageForm .btn {
+  width: 100%;
+  min-width: 0;
 }
 
 .eventParticipantsHeader {
@@ -2051,6 +2074,12 @@ button:focus-visible {
 
   .eventCheckInScanLabel {
     width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .eventDetailCard {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -939,24 +939,69 @@ function parseEventCheckInPayload(value: string): {
   eventId?: string;
   userId?: string;
 } | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const marker = "vela-checkin:";
-  if (trimmed.startsWith(marker)) {
-    const parts = trimmed.split(":");
-    if (parts.length >= 4) {
-      const token = parts.slice(3).join(":").trim();
-      const eventId = parts[1]?.trim();
-      const userId = parts[2]?.trim();
-      if (!token) return null;
-      return {
-        token,
-        eventId: eventId || undefined,
-        userId: userId || undefined,
-      };
+  const normalizeToken = (token: string) =>
+    token.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const normalizeUuid = (id: string) =>
+    id.trim().toLowerCase().replace(/[^a-f0-9-]/g, "");
+
+  const raw = value.trim();
+  if (!raw) return null;
+  let input = raw;
+  try {
+    input = decodeURIComponent(raw);
+  } catch {
+    input = raw;
+  }
+  input = input.trim();
+
+  const markerMatch = input.match(/^vela-checkin:([^:]+):([^:]+):(.+)$/i);
+  if (markerMatch) {
+    const eventId = normalizeUuid(markerMatch[1] ?? "");
+    const userId = normalizeUuid(markerMatch[2] ?? "");
+    const token = normalizeToken(markerMatch[3] ?? "");
+    if (!token) return null;
+    return {
+      token,
+      eventId: eventId || undefined,
+      userId: userId || undefined,
+    };
+  }
+
+  if (/^https?:\/\//i.test(input)) {
+    try {
+      const url = new URL(input);
+      const eventId = normalizeUuid(
+        url.searchParams.get("eventId") ??
+          url.searchParams.get("event_id") ??
+          ""
+      );
+      const userId = normalizeUuid(
+        url.searchParams.get("userId") ??
+          url.searchParams.get("user_id") ??
+          ""
+      );
+      const token = normalizeToken(
+        url.searchParams.get("token") ??
+          url.searchParams.get("check_in_token") ??
+          ""
+      );
+      if (token) {
+        return {
+          token,
+          eventId: eventId || undefined,
+          userId: userId || undefined,
+        };
+      }
+    } catch {
+      // Ignore URL parse errors and continue with generic token extraction.
     }
   }
-  return { token: trimmed };
+
+  const tokenCandidate =
+    input.match(/[a-f0-9]{16,}/i)?.[0] ?? input.replace(/^.*?:\s*/i, "");
+  const token = normalizeToken(tokenCandidate);
+  if (!token) return null;
+  return { token };
 }
 
 function generateCheckInToken(): string {
