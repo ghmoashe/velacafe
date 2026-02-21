@@ -34,6 +34,7 @@ type LanguagePref = (typeof LANGUAGE_LIST)[number];
 type Locale = LanguagePref["locale"];
 type LanguageLevel = (typeof LANGUAGE_LEVELS)[number] | "";
 type EventDuration = (typeof EVENT_DURATIONS)[number] | "";
+type EventPaymentType = "free" | "paid" | "";
 
 const INTEREST_PRESETS = [
   {
@@ -262,6 +263,9 @@ type EventRecord = {
   event_date: string | null;
   event_time?: string | null;
   duration_minutes?: number | null;
+  is_paid?: boolean | null;
+  price_amount?: number | null;
+  max_participants?: number | null;
   format: EventFormat | null;
   created_at: string;
 };
@@ -612,13 +616,49 @@ function formatDate(value: string, locale: Locale): string {
   });
 }
 
-function getStoragePathFromPublicUrl(url: string, bucket: string): string | null {
+function getStorageObjectFromPublicUrl(
+  url: string
+): { bucket: string; path: string } | null {
   if (!url) return null;
-  const marker = `/storage/v1/object/public/${bucket}/`;
+  const marker = "/storage/v1/object/public/";
   const index = url.indexOf(marker);
   if (index === -1) return null;
-  const path = url.slice(index + marker.length);
-  return path ? path.split("?")[0] : null;
+  const value = url.slice(index + marker.length).split("?")[0];
+  const slashIndex = value.indexOf("/");
+  if (slashIndex < 1) return null;
+  const bucket = value.slice(0, slashIndex);
+  const path = value.slice(slashIndex + 1);
+  if (!bucket || !path) return null;
+  return { bucket, path };
+}
+
+function isStorageBucketNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as {
+    message?: unknown;
+    error?: unknown;
+    statusCode?: unknown;
+    status?: unknown;
+  };
+  const messageParts: string[] = [];
+  if (typeof candidate.message === "string") {
+    messageParts.push(candidate.message);
+  }
+  if (typeof candidate.error === "string") {
+    messageParts.push(candidate.error);
+  }
+  const message = messageParts.join(" ").toLowerCase();
+  const statusCode =
+    typeof candidate.statusCode === "number"
+      ? candidate.statusCode
+      : typeof candidate.status === "number"
+        ? candidate.status
+        : null;
+  return (
+    message.includes("bucket not found") ||
+    (message.includes("bucket") && message.includes("not found")) ||
+    statusCode === 404
+  );
 }
 
 function profileMatchesLanguage(profile: SearchProfile, language: Locale): boolean {
@@ -727,6 +767,99 @@ function formatEventDurationLabel(
 function formatEventTime(value: string | null | undefined): string {
   if (!value) return "";
   return value.slice(0, 5);
+}
+
+function withRequiredMark(label: string): string {
+  return `${label} *`;
+}
+
+type EventPricingText = {
+  paymentTypeLabel: string;
+  paymentTypePlaceholder: string;
+  paymentTypeFree: string;
+  paymentTypePaid: string;
+  priceLabel: string;
+  pricePlaceholder: string;
+  participantsLabel: string;
+  participantsPlaceholder: string;
+};
+
+function getEventPricingText(locale: Locale): EventPricingText {
+  if (locale === "ru") {
+    return {
+      paymentTypeLabel: "Тип участия",
+      paymentTypePlaceholder: "Тип участия",
+      paymentTypeFree: "Бесплатно",
+      paymentTypePaid: "Платно",
+      priceLabel: "Цена (EUR)",
+      pricePlaceholder: "Например 10",
+      participantsLabel: "Количество участников",
+      participantsPlaceholder: "Например 20",
+    };
+  }
+  if (locale === "uk") {
+    return {
+      paymentTypeLabel: "Тип участі",
+      paymentTypePlaceholder: "Тип участі",
+      paymentTypeFree: "Безкоштовно",
+      paymentTypePaid: "Платно",
+      priceLabel: "Ціна (EUR)",
+      pricePlaceholder: "Наприклад 10",
+      participantsLabel: "Кількість учасників",
+      participantsPlaceholder: "Наприклад 20",
+    };
+  }
+  return {
+    paymentTypeLabel: "Participation type",
+    paymentTypePlaceholder: "Participation type",
+    paymentTypeFree: "Free",
+    paymentTypePaid: "Paid",
+    priceLabel: "Price (EUR)",
+    pricePlaceholder: "For example 10",
+    participantsLabel: "Participants limit",
+    participantsPlaceholder: "For example 20",
+  };
+}
+
+function parsePositiveInteger(value: string): number | null {
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const next = Number(normalized);
+  if (!Number.isInteger(next) || next <= 0) return null;
+  return next;
+}
+
+function parsePositiveDecimal(value: string): number | null {
+  const normalized = value.trim().replace(",", ".");
+  if (!normalized) return null;
+  const next = Number(normalized);
+  if (!Number.isFinite(next) || next <= 0) return null;
+  return next;
+}
+
+function formatPriceEur(value: number | null | undefined, locale: Locale): string {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return "";
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: "EUR",
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return `${value} EUR`;
+  }
+}
+
+function formatEventPricing(
+  event: EventRecord,
+  locale: Locale,
+  pricingText: EventPricingText
+): string {
+  if (event.is_paid) {
+    const price = formatPriceEur(event.price_amount, locale);
+    return price ? `${pricingText.paymentTypePaid}: ${price}` : pricingText.paymentTypePaid;
+  }
+  return pricingText.paymentTypeFree;
 }
 
 function isEventLevelMatch(event: EventRecord, level: LanguageLevel): boolean {
@@ -3169,10 +3302,13 @@ const GUEST_MODE_KEY = "vela-guest-mode";
 const PROFILE_PHOTO_BUCKET = "avatars";
 const POSTS_BUCKET = "posts";
 const EVENTS_BUCKET = "events";
+const EVENT_IMAGE_UPLOAD_BUCKETS = [EVENTS_BUCKET, POSTS_BUCKET] as const;
 const ORGANIZER_FOLLOWS_TABLE = "organizer_follows";
 const POSTS_TABLE = "posts";
 const ORGANIZER_APPLICATIONS_TABLE = "organizer_applications";
 const POST_MEDIA_FOLDER = "posts";
+const EVENT_SELECT_FIELDS =
+  "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,is_paid,price_amount,max_participants,format,created_at";
 const LEARN_PRACTICE_EXCLUDED = new Set<Locale>([
   "ru",
   "uk",
@@ -7202,6 +7338,9 @@ export default function App() {
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
   const [eventDuration, setEventDuration] = useState<EventDuration>("");
+  const [eventPaymentType, setEventPaymentType] = useState<EventPaymentType>("");
+  const [eventPrice, setEventPrice] = useState("");
+  const [eventMaxParticipants, setEventMaxParticipants] = useState("");
   const [eventFormat, setEventFormat] = useState<"" | EventFormat>("");
   const [eventStatus, setEventStatus] = useState<{
     type: "idle" | "loading" | "success" | "error";
@@ -7294,6 +7433,7 @@ export default function App() {
     message: string;
   }>({ type: "idle", message: "" });
   const strings = MESSAGES[locale] ?? MESSAGES[FALLBACK_LOCALE];
+  const eventPricingText = getEventPricingText(locale);
   const changeLanguageButtonLabel =
     CHANGE_LANGUAGE_BUTTON_LABELS[locale] ?? CHANGE_LANGUAGE_BUTTON_LABELS.en;
   const languageLabels =
@@ -8111,9 +8251,7 @@ export default function App() {
       }
       const { data: eventRows, error } = await supabase
         .from("events")
-        .select(
-          "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,format,created_at"
-        )
+        .select(EVENT_SELECT_FIELDS)
         .eq("organizer_id", user.id)
         .order("event_date", { ascending: false });
       if (!active) return;
@@ -8218,12 +8356,10 @@ export default function App() {
             "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,bio,is_organizer,is_admin"
           )
           .order("full_name", { ascending: true }),
-        supabase
-          .from("events")
-          .select(
-            "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,format,created_at"
-          )
-          .order("event_date", { ascending: false }),
+          supabase
+            .from("events")
+            .select(EVENT_SELECT_FIELDS)
+            .order("event_date", { ascending: false }),
         supabase
           .from(POSTS_TABLE)
           .select("id,user_id,media_url,media_type,caption,created_at")
@@ -8321,9 +8457,7 @@ export default function App() {
       setEventDetailsStatus({ type: "loading", message: "" });
       const { data: eventRow, error } = await supabase
         .from("events")
-        .select(
-          "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,format,created_at"
-        )
+        .select(EVENT_SELECT_FIELDS)
         .eq("id", eventId)
         .maybeSingle();
       if (!active) return;
@@ -9031,6 +9165,9 @@ export default function App() {
     setEventDate("");
     setEventTime("");
     setEventDuration("");
+    setEventPaymentType("");
+    setEventPrice("");
+    setEventMaxParticipants("");
     setEventFormat("");
     setAdminEventOrganizerId("");
   }
@@ -9056,6 +9193,13 @@ export default function App() {
     }
     if (getLevelIndex(value) < getLevelIndex(eventLevelFrom)) {
       setEventLevelFrom(value);
+    }
+  }
+
+  function handleEventPaymentTypeChange(value: EventPaymentType) {
+    setEventPaymentType(value);
+    if (value !== "paid") {
+      setEventPrice("");
     }
   }
 
@@ -9091,6 +9235,18 @@ export default function App() {
         ? (event.duration_minutes as EventDuration)
         : "";
     setEventDuration(durationValue);
+    setEventPaymentType(event.is_paid ? "paid" : "free");
+    setEventPrice(
+      typeof event.price_amount === "number" && Number.isFinite(event.price_amount)
+        ? String(event.price_amount)
+        : ""
+    );
+    setEventMaxParticipants(
+      typeof event.max_participants === "number" &&
+        Number.isFinite(event.max_participants)
+        ? String(event.max_participants)
+        : ""
+    );
     setEventFormat(event.format ?? "");
     setEventExistingImageUrls(existingUrls);
     setEventRemovedImageUrls([]);
@@ -9282,11 +9438,17 @@ export default function App() {
       if (error) throw error;
       const eventImages = getEventImageUrls(event);
       if (eventImages.length) {
-        const paths = eventImages
-          .map((url) => getStoragePathFromPublicUrl(url, EVENTS_BUCKET))
-          .filter((path): path is string => Boolean(path));
-        if (paths.length) {
-          await supabase.storage.from(EVENTS_BUCKET).remove(paths);
+        const groupedByBucket = new Map<string, string[]>();
+        for (const url of eventImages) {
+          const target = getStorageObjectFromPublicUrl(url);
+          if (!target) continue;
+          const existing = groupedByBucket.get(target.bucket) ?? [];
+          existing.push(target.path);
+          groupedByBucket.set(target.bucket, existing);
+        }
+        for (const [bucket, paths] of groupedByBucket) {
+          if (!paths.length) continue;
+          await supabase.storage.from(bucket).remove(paths);
         }
       }
       setEventsList((prev) => prev.filter((item) => item.id !== event.id));
@@ -9313,7 +9475,39 @@ export default function App() {
       });
       return;
     }
-    if (!eventTitle.trim() || !eventDate || !eventTime || !eventDuration) {
+    if (
+      !eventTitle.trim() ||
+      !eventDescription.trim() ||
+      !eventDate ||
+      !eventTime ||
+      !eventDuration ||
+      !eventPaymentType ||
+      !eventFormat ||
+      !eventCity.trim() ||
+      !eventCountry.trim() ||
+      !eventLanguage ||
+      !eventLevelFrom ||
+      !eventLevelTo
+    ) {
+      setEventStatus({ type: "error", message: strings.errorRequired });
+      return;
+    }
+    if (eventFormat === "offline" && !eventAddress.trim()) {
+      setEventStatus({ type: "error", message: strings.errorRequired });
+      return;
+    }
+    if (eventFormat === "online" && !eventOnlineUrl.trim()) {
+      setEventStatus({ type: "error", message: strings.errorRequired });
+      return;
+    }
+    const maxParticipants = parsePositiveInteger(eventMaxParticipants);
+    if (!maxParticipants) {
+      setEventStatus({ type: "error", message: strings.errorRequired });
+      return;
+    }
+    const priceAmount =
+      eventPaymentType === "paid" ? parsePositiveDecimal(eventPrice) : null;
+    if (eventPaymentType === "paid" && !priceAmount) {
       setEventStatus({ type: "error", message: strings.errorRequired });
       return;
     }
@@ -9351,19 +9545,37 @@ export default function App() {
             .toString(36)
             .slice(2, 8)}.${extension}`;
           const filePath = `${user.id}/events/${fileName}`;
-          const { error: uploadError } = await supabase.storage
-            .from(EVENTS_BUCKET)
-            .upload(filePath, file, {
-              upsert: true,
-              contentType: file.type || "image/jpeg",
-            });
-          if (uploadError) throw uploadError;
-          const { data: publicData } = supabase.storage
-            .from(EVENTS_BUCKET)
-            .getPublicUrl(filePath);
-          if (publicData.publicUrl) {
-            uploads.push(publicData.publicUrl);
+          let publicUrl: string | null = null;
+          let lastUploadError: unknown = null;
+          for (const bucket of EVENT_IMAGE_UPLOAD_BUCKETS) {
+            const { error: uploadError } = await supabase.storage
+              .from(bucket)
+              .upload(filePath, file, {
+                upsert: true,
+                contentType: file.type || "image/jpeg",
+              });
+            if (uploadError) {
+              lastUploadError = uploadError;
+              if (
+                bucket === EVENTS_BUCKET &&
+                isStorageBucketNotFoundError(uploadError)
+              ) {
+                continue;
+              }
+              throw uploadError;
+            }
+            const { data: publicData } = supabase.storage
+              .from(bucket)
+              .getPublicUrl(filePath);
+            if (publicData.publicUrl) {
+              publicUrl = publicData.publicUrl;
+            }
+            break;
           }
+          if (!publicUrl) {
+            throw lastUploadError ?? new Error("Event image upload failed.");
+          }
+          uploads.push(publicUrl);
         }
         nextImageUrls = uploads;
       } else if (eventRemoveImage) {
@@ -9393,6 +9605,9 @@ export default function App() {
         event_date: eventDate || null,
         event_time: eventTime || null,
         duration_minutes: eventDuration || null,
+        is_paid: eventPaymentType === "paid",
+        price_amount: eventPaymentType === "paid" ? priceAmount : null,
+        max_participants: maxParticipants,
         format: eventFormat || null,
       };
       const updatePayload =
@@ -9405,9 +9620,7 @@ export default function App() {
           .from("events")
           .update(updatePayload)
           .eq("id", eventEditingId)
-          .select(
-            "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,format,created_at"
-          )
+          .select(EVENT_SELECT_FIELDS)
           .single();
         if (error) throw error;
         savedEvent = updated as EventRecord;
@@ -9425,9 +9638,7 @@ export default function App() {
         const { data: inserted, error } = await supabase
           .from("events")
           .insert(payload)
-          .select(
-            "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,format,created_at"
-          )
+          .select(EVENT_SELECT_FIELDS)
           .single();
         if (error) throw error;
         savedEvent = inserted as EventRecord;
@@ -9440,11 +9651,17 @@ export default function App() {
         existingImageUrls.forEach((url) => urlsToDelete.add(url));
       }
       if (urlsToDelete.size > 0) {
-        const paths = Array.from(urlsToDelete)
-          .map((url) => getStoragePathFromPublicUrl(url, EVENTS_BUCKET))
-          .filter((path): path is string => Boolean(path));
-        if (paths.length) {
-          await supabase.storage.from(EVENTS_BUCKET).remove(paths);
+        const groupedByBucket = new Map<string, string[]>();
+        for (const url of urlsToDelete) {
+          const target = getStorageObjectFromPublicUrl(url);
+          if (!target) continue;
+          const existing = groupedByBucket.get(target.bucket) ?? [];
+          existing.push(target.path);
+          groupedByBucket.set(target.bucket, existing);
+        }
+        for (const [bucket, paths] of groupedByBucket) {
+          if (!paths.length) continue;
+          await supabase.storage.from(bucket).remove(paths);
         }
       }
       resetEventForm();
@@ -9634,9 +9851,7 @@ export default function App() {
 
       let eventsQuery = supabase
         .from("events")
-        .select(
-          "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,format,created_at"
-        )
+        .select(EVENT_SELECT_FIELDS)
         .order("event_date", { ascending: true })
         .limit(200);
       if (queryValue) {
@@ -10710,23 +10925,25 @@ export default function App() {
         <div className="eventsForm">
           <div className="field">
             <label className="label" htmlFor="eventTitle">
-              {strings.eventNameLabel}
+              {withRequiredMark(strings.eventNameLabel)}
             </label>
             <input
               className="input"
               id="eventTitle"
               type="text"
+              required
               value={eventTitle}
               onChange={(event) => setEventTitle(event.target.value)}
             />
           </div>
           <div className="field">
             <label className="label" htmlFor="eventDescription">
-              {strings.eventDescriptionLabel}
+              {withRequiredMark(strings.eventDescriptionLabel)}
             </label>
             <textarea
               className="input eventsTextarea"
               id="eventDescription"
+              required
               value={eventDescription}
               onChange={(event) => setEventDescription(event.target.value)}
             />
@@ -10781,35 +10998,38 @@ export default function App() {
           <div className="eventsGrid">
             <div className="field">
               <label className="label" htmlFor="eventDate">
-                {strings.searchDateLabel}
+                {withRequiredMark(strings.searchDateLabel)}
               </label>
               <input
                 className="input"
                 id="eventDate"
                 type="date"
+                required
                 value={eventDate}
                 onChange={(event) => setEventDate(event.target.value)}
               />
             </div>
             <div className="field">
               <label className="label" htmlFor="eventTime">
-                {strings.eventTimeLabel}
+                {withRequiredMark(strings.eventTimeLabel)}
               </label>
               <input
                 className="input"
                 id="eventTime"
                 type="time"
+                required
                 value={eventTime}
                 onChange={(event) => setEventTime(event.target.value)}
               />
             </div>
             <div className="field">
               <label className="label" htmlFor="eventFormat">
-                {strings.eventFormatLabel}
+                {withRequiredMark(strings.eventFormatLabel)}
               </label>
               <select
                 className="input"
                 id="eventFormat"
+                required
                 value={eventFormat}
                 onChange={(event) =>
                   setEventFormat(event.target.value as "" | EventFormat)
@@ -10822,11 +11042,12 @@ export default function App() {
             </div>
             <div className="field">
               <label className="label" htmlFor="eventDuration">
-                {strings.eventDurationLabel}
+                {withRequiredMark(strings.eventDurationLabel)}
               </label>
               <select
                 className="input"
                 id="eventDuration"
+                required
                 value={eventDuration}
                 onChange={(event) =>
                   setEventDuration(
@@ -10845,13 +11066,70 @@ export default function App() {
               </select>
             </div>
             <div className="field">
+              <label className="label" htmlFor="eventPaymentType">
+                {withRequiredMark(eventPricingText.paymentTypeLabel)}
+              </label>
+              <select
+                className="input"
+                id="eventPaymentType"
+                required
+                value={eventPaymentType}
+                onChange={(event) =>
+                  handleEventPaymentTypeChange(
+                    event.target.value as EventPaymentType
+                  )
+                }
+              >
+                <option value="">{eventPricingText.paymentTypePlaceholder}</option>
+                <option value="free">{eventPricingText.paymentTypeFree}</option>
+                <option value="paid">{eventPricingText.paymentTypePaid}</option>
+              </select>
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="eventMaxParticipants">
+                {withRequiredMark(eventPricingText.participantsLabel)}
+              </label>
+              <input
+                className="input"
+                id="eventMaxParticipants"
+                type="number"
+                required
+                min={1}
+                step={1}
+                inputMode="numeric"
+                placeholder={eventPricingText.participantsPlaceholder}
+                value={eventMaxParticipants}
+                onChange={(event) => setEventMaxParticipants(event.target.value)}
+              />
+            </div>
+            {eventPaymentType === "paid" ? (
+              <div className="field">
+                <label className="label" htmlFor="eventPrice">
+                  {withRequiredMark(eventPricingText.priceLabel)}
+                </label>
+                <input
+                  className="input"
+                  id="eventPrice"
+                  type="number"
+                  required
+                  min={0.01}
+                  step={0.01}
+                  inputMode="decimal"
+                  placeholder={eventPricingText.pricePlaceholder}
+                  value={eventPrice}
+                  onChange={(event) => setEventPrice(event.target.value)}
+                />
+              </div>
+            ) : null}
+            <div className="field">
               <label className="label" htmlFor="eventCity">
-                {strings.profileCityLabel}
+                {withRequiredMark(strings.profileCityLabel)}
               </label>
               <input
                 className="input"
                 id="eventCity"
                 type="text"
+                required
                 value={eventCity}
                 onChange={(event) => setEventCity(event.target.value)}
               />
@@ -10859,12 +11137,13 @@ export default function App() {
             {eventFormat === "offline" ? (
               <div className="field">
                 <label className="label" htmlFor="eventAddress">
-                  {strings.eventAddressLabel}
+                  {withRequiredMark(strings.eventAddressLabel)}
                 </label>
                 <input
                   className="input"
                   id="eventAddress"
                   type="text"
+                  required
                   value={eventAddress}
                   onChange={(event) => setEventAddress(event.target.value)}
                 />
@@ -10872,23 +11151,25 @@ export default function App() {
             ) : null}
             <div className="field">
               <label className="label" htmlFor="eventCountry">
-                {strings.profileCountryLabel}
+                {withRequiredMark(strings.profileCountryLabel)}
               </label>
               <input
                 className="input"
                 id="eventCountry"
                 type="text"
+                required
                 value={eventCountry}
                 onChange={(event) => setEventCountry(event.target.value)}
               />
             </div>
             <div className="field">
               <label className="label" htmlFor="eventLanguage">
-                {strings.searchLanguageLabel}
+                {withRequiredMark(strings.searchLanguageLabel)}
               </label>
               <select
                 className="input"
                 id="eventLanguage"
+                required
                 value={eventLanguage}
                 onChange={(event) =>
                   setEventLanguage(event.target.value as Locale | "")
@@ -10907,11 +11188,12 @@ export default function App() {
             </div>
             <div className="field">
               <label className="label" htmlFor="eventLevelFrom">
-                {strings.eventLevelFromLabel}
+                {withRequiredMark(strings.eventLevelFromLabel)}
               </label>
               <select
                 className="input"
                 id="eventLevelFrom"
+                required
                 value={eventLevelFrom}
                 onChange={(event) =>
                   handleEventLevelFromChange(
@@ -10929,11 +11211,12 @@ export default function App() {
             </div>
             <div className="field">
               <label className="label" htmlFor="eventLevelTo">
-                {strings.eventLevelToLabel}
+                {withRequiredMark(strings.eventLevelToLabel)}
               </label>
               <select
                 className="input"
                 id="eventLevelTo"
+                required
                 value={eventLevelTo}
                 onChange={(event) =>
                   handleEventLevelToChange(
@@ -10952,12 +11235,13 @@ export default function App() {
             {eventFormat === "online" ? (
               <div className="field">
                 <label className="label" htmlFor="eventOnlineUrl">
-                  {strings.eventOnlineLabel}
+                  {withRequiredMark(strings.eventOnlineLabel)}
                 </label>
                 <input
                   className="input"
                   id="eventOnlineUrl"
                   type="url"
+                  required
                   value={eventOnlineUrl}
                   onChange={(event) => setEventOnlineUrl(event.target.value)}
                 />
@@ -11013,6 +11297,17 @@ export default function App() {
                 event.duration_minutes,
                 strings.eventDurationUnit
               );
+              const paymentLabel = formatEventPricing(
+                event,
+                locale,
+                eventPricingText
+              );
+              const participantsLabel =
+                typeof event.max_participants === "number" &&
+                Number.isFinite(event.max_participants) &&
+                event.max_participants > 0
+                  ? `${eventPricingText.participantsLabel}: ${event.max_participants}`
+                  : "";
               const timeLabel = formatEventTime(event.event_time);
               const meta = [
                 event.event_date ? formatDate(event.event_date, locale) : "",
@@ -11023,6 +11318,8 @@ export default function App() {
                   : event.language ?? "",
                 levelLabel,
                 durationLabel,
+                paymentLabel,
+                participantsLabel,
                 event.format === "online"
                   ? strings.eventFormatOnline
                   : event.format === "offline"
@@ -12648,6 +12945,17 @@ export default function App() {
                               event.duration_minutes,
                               strings.eventDurationUnit
                             );
+                            const paymentLabel = formatEventPricing(
+                              event,
+                              locale,
+                              eventPricingText
+                            );
+                            const participantsLabel =
+                              typeof event.max_participants === "number" &&
+                              Number.isFinite(event.max_participants) &&
+                              event.max_participants > 0
+                                ? `${eventPricingText.participantsLabel}: ${event.max_participants}`
+                                : "";
                             const timeLabel = formatEventTime(event.event_time);
                             const eventMeta = [
                               event.event_date
@@ -12659,6 +12967,8 @@ export default function App() {
                               event.city || organizerCity,
                               eventLanguage,
                               levelLabel,
+                              paymentLabel,
+                              participantsLabel,
                               event.format === "online"
                                 ? strings.eventFormatOnline
                                 : event.format === "offline"
@@ -12909,12 +13219,13 @@ export default function App() {
                       <div className="eventsForm">
                         <div className="field">
                           <label className="label" htmlFor="eventTitle">
-                            {strings.eventNameLabel}
+                            {withRequiredMark(strings.eventNameLabel)}
                           </label>
                           <input
                             className="input"
                             id="eventTitle"
                             type="text"
+                            required
                             value={eventTitle}
                             onChange={(event) =>
                               setEventTitle(event.target.value)
@@ -12923,11 +13234,12 @@ export default function App() {
                         </div>
                         <div className="field">
                           <label className="label" htmlFor="eventDescription">
-                            {strings.eventDescriptionLabel}
+                            {withRequiredMark(strings.eventDescriptionLabel)}
                           </label>
                           <textarea
                             className="input eventsTextarea"
                             id="eventDescription"
+                            required
                             value={eventDescription}
                             onChange={(event) =>
                               setEventDescription(event.target.value)
@@ -12989,12 +13301,13 @@ export default function App() {
                         <div className="eventsGrid">
                           <div className="field">
                             <label className="label" htmlFor="eventDate">
-                              {strings.searchDateLabel}
+                              {withRequiredMark(strings.searchDateLabel)}
                             </label>
                             <input
                               className="input"
                               id="eventDate"
                               type="date"
+                              required
                               value={eventDate}
                               onChange={(event) =>
                                 setEventDate(event.target.value)
@@ -13003,12 +13316,13 @@ export default function App() {
                           </div>
                           <div className="field">
                             <label className="label" htmlFor="eventTime">
-                              {strings.eventTimeLabel}
+                              {withRequiredMark(strings.eventTimeLabel)}
                             </label>
                             <input
                               className="input"
                               id="eventTime"
                               type="time"
+                              required
                               value={eventTime}
                               onChange={(event) =>
                                 setEventTime(event.target.value)
@@ -13017,11 +13331,12 @@ export default function App() {
                           </div>
                           <div className="field">
                             <label className="label" htmlFor="eventFormat">
-                              {strings.eventFormatLabel}
+                              {withRequiredMark(strings.eventFormatLabel)}
                             </label>
                             <select
                               className="input"
                               id="eventFormat"
+                              required
                               value={eventFormat}
                               onChange={(event) =>
                                 setEventFormat(
@@ -13042,11 +13357,12 @@ export default function App() {
                           </div>
                           <div className="field">
                             <label className="label" htmlFor="eventDuration">
-                              {strings.eventDurationLabel}
+                              {withRequiredMark(strings.eventDurationLabel)}
                             </label>
                             <select
                               className="input"
                               id="eventDuration"
+                              required
                               value={eventDuration}
                               onChange={(event) =>
                                 setEventDuration(
@@ -13067,13 +13383,78 @@ export default function App() {
                             </select>
                           </div>
                           <div className="field">
+                            <label className="label" htmlFor="eventPaymentType">
+                              {withRequiredMark(eventPricingText.paymentTypeLabel)}
+                            </label>
+                            <select
+                              className="input"
+                              id="eventPaymentType"
+                              required
+                              value={eventPaymentType}
+                              onChange={(event) =>
+                                handleEventPaymentTypeChange(
+                                  event.target.value as EventPaymentType
+                                )
+                              }
+                            >
+                              <option value="">
+                                {eventPricingText.paymentTypePlaceholder}
+                              </option>
+                              <option value="free">
+                                {eventPricingText.paymentTypeFree}
+                              </option>
+                              <option value="paid">
+                                {eventPricingText.paymentTypePaid}
+                              </option>
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label className="label" htmlFor="eventMaxParticipants">
+                              {withRequiredMark(eventPricingText.participantsLabel)}
+                            </label>
+                            <input
+                              className="input"
+                              id="eventMaxParticipants"
+                              type="number"
+                              required
+                              min={1}
+                              step={1}
+                              inputMode="numeric"
+                              placeholder={eventPricingText.participantsPlaceholder}
+                              value={eventMaxParticipants}
+                              onChange={(event) =>
+                                setEventMaxParticipants(event.target.value)
+                              }
+                            />
+                          </div>
+                          {eventPaymentType === "paid" ? (
+                            <div className="field">
+                              <label className="label" htmlFor="eventPrice">
+                                {withRequiredMark(eventPricingText.priceLabel)}
+                              </label>
+                              <input
+                                className="input"
+                                id="eventPrice"
+                                type="number"
+                                required
+                                min={0.01}
+                                step={0.01}
+                                inputMode="decimal"
+                                placeholder={eventPricingText.pricePlaceholder}
+                                value={eventPrice}
+                                onChange={(event) => setEventPrice(event.target.value)}
+                              />
+                            </div>
+                          ) : null}
+                          <div className="field">
                             <label className="label" htmlFor="eventCity">
-                              {strings.profileCityLabel}
+                              {withRequiredMark(strings.profileCityLabel)}
                             </label>
                             <input
                               className="input"
                               id="eventCity"
                               type="text"
+                              required
                               value={eventCity}
                               onChange={(event) =>
                                 setEventCity(event.target.value)
@@ -13083,12 +13464,13 @@ export default function App() {
                           {eventFormat === "offline" ? (
                             <div className="field">
                               <label className="label" htmlFor="eventAddress">
-                                {strings.eventAddressLabel}
+                                {withRequiredMark(strings.eventAddressLabel)}
                               </label>
                               <input
                                 className="input"
                                 id="eventAddress"
                                 type="text"
+                                required
                                 value={eventAddress}
                                 onChange={(event) =>
                                   setEventAddress(event.target.value)
@@ -13098,12 +13480,13 @@ export default function App() {
                           ) : null}
                           <div className="field">
                             <label className="label" htmlFor="eventCountry">
-                              {strings.profileCountryLabel}
+                              {withRequiredMark(strings.profileCountryLabel)}
                             </label>
                             <input
                               className="input"
                               id="eventCountry"
                               type="text"
+                              required
                               value={eventCountry}
                               onChange={(event) =>
                                 setEventCountry(event.target.value)
@@ -13112,11 +13495,12 @@ export default function App() {
                           </div>
                           <div className="field">
                             <label className="label" htmlFor="eventLanguage">
-                              {strings.searchLanguageLabel}
+                              {withRequiredMark(strings.searchLanguageLabel)}
                             </label>
                             <select
                               className="input"
                               id="eventLanguage"
+                              required
                               value={eventLanguage}
                               onChange={(event) =>
                                 setEventLanguage(
@@ -13140,11 +13524,12 @@ export default function App() {
                           </div>
                           <div className="field">
                             <label className="label" htmlFor="eventLevelFrom">
-                              {strings.eventLevelFromLabel}
+                              {withRequiredMark(strings.eventLevelFromLabel)}
                             </label>
                             <select
                               className="input"
                               id="eventLevelFrom"
+                              required
                               value={eventLevelFrom}
                               onChange={(event) =>
                                 handleEventLevelFromChange(
@@ -13164,11 +13549,12 @@ export default function App() {
                           </div>
                           <div className="field">
                             <label className="label" htmlFor="eventLevelTo">
-                              {strings.eventLevelToLabel}
+                              {withRequiredMark(strings.eventLevelToLabel)}
                             </label>
                             <select
                               className="input"
                               id="eventLevelTo"
+                              required
                               value={eventLevelTo}
                               onChange={(event) =>
                                 handleEventLevelToChange(
@@ -13189,12 +13575,13 @@ export default function App() {
                           {eventFormat === "online" ? (
                             <div className="field">
                               <label className="label" htmlFor="eventOnlineUrl">
-                                {strings.eventOnlineLabel}
+                                {withRequiredMark(strings.eventOnlineLabel)}
                               </label>
                               <input
                                 className="input"
                                 id="eventOnlineUrl"
                                 type="url"
+                                required
                                 value={eventOnlineUrl}
                                 onChange={(event) =>
                                   setEventOnlineUrl(event.target.value)
@@ -13257,6 +13644,17 @@ export default function App() {
                           event.duration_minutes,
                           strings.eventDurationUnit
                         );
+                        const paymentLabel = formatEventPricing(
+                          event,
+                          locale,
+                          eventPricingText
+                        );
+                        const participantsLabel =
+                          typeof event.max_participants === "number" &&
+                          Number.isFinite(event.max_participants) &&
+                          event.max_participants > 0
+                            ? `${eventPricingText.participantsLabel}: ${event.max_participants}`
+                            : "";
                         const timeLabel = formatEventTime(event.event_time);
                         const meta = [
                           event.event_date
@@ -13269,6 +13667,8 @@ export default function App() {
                             : event.language ?? "",
                           levelLabel,
                           durationLabel,
+                          paymentLabel,
+                          participantsLabel,
                           event.format === "online"
                             ? strings.eventFormatOnline
                             : event.format === "offline"
@@ -13496,6 +13896,20 @@ export default function App() {
                       ) : null}
                     </div>
                     <div className="eventDetailBody">
+                      {(() => {
+                        const eventPaymentLabel = formatEventPricing(
+                          eventDetails,
+                          locale,
+                          eventPricingText
+                        );
+                        const eventParticipantsLabel =
+                          typeof eventDetails.max_participants === "number" &&
+                          Number.isFinite(eventDetails.max_participants) &&
+                          eventDetails.max_participants > 0
+                            ? `${eventPricingText.participantsLabel}: ${eventDetails.max_participants}`
+                            : "";
+                        return (
+                          <>
                       <div className="eventDetailHeadline">
                         {eventDetails.title}
                       </div>
@@ -13521,6 +13935,8 @@ export default function App() {
                             : eventDetails.format === "offline"
                               ? strings.eventFormatOffline
                               : "",
+                          eventPaymentLabel,
+                          eventParticipantsLabel,
                         ]
                           .filter(Boolean)
                           .join(" • ")}
@@ -13574,6 +13990,36 @@ export default function App() {
                             </span>
                           </div>
                         ) : null}
+                        {eventDetails.is_paid ? (
+                          <div className="eventDetailInfoRow">
+                            <span className="eventDetailInfoLabel">
+                              {eventPricingText.priceLabel}
+                            </span>
+                            <span className="eventDetailInfoValue">
+                              {formatPriceEur(eventDetails.price_amount, locale) ||
+                                eventPricingText.paymentTypePaid}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="eventDetailInfoRow">
+                            <span className="eventDetailInfoLabel">
+                              {eventPricingText.paymentTypeLabel}
+                            </span>
+                            <span className="eventDetailInfoValue">
+                              {eventPricingText.paymentTypeFree}
+                            </span>
+                          </div>
+                        )}
+                        {eventDetails.max_participants ? (
+                          <div className="eventDetailInfoRow">
+                            <span className="eventDetailInfoLabel">
+                              {eventPricingText.participantsLabel}
+                            </span>
+                            <span className="eventDetailInfoValue">
+                              {eventDetails.max_participants}
+                            </span>
+                          </div>
+                        ) : null}
                         {eventOrganizer?.id ? (
                           <div className="eventDetailInfoRow">
                             <span className="eventDetailInfoLabel">
@@ -13610,6 +14056,9 @@ export default function App() {
                           </div>
                         ) : null}
                       </div>
+                          </>
+                        );
+                      })()}
                       <div className="eventDetailActions">
                         <button
                           className={`btn${
