@@ -5,6 +5,7 @@
   useRef,
   useState,
   type ChangeEvent,
+  type FormEvent,
   type KeyboardEvent,
   type PointerEvent,
 } from "react";
@@ -268,6 +269,14 @@ type EventRecord = {
   max_participants?: number | null;
   format: EventFormat | null;
   created_at: string;
+};
+
+type EventRsvpRecord = {
+  user_id: string;
+  status: "going" | "interested";
+  check_in_token?: string | null;
+  checked_in_at?: string | null;
+  checked_in_by?: string | null;
 };
 
 type OrganizerApplication = {
@@ -784,6 +793,29 @@ type EventPricingText = {
   participantsPlaceholder: string;
 };
 
+type EventCheckInText = {
+  myQrTitle: string;
+  myQrHint: string;
+  myQrCodeLabel: string;
+  qrCheckInTitle: string;
+  qrCheckInHint: string;
+  qrInputPlaceholder: string;
+  qrCheckInSubmit: string;
+  qrScanFromPhoto: string;
+  qrNotFound: string;
+  qrWrongEvent: string;
+  qrOnlyGoing: string;
+  qrCheckInMarked: string;
+  qrCheckInUnmarked: string;
+  qrCheckInAlready: string;
+  qrScannerUnsupported: string;
+  qrScannerNoCode: string;
+  qrCheckedInBadge: string;
+  qrNotCheckedInBadge: string;
+  qrMarkButton: string;
+  qrUnmarkButton: string;
+};
+
 function getEventPricingText(locale: Locale): EventPricingText {
   if (locale === "ru") {
     return {
@@ -819,6 +851,138 @@ function getEventPricingText(locale: Locale): EventPricingText {
     participantsLabel: "Participants limit",
     participantsPlaceholder: "For example 20",
   };
+}
+
+function getEventCheckInText(locale: Locale): EventCheckInText {
+  if (locale === "ru") {
+    return {
+      myQrTitle: "Мой QR для check-in",
+      myQrHint: "Покажите этот QR организатору на входе.",
+      myQrCodeLabel: "Код",
+      qrCheckInTitle: "QR check-in участников",
+      qrCheckInHint: "Сканируйте QR или вставьте код участника.",
+      qrInputPlaceholder: "Вставьте QR-код или токен",
+      qrCheckInSubmit: "Отметить",
+      qrScanFromPhoto: "Сканировать из фото",
+      qrNotFound: "QR-код не найден для этого события.",
+      qrWrongEvent: "Этот QR-код относится к другому событию.",
+      qrOnlyGoing: "Check-in доступен только для статуса «Идут».",
+      qrCheckInMarked: "Участник отмечен как пришедший.",
+      qrCheckInUnmarked: "Отметка посещения снята.",
+      qrCheckInAlready: "Участник уже отмечен.",
+      qrScannerUnsupported: "Сканер QR не поддерживается в этом браузере.",
+      qrScannerNoCode: "На изображении не найден QR-код.",
+      qrCheckedInBadge: "Пришел",
+      qrNotCheckedInBadge: "Не отмечен",
+      qrMarkButton: "Отметить",
+      qrUnmarkButton: "Снять",
+    };
+  }
+  if (locale === "uk") {
+    return {
+      myQrTitle: "Мій QR для check-in",
+      myQrHint: "Покажіть цей QR організатору на вході.",
+      myQrCodeLabel: "Код",
+      qrCheckInTitle: "QR check-in учасників",
+      qrCheckInHint: "Скануйте QR або вставте код учасника.",
+      qrInputPlaceholder: "Вставте QR-код або токен",
+      qrCheckInSubmit: "Відмітити",
+      qrScanFromPhoto: "Сканувати з фото",
+      qrNotFound: "QR-код не знайдено для цієї події.",
+      qrWrongEvent: "Цей QR-код належить іншій події.",
+      qrOnlyGoing: "Check-in доступний лише для статусу «Йдуть».",
+      qrCheckInMarked: "Учасника відмічено як присутнього.",
+      qrCheckInUnmarked: "Відмітку відвідування знято.",
+      qrCheckInAlready: "Учасника вже відмічено.",
+      qrScannerUnsupported: "Сканер QR не підтримується у цьому браузері.",
+      qrScannerNoCode: "На зображенні не знайдено QR-код.",
+      qrCheckedInBadge: "Прийшов",
+      qrNotCheckedInBadge: "Не відмічено",
+      qrMarkButton: "Відмітити",
+      qrUnmarkButton: "Зняти",
+    };
+  }
+  return {
+    myQrTitle: "My check-in QR",
+    myQrHint: "Show this QR to the organizer at the entrance.",
+    myQrCodeLabel: "Code",
+    qrCheckInTitle: "Participant QR check-in",
+    qrCheckInHint: "Scan a QR or paste the participant code.",
+    qrInputPlaceholder: "Paste QR payload or token",
+    qrCheckInSubmit: "Check in",
+    qrScanFromPhoto: "Scan from photo",
+    qrNotFound: "QR code not found for this event.",
+    qrWrongEvent: "This QR code belongs to another event.",
+    qrOnlyGoing: "Check-in is available only for users with Going status.",
+    qrCheckInMarked: "Participant checked in.",
+    qrCheckInUnmarked: "Check-in removed.",
+    qrCheckInAlready: "Participant is already checked in.",
+    qrScannerUnsupported: "QR scanner is not supported in this browser.",
+    qrScannerNoCode: "No QR code found in the image.",
+    qrCheckedInBadge: "Checked in",
+    qrNotCheckedInBadge: "Not checked in",
+    qrMarkButton: "Mark",
+    qrUnmarkButton: "Unmark",
+  };
+}
+
+function buildEventCheckInPayload(
+  eventId: string,
+  userId: string,
+  token: string
+): string {
+  return `vela-checkin:${eventId}:${userId}:${token}`;
+}
+
+function parseEventCheckInPayload(value: string): {
+  token: string;
+  eventId?: string;
+  userId?: string;
+} | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const marker = "vela-checkin:";
+  if (trimmed.startsWith(marker)) {
+    const parts = trimmed.split(":");
+    if (parts.length >= 4) {
+      const token = parts.slice(3).join(":").trim();
+      const eventId = parts[1]?.trim();
+      const userId = parts[2]?.trim();
+      if (!token) return null;
+      return {
+        token,
+        eventId: eventId || undefined,
+        userId: userId || undefined,
+      };
+    }
+  }
+  return { token: trimmed };
+}
+
+function generateCheckInToken(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().replace(/-/g, "");
+  }
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function getQrImageUrl(value: string): string {
+  const encoded = encodeURIComponent(value);
+  return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=8&data=${encoded}`;
+}
+
+function isMissingColumnError(error: unknown, columnName: string): boolean {
+  if (!error || typeof error !== "object") return false;
+  const message =
+    "message" in error && typeof error.message === "string"
+      ? error.message.toLowerCase()
+      : "";
+  const details =
+    "details" in error && typeof error.details === "string"
+      ? error.details.toLowerCase()
+      : "";
+  const haystack = `${message} ${details}`;
+  return haystack.includes("does not exist") && haystack.includes(columnName.toLowerCase());
 }
 
 function parsePositiveInteger(value: string): number | null {
@@ -7310,12 +7474,20 @@ export default function App() {
     "going" | "interested" | null
   >(null);
   const [eventRsvpLoading, setEventRsvpLoading] = useState(false);
-  const [eventRsvps, setEventRsvps] = useState<
-    { user_id: string; status: "going" | "interested" }[]
-  >([]);
+  const [eventRsvps, setEventRsvps] = useState<EventRsvpRecord[]>([]);
   const [eventRsvpProfiles, setEventRsvpProfiles] = useState<
     Record<string, SearchProfile>
   >({});
+  const [eventCheckInCode, setEventCheckInCode] = useState("");
+  const [eventCheckInLoading, setEventCheckInLoading] = useState(false);
+  const [eventCheckInStatus, setEventCheckInStatus] = useState<{
+    type: "idle" | "success" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [eventCheckInUpdating, setEventCheckInUpdating] = useState<
+    Record<string, boolean>
+  >({});
+  const [eventQrScanLoading, setEventQrScanLoading] = useState(false);
   const [eventEditingId, setEventEditingId] = useState<string | null>(null);
   const [eventExistingImageUrls, setEventExistingImageUrls] = useState<string[]>(
     []
@@ -7434,6 +7606,7 @@ export default function App() {
   }>({ type: "idle", message: "" });
   const strings = MESSAGES[locale] ?? MESSAGES[FALLBACK_LOCALE];
   const eventPricingText = getEventPricingText(locale);
+  const eventCheckInText = getEventCheckInText(locale);
   const changeLanguageButtonLabel =
     CHANGE_LANGUAGE_BUTTON_LABELS[locale] ?? CHANGE_LANGUAGE_BUTTON_LABELS.en;
   const languageLabels =
@@ -7481,8 +7654,11 @@ export default function App() {
   const eventDetailImageUrl =
     eventDetailImages[eventDetailSlideIndex] ?? null;
   const sortedEventRsvps = [...eventRsvps].sort((a, b) => {
-    if (a.status === b.status) return 0;
-    return a.status === "going" ? -1 : 1;
+    if (a.status !== b.status) return a.status === "going" ? -1 : 1;
+    const aChecked = Boolean(a.checked_in_at);
+    const bChecked = Boolean(b.checked_in_at);
+    if (aChecked !== bChecked) return aChecked ? -1 : 1;
+    return 0;
   });
   const eventGoingCount = eventRsvps.filter(
     (item) => item.status === "going"
@@ -7490,6 +7666,27 @@ export default function App() {
   const eventInterestedCount = eventRsvps.filter(
     (item) => item.status === "interested"
   ).length;
+  const eventCheckedInCount = eventRsvps.filter(
+    (item) => item.status === "going" && Boolean(item.checked_in_at)
+  ).length;
+  const currentEventRsvp =
+    sessionUser?.id ? eventRsvps.find((row) => row.user_id === sessionUser.id) : null;
+  const currentEventCheckInPayload =
+    eventDetails?.id && sessionUser?.id && currentEventRsvp?.check_in_token
+      ? buildEventCheckInPayload(
+          eventDetails.id,
+          sessionUser.id,
+          currentEventRsvp.check_in_token
+        )
+      : "";
+  const currentEventCheckInQrUrl = currentEventCheckInPayload
+    ? getQrImageUrl(currentEventCheckInPayload)
+    : "";
+  const canManageEventCheckIn = Boolean(
+    eventDetails?.id &&
+      sessionUser?.id &&
+      (profileIsAdmin || sessionUser.id === eventDetails.organizer_id)
+  );
   const normalizedFollowingSearch = followingSearch.trim().toLowerCase();
   const filteredFollowingOrganizers = normalizedFollowingSearch
     ? followingOrganizers.filter((profile) => {
@@ -8066,17 +8263,27 @@ export default function App() {
     if (!supabase) {
       return null;
     }
-    const { data: rsvpRows, error } = await supabase
+    const firstResult = await supabase
       .from("event_rsvps")
-      .select("user_id,status")
+      .select("user_id,status,check_in_token,checked_in_at,checked_in_by")
       .eq("event_id", eventId);
-    if (error) {
+    let rsvpRows: EventRsvpRecord[] | null = null;
+    let rsvpError: unknown = null;
+    if (firstResult.error && isMissingColumnError(firstResult.error, "check_in_token")) {
+      const fallbackResult = await supabase
+        .from("event_rsvps")
+        .select("user_id,status")
+        .eq("event_id", eventId);
+      rsvpRows = (fallbackResult.data ?? []) as EventRsvpRecord[];
+      rsvpError = fallbackResult.error;
+    } else {
+      rsvpRows = (firstResult.data ?? []) as EventRsvpRecord[];
+      rsvpError = firstResult.error;
+    }
+    if (rsvpError) {
       return null;
     }
-    const rsvps = (rsvpRows ?? []) as {
-      user_id: string;
-      status: "going" | "interested";
-    }[];
+    const rsvps = (rsvpRows ?? []) as EventRsvpRecord[];
     const ids = Array.from(
       new Set(rsvps.map((row) => row.user_id).filter(Boolean))
     ) as string[];
@@ -8432,6 +8639,9 @@ export default function App() {
       setEventRsvps([]);
       setEventRsvpProfiles({});
       setEventRsvpStatus(null);
+      setEventCheckInCode("");
+      setEventCheckInStatus({ type: "idle", message: "" });
+      setEventCheckInUpdating({});
       return;
     }
     const supabase = getSupabaseClient();
@@ -8564,6 +8774,41 @@ export default function App() {
       active = false;
     };
   }, [eventOrganizer?.id, fetchOrganizerFollowerCounts, route]);
+
+  useEffect(() => {
+    if (route !== "event" || !eventDetails?.id || !sessionUser?.id) return;
+    const ownRsvp = eventRsvps.find((row) => row.user_id === sessionUser.id);
+    if (!ownRsvp || ownRsvp.status !== "going" || ownRsvp.check_in_token) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase
+        .from("event_rsvps")
+        .update({ check_in_token: generateCheckInToken() })
+        .eq("event_id", eventDetails.id)
+        .eq("user_id", sessionUser.id)
+        .eq("status", "going")
+        .select("user_id,status,check_in_token,checked_in_at,checked_in_by")
+        .maybeSingle();
+      if (!active || error || !data) return;
+      setEventRsvps((prev) =>
+        prev.map((row) =>
+          row.user_id === sessionUser.id
+            ? {
+                ...row,
+                check_in_token: data.check_in_token ?? row.check_in_token ?? null,
+                checked_in_at: data.checked_in_at ?? row.checked_in_at ?? null,
+                checked_in_by: data.checked_in_by ?? row.checked_in_by ?? null,
+              }
+            : row
+        )
+      );
+    })();
+    return () => {
+      active = false;
+    };
+  }, [eventDetails?.id, eventRsvps, route, sessionUser?.id]);
 
   useEffect(() => {
     if (route !== "organizer") {
@@ -9711,9 +9956,28 @@ export default function App() {
         if (error) throw error;
         setEventRsvpStatus(null);
       } else {
-        const { error } = await supabase
+        const nextPayload: {
+          event_id: string;
+          user_id: string;
+          status: "going" | "interested";
+          check_in_token?: string;
+          checked_in_at?: null;
+          checked_in_by?: null;
+        } = {
+          event_id: eventDetails.id,
+          user_id: user.id,
+          status: nextStatus,
+        };
+        if (nextStatus === "going") {
+          nextPayload.check_in_token = generateCheckInToken();
+          nextPayload.checked_in_at = null;
+          nextPayload.checked_in_by = null;
+        }
+        let { error } = await supabase
           .from("event_rsvps")
-          .upsert(
+          .upsert(nextPayload, { onConflict: "event_id,user_id" });
+        if (error && isMissingColumnError(error, "check_in_token")) {
+          const fallback = await supabase.from("event_rsvps").upsert(
             {
               event_id: eventDetails.id,
               user_id: user.id,
@@ -9721,6 +9985,8 @@ export default function App() {
             },
             { onConflict: "event_id,user_id" }
           );
+          error = fallback.error;
+        }
         if (error) throw error;
         setEventRsvpStatus(nextStatus);
       }
@@ -9735,6 +10001,202 @@ export default function App() {
       }
     } finally {
       setEventRsvpLoading(false);
+    }
+  }
+
+  async function updateEventParticipantCheckIn(
+    userId: string,
+    shouldCheckIn: boolean
+  ) {
+    if (!eventDetails?.id || !canManageEventCheckIn || !sessionUser?.id) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setEventCheckInStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    setEventCheckInUpdating((prev) => ({ ...prev, [userId]: true }));
+    setEventCheckInStatus({ type: "idle", message: "" });
+    try {
+      const { data, error } = await supabase
+        .from("event_rsvps")
+        .update({
+          checked_in_at: shouldCheckIn ? new Date().toISOString() : null,
+          checked_in_by: shouldCheckIn ? sessionUser.id : null,
+        })
+        .eq("event_id", eventDetails.id)
+        .eq("user_id", userId)
+        .eq("status", "going")
+        .select("user_id,status,check_in_token,checked_in_at,checked_in_by")
+        .maybeSingle();
+      if (error && isMissingColumnError(error, "checked_in_at")) {
+        setEventCheckInStatus({
+          type: "error",
+          message:
+            "The check-in columns are missing in event_rsvps. Run supabase/event_rsvps_qr_checkin.sql first.",
+        });
+        return;
+      }
+      if (error) throw error;
+      if (!data) {
+        setEventCheckInStatus({
+          type: "error",
+          message: eventCheckInText.qrOnlyGoing,
+        });
+        return;
+      }
+      const updatedRsvp = data as EventRsvpRecord;
+      setEventRsvps((prev) =>
+        prev.map((row) =>
+          row.user_id === updatedRsvp.user_id
+            ? {
+                ...row,
+                checked_in_at: updatedRsvp.checked_in_at ?? null,
+                checked_in_by: updatedRsvp.checked_in_by ?? null,
+                check_in_token: updatedRsvp.check_in_token ?? row.check_in_token ?? null,
+              }
+            : row
+        )
+      );
+      setEventCheckInStatus({
+        type: "success",
+        message: shouldCheckIn
+          ? eventCheckInText.qrCheckInMarked
+          : eventCheckInText.qrCheckInUnmarked,
+      });
+    } catch (error) {
+      setEventCheckInStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    } finally {
+      setEventCheckInUpdating((prev) => ({ ...prev, [userId]: false }));
+    }
+  }
+
+  async function handleEventCheckInByCode(rawValue: string) {
+    if (eventCheckInLoading || !eventDetails?.id || !canManageEventCheckIn) return;
+    const parsed = parseEventCheckInPayload(rawValue);
+    if (!parsed?.token) {
+      setEventCheckInStatus({ type: "error", message: eventCheckInText.qrNotFound });
+      return;
+    }
+    if (parsed.eventId && parsed.eventId !== eventDetails.id) {
+      setEventCheckInStatus({ type: "error", message: eventCheckInText.qrWrongEvent });
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setEventCheckInStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    setEventCheckInLoading(true);
+    setEventCheckInStatus({ type: "idle", message: "" });
+    try {
+      let rsvpQuery = supabase
+        .from("event_rsvps")
+        .select("user_id,status,check_in_token,checked_in_at")
+        .eq("event_id", eventDetails.id)
+        .eq("check_in_token", parsed.token);
+      if (parsed.userId) {
+        rsvpQuery = rsvpQuery.eq("user_id", parsed.userId);
+      }
+      const { data: rsvpRow, error } = await rsvpQuery.maybeSingle();
+      if (error && isMissingColumnError(error, "check_in_token")) {
+        setEventCheckInStatus({
+          type: "error",
+          message:
+            "The check-in token column is missing in event_rsvps. Run supabase/event_rsvps_qr_checkin.sql first.",
+        });
+        return;
+      }
+      if (error) throw error;
+      if (!rsvpRow?.user_id) {
+        setEventCheckInStatus({ type: "error", message: eventCheckInText.qrNotFound });
+        return;
+      }
+      if (rsvpRow.status !== "going") {
+        setEventCheckInStatus({
+          type: "error",
+          message: eventCheckInText.qrOnlyGoing,
+        });
+        return;
+      }
+      if (rsvpRow.checked_in_at) {
+        setEventCheckInStatus({
+          type: "success",
+          message: eventCheckInText.qrCheckInAlready,
+        });
+        return;
+      }
+      await updateEventParticipantCheckIn(rsvpRow.user_id, true);
+      setEventCheckInCode("");
+    } catch (error) {
+      setEventCheckInStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    } finally {
+      setEventCheckInLoading(false);
+    }
+  }
+
+  async function handleEventCheckInSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await handleEventCheckInByCode(eventCheckInCode);
+  }
+
+  async function handleEventCheckInScanFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    event.currentTarget.value = "";
+    if (!file) return;
+    if (!canManageEventCheckIn) return;
+    const BarcodeDetectorCtor = (
+      window as Window & {
+        BarcodeDetector?: new (options?: {
+          formats?: string[];
+        }) => {
+          detect: (
+            source: ImageBitmapSource
+          ) => Promise<Array<{ rawValue?: string }>>;
+        };
+      }
+    ).BarcodeDetector;
+    if (!BarcodeDetectorCtor || typeof createImageBitmap === "undefined") {
+      setEventCheckInStatus({
+        type: "error",
+        message: eventCheckInText.qrScannerUnsupported,
+      });
+      return;
+    }
+    setEventQrScanLoading(true);
+    setEventCheckInStatus({ type: "idle", message: "" });
+    try {
+      const detector = new BarcodeDetectorCtor({ formats: ["qr_code"] });
+      const bitmap = await createImageBitmap(file);
+      const results = await detector.detect(bitmap);
+      const rawValue = results.find((item) => item.rawValue?.trim())?.rawValue ?? "";
+      if (!rawValue.trim()) {
+        setEventCheckInStatus({
+          type: "error",
+          message: eventCheckInText.qrScannerNoCode,
+        });
+        return;
+      }
+      setEventCheckInCode(rawValue);
+      await handleEventCheckInByCode(rawValue);
+    } catch (error) {
+      setEventCheckInStatus({
+        type: "error",
+        message: getSupabaseErrorMessage(error),
+      });
+    } finally {
+      setEventQrScanLoading(false);
     }
   }
 
@@ -14116,6 +14578,75 @@ export default function App() {
                           </button>
                         ) : null}
                       </div>
+                      {currentEventCheckInQrUrl && eventRsvpStatus === "going" ? (
+                        <div className="eventCheckInSelfCard">
+                          <div className="eventCheckInSelfTitle">
+                            {eventCheckInText.myQrTitle}
+                          </div>
+                          <div className="eventCheckInSelfHint">
+                            {eventCheckInText.myQrHint}
+                          </div>
+                          <img
+                            className="eventCheckInSelfQr"
+                            src={currentEventCheckInQrUrl}
+                            alt={eventCheckInText.myQrTitle}
+                          />
+                          <div className="eventCheckInSelfCode">
+                            <span>{eventCheckInText.myQrCodeLabel}:</span>
+                            <strong>{currentEventRsvp?.check_in_token}</strong>
+                          </div>
+                        </div>
+                      ) : null}
+                      {canManageEventCheckIn ? (
+                        <div className="eventCheckInManageCard">
+                          <div className="eventCheckInManageTitle">
+                            {eventCheckInText.qrCheckInTitle}
+                          </div>
+                          <div className="eventCheckInManageHint">
+                            {eventCheckInText.qrCheckInHint}
+                          </div>
+                          <form
+                            className="eventCheckInManageForm"
+                            onSubmit={handleEventCheckInSubmit}
+                          >
+                            <input
+                              className="input"
+                              value={eventCheckInCode}
+                              onChange={(event) =>
+                                setEventCheckInCode(event.target.value)
+                              }
+                              placeholder={eventCheckInText.qrInputPlaceholder}
+                            />
+                            <button
+                              className="btn"
+                              type="submit"
+                              disabled={eventCheckInLoading}
+                            >
+                              {eventCheckInText.qrCheckInSubmit}
+                            </button>
+                            <label className="eventCheckInScanLabel">
+                              {eventCheckInText.qrScanFromPhoto}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                onChange={handleEventCheckInScanFile}
+                                disabled={eventQrScanLoading || eventCheckInLoading}
+                              />
+                            </label>
+                          </form>
+                          {eventCheckInStatus.type === "error" ? (
+                            <div className="authStatus authStatus--error">
+                              {eventCheckInStatus.message}
+                            </div>
+                          ) : null}
+                          {eventCheckInStatus.type === "success" ? (
+                            <div className="authStatus authStatus--success">
+                              {eventCheckInStatus.message}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                       <div className="eventParticipants">
                         <div className="eventParticipantsHeader">
                           <div className="eventParticipantsTitle">
@@ -14128,6 +14659,9 @@ export default function App() {
                             <span className="eventParticipantsBadge">
                               {strings.eventInterestedLabel}: {eventInterestedCount}
                             </span>
+                            <span className="eventParticipantsBadge">
+                              {eventCheckInText.qrCheckedInBadge}: {eventCheckedInCount}
+                            </span>
                           </div>
                         </div>
                         {sortedEventRsvps.length ? (
@@ -14137,6 +14671,7 @@ export default function App() {
                               const name =
                                 profile?.full_name ??
                                 strings.profileHeaderNameFallback;
+                              const checkedIn = Boolean(rsvp.checked_in_at);
                               const statusLabel =
                                 rsvp.status === "going"
                                   ? strings.eventGoingLabel
@@ -14163,7 +14698,41 @@ export default function App() {
                                     <div className="eventParticipantStatus">
                                       {statusLabel}
                                     </div>
+                                    {rsvp.status === "going" ? (
+                                      <div
+                                        className={`eventParticipantCheckInBadge${
+                                          checkedIn
+                                            ? " eventParticipantCheckInBadge--ok"
+                                            : ""
+                                        }`}
+                                      >
+                                        {checkedIn
+                                          ? eventCheckInText.qrCheckedInBadge
+                                          : eventCheckInText.qrNotCheckedInBadge}
+                                      </div>
+                                    ) : null}
                                   </div>
+                                  {canManageEventCheckIn && rsvp.status === "going" ? (
+                                    <button
+                                      className={`eventParticipantCheckInButton${
+                                        checkedIn
+                                          ? " eventParticipantCheckInButton--checked"
+                                          : ""
+                                      }`}
+                                      type="button"
+                                      disabled={eventCheckInUpdating[rsvp.user_id] === true}
+                                      onClick={() =>
+                                        updateEventParticipantCheckIn(
+                                          rsvp.user_id,
+                                          !checkedIn
+                                        )
+                                      }
+                                    >
+                                      {checkedIn
+                                        ? eventCheckInText.qrUnmarkButton
+                                        : eventCheckInText.qrMarkButton}
+                                    </button>
+                                  ) : null}
                                 </div>
                               );
                             })}
