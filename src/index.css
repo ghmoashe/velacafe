@@ -933,6 +933,24 @@ button:focus-visible {
   place-items: center;
 }
 
+.eventImageEditOne {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  border: none;
+  border-radius: 999px;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(31, 27, 22, 0.75);
+  color: #fff;
+}
+
+.eventImageEditOne:hover {
+  background: rgba(31, 27, 22, 0.88);
+}
+
 .eventImageRemove {
   justify-self: flex-start;
   font-size: 12px;
@@ -2837,6 +2855,80 @@ button:focus-visible {
   justify-content: center;
   padding: 24px;
   z-index: 110;
+}
+
+.eventImageEditorOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(29, 21, 15, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 125;
+}
+
+.eventImageEditorModal {
+  width: min(520px, 100%);
+  background: #fffaf6;
+  border: 1px solid rgba(200, 170, 140, 0.35);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 24px 60px rgba(31, 23, 16, 0.25);
+  display: grid;
+  gap: 12px;
+}
+
+.eventImageEditorTitle {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.eventImageEditorHint {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.eventImageCropper {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.eventImageCropBox {
+  width: 220px;
+  height: 220px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: #fff;
+  overflow: hidden;
+  position: relative;
+  touch-action: none;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+}
+
+.eventImageCropBox:active {
+  cursor: grabbing;
+}
+
+.eventImageCropImage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  user-select: none;
+  pointer-events: none;
+}
+
+.eventImageCropSlider {
+  width: 220px;
+}
+
+.eventImageEditorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .organizerApplyModal {

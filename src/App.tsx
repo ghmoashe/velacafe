@@ -41,6 +41,8 @@ const EVENT_RECURRENCE_OPTIONS = [
 ] as const;
 const EVENT_RECURRENCE_DEFAULT_OCCURRENCES = 8;
 const EVENT_RECURRENCE_MAX_OCCURRENCES = 52;
+const EVENT_IMAGE_CROP_SIZE = 220;
+const EVENT_IMAGE_OUTPUT_SIZE = 1200;
 
 type LanguagePref = (typeof LANGUAGE_LIST)[number];
 type Locale = LanguagePref["locale"];
@@ -847,6 +849,14 @@ type EventScheduleText = {
   recurrenceCountError: string;
 };
 
+type EventImageEditorText = {
+  editButton: string;
+  cropTitle: string;
+  cropHint: string;
+  cropApply: string;
+  cropCancel: string;
+};
+
 function getEventPricingText(locale: Locale): EventPricingText {
   if (locale === "vi") {
     return {
@@ -1097,6 +1107,16 @@ function getEventScheduleText(locale: Locale): EventScheduleText {
     recurrenceCountLabel: "Events in series",
     recurrenceCountHint: "How many separate events should be created.",
     recurrenceCountError: `Enter a number from 1 to ${EVENT_RECURRENCE_MAX_OCCURRENCES}.`,
+  };
+}
+
+function getEventImageEditorText(_locale: Locale): EventImageEditorText {
+  return {
+    editButton: "Crop",
+    cropTitle: "Crop event image",
+    cropHint: "Move and zoom the image before saving.",
+    cropApply: "Apply",
+    cropCancel: "Cancel",
   };
 }
 
@@ -7993,6 +8013,17 @@ export default function App() {
   const [eventDescription, setEventDescription] = useState("");
   const [eventImageFiles, setEventImageFiles] = useState<File[]>([]);
   const [eventImagePreviews, setEventImagePreviews] = useState<string[]>([]);
+  const [eventCropOpen, setEventCropOpen] = useState(false);
+  const [eventCropSourceUrl, setEventCropSourceUrl] = useState<string | null>(null);
+  const [eventCropTargetIndex, setEventCropTargetIndex] = useState<number | null>(null);
+  const [eventCropImageSize, setEventCropImageSize] = useState<{
+    w: number;
+    h: number;
+  } | null>(null);
+  const [eventCropScale, setEventCropScale] = useState(1);
+  const [eventCropMinScale, setEventCropMinScale] = useState(1);
+  const [eventCropOffset, setEventCropOffset] = useState({ x: 0, y: 0 });
+  const [eventCropApplying, setEventCropApplying] = useState(false);
   const [eventCity, setEventCity] = useState("");
   const [eventCountry, setEventCountry] = useState("");
   const [eventAddress, setEventAddress] = useState("");
@@ -8084,8 +8115,16 @@ export default function App() {
   const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
   const postFileInputRef = useRef<HTMLInputElement | null>(null);
   const eventImageInputRef = useRef<HTMLInputElement | null>(null);
+  const eventCropImageRef = useRef<HTMLImageElement | null>(null);
   const cropImageRef = useRef<HTMLImageElement | null>(null);
   const cropDragRef = useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+  }>({ active: false, startX: 0, startY: 0, originX: 0, originY: 0 });
+  const eventCropDragRef = useRef<{
     active: boolean;
     startX: number;
     startY: number;
@@ -8105,6 +8144,7 @@ export default function App() {
   const eventPricingText = getEventPricingText(locale);
   const eventCheckInText = getEventCheckInText(locale);
   const eventScheduleText = getEventScheduleText(locale);
+  const eventImageEditorText = getEventImageEditorText(locale);
   const changeLanguageButtonLabel =
     CHANGE_LANGUAGE_BUTTON_LABELS[locale] ?? CHANGE_LANGUAGE_BUTTON_LABELS.en;
   const languageLabels =
@@ -8587,9 +8627,37 @@ export default function App() {
   }, [cropImageUrl]);
 
   useEffect(() => {
+    if (!eventCropSourceUrl) {
+      setEventCropImageSize(null);
+      eventCropImageRef.current = null;
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      setEventCropImageSize({ w: img.naturalWidth, h: img.naturalHeight });
+      const minScale = Math.max(
+        EVENT_IMAGE_CROP_SIZE / img.naturalWidth,
+        EVENT_IMAGE_CROP_SIZE / img.naturalHeight
+      );
+      setEventCropMinScale(minScale);
+      setEventCropScale(minScale);
+      setEventCropOffset({ x: 0, y: 0 });
+      eventCropImageRef.current = img;
+    };
+    img.src = eventCropSourceUrl;
+  }, [eventCropSourceUrl]);
+
+  useEffect(() => {
     if (!cropImageSize) return;
     setCropOffset((prev) => clampCropOffset(prev.x, prev.y, cropScale));
   }, [clampCropOffset, cropImageSize, cropScale]);
+
+  useEffect(() => {
+    if (!eventCropImageSize) return;
+    setEventCropOffset((prev) =>
+      clampEventImageCropOffset(prev.x, prev.y, eventCropScale)
+    );
+  }, [eventCropImageSize, eventCropScale]);
 
   useEffect(() => {
     if (!profilePhoto || !cropImageSize) return;
@@ -9615,6 +9683,9 @@ export default function App() {
   }
 
   function handleEventImageChange(event: ChangeEvent<HTMLInputElement>) {
+    if (eventCropOpen) {
+      closeEventImageEditor();
+    }
     const files = Array.from(event.target.files ?? []);
     const imageFiles = files
       .filter((file) => file.type.startsWith("image/"))
@@ -9631,6 +9702,9 @@ export default function App() {
   }
 
   function handleRemoveEventImageAt(index: number) {
+    if (eventCropOpen) {
+      closeEventImageEditor();
+    }
     const preview = eventImagePreviews[index];
     if (preview) {
       revokeEventImagePreviews([preview]);
@@ -9665,6 +9739,9 @@ export default function App() {
   }
 
   function handleRemoveEventImage() {
+    if (eventCropOpen) {
+      closeEventImageEditor();
+    }
     revokeEventImagePreviews(eventImagePreviews);
     setEventImageFiles([]);
     if (eventExistingImageUrls.length) {
@@ -9897,6 +9974,7 @@ export default function App() {
   }
 
   function resetEventForm() {
+    closeEventImageEditor();
     revokeEventImagePreviews(eventImagePreviews);
     setEventEditingId(null);
     setEventExistingImageUrls([]);
@@ -9976,6 +10054,7 @@ export default function App() {
   }
 
   function handleEditEvent(event: EventRecord) {
+    closeEventImageEditor();
     revokeEventImagePreviews(eventImagePreviews);
     const existingUrls = getEventImageUrls(event);
     setEventEditingId(event.id);
@@ -11594,6 +11673,181 @@ export default function App() {
     setCropOffset((prev) => clampCropOffset(prev.x, prev.y, nextScale));
   }
 
+  function clampEventImageCropOffset(
+    nextX: number,
+    nextY: number,
+    scale: number
+  ) {
+    if (!eventCropImageSize) {
+      return { x: 0, y: 0 };
+    }
+    const scaledWidth = eventCropImageSize.w * scale;
+    const scaledHeight = eventCropImageSize.h * scale;
+    const maxX = Math.max(0, (scaledWidth - EVENT_IMAGE_CROP_SIZE) / 2);
+    const maxY = Math.max(0, (scaledHeight - EVENT_IMAGE_CROP_SIZE) / 2);
+    return {
+      x: Math.min(maxX, Math.max(-maxX, nextX)),
+      y: Math.min(maxY, Math.max(-maxY, nextY)),
+    };
+  }
+
+  function handleStartEventImageCrop(index: number) {
+    if (eventImageFiles.length === 0) return;
+    if (index < 0 || index >= eventImageFiles.length) return;
+    const preview = eventImagePreviews[index] ?? null;
+    if (!preview) return;
+    setEventCropTargetIndex(index);
+    setEventCropSourceUrl(preview);
+    setEventCropOpen(true);
+    setEventCropApplying(false);
+  }
+
+  function closeEventImageEditor() {
+    eventCropDragRef.current.active = false;
+    setEventCropOpen(false);
+    setEventCropApplying(false);
+    setEventCropTargetIndex(null);
+    setEventCropSourceUrl(null);
+    setEventCropImageSize(null);
+    setEventCropMinScale(1);
+    setEventCropScale(1);
+    setEventCropOffset({ x: 0, y: 0 });
+    eventCropImageRef.current = null;
+  }
+
+  function handleEventImageCropPointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (!eventCropImageSize) return;
+    eventCropDragRef.current = {
+      active: true,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: eventCropOffset.x,
+      originY: eventCropOffset.y,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handleEventImageCropPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!eventCropDragRef.current.active) return;
+    const dx = event.clientX - eventCropDragRef.current.startX;
+    const dy = event.clientY - eventCropDragRef.current.startY;
+    const next = clampEventImageCropOffset(
+      eventCropDragRef.current.originX + dx,
+      eventCropDragRef.current.originY + dy,
+      eventCropScale
+    );
+    setEventCropOffset(next);
+  }
+
+  function handleEventImageCropPointerEnd(event: PointerEvent<HTMLDivElement>) {
+    if (!eventCropDragRef.current.active) return;
+    eventCropDragRef.current.active = false;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+
+  function handleEventImageCropScaleChange(event: ChangeEvent<HTMLInputElement>) {
+    const nextScale = Number(event.target.value);
+    setEventCropScale(nextScale);
+    setEventCropOffset((prev) =>
+      clampEventImageCropOffset(prev.x, prev.y, nextScale)
+    );
+  }
+
+  async function createCroppedEventImageBlob() {
+    if (!eventCropImageSize || !eventCropImageRef.current) {
+      return null;
+    }
+    const scale = eventCropScale;
+    const { w, h } = eventCropImageSize;
+    const scaledWidth = w * scale;
+    const scaledHeight = h * scale;
+    const centerX = EVENT_IMAGE_CROP_SIZE / 2 + eventCropOffset.x;
+    const centerY = EVENT_IMAGE_CROP_SIZE / 2 + eventCropOffset.y;
+    const x0 = centerX - scaledWidth / 2;
+    const y0 = centerY - scaledHeight / 2;
+    const sourceSize = EVENT_IMAGE_CROP_SIZE / scale;
+    let sx = (0 - x0) / scale;
+    let sy = (0 - y0) / scale;
+    sx = Math.max(0, Math.min(w - sourceSize, sx));
+    sy = Math.max(0, Math.min(h - sourceSize, sy));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = EVENT_IMAGE_OUTPUT_SIZE;
+    canvas.height = EVENT_IMAGE_OUTPUT_SIZE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.drawImage(
+      eventCropImageRef.current,
+      sx,
+      sy,
+      sourceSize,
+      sourceSize,
+      0,
+      0,
+      EVENT_IMAGE_OUTPUT_SIZE,
+      EVENT_IMAGE_OUTPUT_SIZE
+    );
+
+    return new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", 0.92);
+    });
+  }
+
+  async function handleApplyEventImageCrop() {
+    if (eventCropApplying) return;
+    if (eventCropTargetIndex === null) return;
+    if (eventCropTargetIndex < 0 || eventCropTargetIndex >= eventImageFiles.length) {
+      closeEventImageEditor();
+      return;
+    }
+
+    const sourceFile = eventImageFiles[eventCropTargetIndex];
+    if (!sourceFile) {
+      closeEventImageEditor();
+      return;
+    }
+
+    setEventCropApplying(true);
+    try {
+      const blob = await createCroppedEventImageBlob();
+      if (!blob) {
+        closeEventImageEditor();
+        return;
+      }
+
+      const baseName = sourceFile.name.replace(/\.[^.]+$/, "");
+      const croppedFile = new File(
+        [blob],
+        (baseName || "event-image") + "-cropped.jpg",
+        { type: "image/jpeg" }
+      );
+      const previewUrl = URL.createObjectURL(croppedFile);
+
+      setEventImageFiles((prev) => {
+        const next = [...prev];
+        if (eventCropTargetIndex !== null && eventCropTargetIndex < next.length) {
+          next[eventCropTargetIndex] = croppedFile;
+        }
+        return next;
+      });
+
+      setEventImagePreviews((prev) => {
+        const next = [...prev];
+        if (eventCropTargetIndex !== null && eventCropTargetIndex < next.length) {
+          const old = next[eventCropTargetIndex];
+          if (old?.startsWith("blob:")) {
+            URL.revokeObjectURL(old);
+          }
+          next[eventCropTargetIndex] = previewUrl;
+        }
+        return next;
+      });
+    } finally {
+      closeEventImageEditor();
+    }
+  }
+
   async function createCroppedAvatarBlob() {
     if (!profilePhoto || !cropImageSize || !cropImageRef.current) {
       return profilePhoto;
@@ -12038,13 +12292,23 @@ export default function App() {
                         src={preview}
                         alt={strings.eventImageLabel}
                       />
+                      {eventImageFiles.length > 0 ? (
+                        <button
+                          className="eventImageEditOne"
+                          type="button"
+                          onClick={() => handleStartEventImageCrop(index)}
+                          aria-label={eventImageEditorText.editButton}
+                        >
+                          {eventImageEditorText.editButton}
+                        </button>
+                      ) : null}
                       <button
                         className="eventImageRemoveOne"
                         type="button"
                         onClick={() => handleRemoveEventImageAt(index)}
                         aria-label={strings.eventImageRemove}
                       >
-                        Г—
+                        x
                       </button>
                     </div>
                   ))}
@@ -12699,6 +12963,88 @@ export default function App() {
                       onClick={handleAdminPinSubmit}
                     >
                       {strings.loginButton}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+            {eventCropOpen ? (
+              <div
+                className="eventImageEditorOverlay"
+                role="dialog"
+                aria-modal="true"
+                onClick={closeEventImageEditor}
+              >
+                <div
+                  className="eventImageEditorModal"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="eventImageEditorTitle">
+                    {eventImageEditorText.cropTitle}
+                  </div>
+                  <div className="eventImageEditorHint">
+                    {eventImageEditorText.cropHint}
+                  </div>
+                  <div className="eventImageCropper">
+                    <div
+                      className="eventImageCropBox"
+                      onPointerDown={handleEventImageCropPointerDown}
+                      onPointerMove={handleEventImageCropPointerMove}
+                      onPointerUp={handleEventImageCropPointerEnd}
+                      onPointerLeave={handleEventImageCropPointerEnd}
+                    >
+                      {eventCropSourceUrl ? (
+                        <img
+                          className="eventImageCropImage"
+                          src={eventCropSourceUrl}
+                          alt={eventImageEditorText.cropTitle}
+                          draggable={false}
+                          style={{
+                            width: eventCropImageSize
+                              ? eventCropImageSize.w + "px"
+                              : "auto",
+                            height: eventCropImageSize
+                              ? eventCropImageSize.h + "px"
+                              : "auto",
+                            transform:
+                              "translate(-50%, -50%) translate(" +
+                              eventCropOffset.x +
+                              "px, " +
+                              eventCropOffset.y +
+                              "px) scale(" +
+                              eventCropScale +
+                              ")",
+                          }}
+                        />
+                      ) : null}
+                    </div>
+                    <input
+                      className="eventImageCropSlider"
+                      type="range"
+                      min={eventCropMinScale}
+                      max={eventCropMinScale * 3}
+                      step={0.01}
+                      value={eventCropScale}
+                      onChange={handleEventImageCropScaleChange}
+                    />
+                  </div>
+                  <div className="eventImageEditorActions">
+                    <button
+                      className="btn btnGhost"
+                      type="button"
+                      onClick={closeEventImageEditor}
+                    >
+                      {eventImageEditorText.cropCancel}
+                    </button>
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={handleApplyEventImageCrop}
+                      disabled={eventCropApplying || !eventCropSourceUrl}
+                    >
+                      {eventCropApplying
+                        ? strings.loadingLabel
+                        : eventImageEditorText.cropApply}
                     </button>
                   </div>
                 </div>
@@ -14394,15 +14740,23 @@ export default function App() {
                                       src={preview}
                                       alt={strings.eventImageLabel}
                                     />
+                                    {eventImageFiles.length > 0 ? (
+                                      <button
+                                        className="eventImageEditOne"
+                                        type="button"
+                                        onClick={() => handleStartEventImageCrop(index)}
+                                        aria-label={eventImageEditorText.editButton}
+                                      >
+                                        {eventImageEditorText.editButton}
+                                      </button>
+                                    ) : null}
                                     <button
                                       className="eventImageRemoveOne"
                                       type="button"
-                                      onClick={() =>
-                                        handleRemoveEventImageAt(index)
-                                      }
+                                      onClick={() => handleRemoveEventImageAt(index)}
                                       aria-label={strings.eventImageRemove}
                                     >
-                                      Г—
+                                      x
                                     </button>
                                   </div>
                                 ))}
