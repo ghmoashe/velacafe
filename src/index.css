@@ -1095,6 +1095,7 @@ button:focus-visible {
 .eventDetailPage {
   display: grid;
   gap: 16px;
+  container-type: inline-size;
 }
 
 .eventDetailHeader {
@@ -1108,13 +1109,14 @@ button:focus-visible {
 
 .eventDetailCard {
   display: grid;
-  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   padding: 16px;
   border-radius: 18px;
   border: 1px solid rgba(223, 230, 242, 0.9);
   background: #fff;
   box-shadow: 0 8px 18px rgba(31, 27, 22, 0.08);
+  min-width: 0;
 }
 
 .eventDetailMedia {
@@ -1195,6 +1197,7 @@ button:focus-visible {
   display: grid;
   gap: 10px;
   min-width: 0;
+  container-type: inline-size;
 }
 
 .eventDetailHeadline {
@@ -1270,6 +1273,7 @@ button:focus-visible {
     rgba(255, 255, 255, 0.92),
     rgba(248, 242, 236, 0.78)
   );
+  min-width: 0;
 }
 
 .organizerPage {
@@ -1365,9 +1369,10 @@ button:focus-visible {
 
 .eventCheckInGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   align-items: start;
+  min-width: 0;
 }
 
 .eventCheckInSelfCard,
@@ -1450,10 +1455,11 @@ button:focus-visible {
 
 .eventCheckInManageForm {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    "input submit"
-    "scan scan";
+    "input"
+    "submit"
+    "scan";
   gap: 8px;
   align-items: stretch;
 }
@@ -1466,8 +1472,35 @@ button:focus-visible {
 .eventCheckInSubmit {
   grid-area: submit;
   min-height: 44px;
-  white-space: nowrap;
+  width: 100%;
+  white-space: normal;
   padding-inline: 16px;
+}
+
+@container (min-width: 820px) {
+  .eventDetailCard {
+    grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  }
+}
+
+@container (min-width: 460px) {
+  .eventCheckInManageForm {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "input submit"
+      "scan scan";
+  }
+
+  .eventCheckInSubmit {
+    width: auto;
+    white-space: nowrap;
+  }
+}
+
+@container (min-width: 560px) {
+  .eventCheckInGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .eventCheckInScanLabel {
