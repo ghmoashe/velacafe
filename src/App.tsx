@@ -8226,7 +8226,9 @@ export default function App() {
 
   useEffect(() => {
     if (typeof document !== "undefined") {
+      const localeStrings = MESSAGES[locale] ?? MESSAGES[FALLBACK_LOCALE];
       document.documentElement.lang = locale;
+      document.title = `VELA ${localeStrings.brandTag} — ${localeStrings.brandSub}`;
     }
     void setupKlaro(locale).then(() => {
       if (klaroAutoOpened.current) return;
