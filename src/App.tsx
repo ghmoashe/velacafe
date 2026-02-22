@@ -821,6 +821,18 @@ type EventCheckInText = {
 };
 
 function getEventPricingText(locale: Locale): EventPricingText {
+  if (locale === "vi") {
+    return {
+      paymentTypeLabel: "Hình thức tham gia",
+      paymentTypePlaceholder: "Hình thức tham gia",
+      paymentTypeFree: "Miễn phí",
+      paymentTypePaid: "Có phí",
+      priceLabel: "Giá (EUR)",
+      pricePlaceholder: "Ví dụ 10",
+      participantsLabel: "Số lượng người tham gia",
+      participantsPlaceholder: "Ví dụ 20",
+    };
+  }
   if (locale === "ru") {
     return {
       paymentTypeLabel: "Тип участия",
@@ -870,6 +882,30 @@ function getEventPricingText(locale: Locale): EventPricingText {
 }
 
 function getEventCheckInText(locale: Locale): EventCheckInText {
+  if (locale === "vi") {
+    return {
+      myQrTitle: "Mã QR check-in của tôi",
+      myQrHint: "Hiển thị mã QR này cho người tổ chức tại cổng vào.",
+      myQrCodeLabel: "Mã",
+      qrCheckInTitle: "Check-in người tham gia bằng QR",
+      qrCheckInHint: "Quét QR hoặc dán mã người tham gia.",
+      qrInputPlaceholder: "Dán nội dung QR hoặc mã token",
+      qrCheckInSubmit: "Check-in",
+      qrScanFromPhoto: "Quét từ ảnh",
+      qrNotFound: "Không tìm thấy mã QR cho sự kiện này.",
+      qrWrongEvent: "Mã QR này thuộc sự kiện khác.",
+      qrOnlyGoing: "Chỉ check-in cho người có trạng thái Sẽ tham gia.",
+      qrCheckInMarked: "Đã check-in người tham gia.",
+      qrCheckInUnmarked: "Đã hủy check-in.",
+      qrCheckInAlready: "Người tham gia đã được check-in.",
+      qrScannerUnsupported: "Trình duyệt này không hỗ trợ quét QR.",
+      qrScannerNoCode: "Không tìm thấy mã QR trong ảnh.",
+      qrCheckedInBadge: "Đã check-in",
+      qrNotCheckedInBadge: "Chưa check-in",
+      qrMarkButton: "Đánh dấu",
+      qrUnmarkButton: "Bỏ đánh dấu",
+    };
+  }
   if (locale === "ru") {
     return {
       myQrTitle: "Мой QR для check-in",
@@ -3640,6 +3676,29 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     logoutButton: "Đăng xuất",
     eventsTitle: "Sự kiện",
     eventsSubtitle: "Tạo và quản lý sự kiện của bạn.",
+    eventCreateTitle: "Sự kiện mới",
+    eventNameLabel: "Tiêu đề",
+    eventDescriptionLabel: "Mô tả",
+    eventFormatLabel: "Hình thức",
+    eventFormatOnline: "Trực tuyến",
+    eventFormatOffline: "Trực tiếp",
+    eventTimeLabel: "Thời gian",
+    eventDurationLabel: "Thời lượng",
+    eventDurationUnit: "phút",
+    eventLevelFromLabel: "Trình độ từ",
+    eventLevelToLabel: "Trình độ đến",
+    eventImageLabel: "Ảnh sự kiện",
+    eventImageHint: "Tùy chọn. PNG/JPG tối đa 5 MB.",
+    eventOnlineLabel: "Liên kết trực tuyến (Zoom/Meet)",
+    eventAddressLabel: "Địa chỉ",
+    eventJoin: "Tham gia",
+    eventInterested: "Quan tâm",
+    eventOrganizerLabel: "Người tổ chức",
+    eventDetailsTitle: "Sự kiện",
+    eventView: "Xem",
+    eventParticipantsTitle: "Người tham gia",
+    eventGoingLabel: "Sẽ tham gia",
+    eventInterestedLabel: "Quan tâm",
     profileTitle: "Hoàn thiện hồ sơ",
     profileSubtitle: "Giới thiệu ngắn về bạn.",
     userPageTitle: "Hồ sơ của tôi",
