@@ -15,6 +15,7 @@ import { getSupabaseClient } from "./supabaseClient";
 const LANGUAGE_LIST = [
   { label: "Deutsch", locale: "de", codes: ["DE"] },
   { label: "English", locale: "en", codes: ["GB"] },
+  { label: "Tiếng Việt", locale: "vi", codes: ["VN"] },
   { label: "Русский", locale: "ru", codes: ["RU"] },
   { label: "Українська", locale: "uk", codes: ["UA"] },
   { label: "فارسی", locale: "fa", codes: ["IR", "AF"], dir: "rtl" },
@@ -33,6 +34,7 @@ const EVENT_IMAGE_LIMIT = 3;
 
 type LanguagePref = (typeof LANGUAGE_LIST)[number];
 type Locale = LanguagePref["locale"];
+type CoreLocale = Exclude<Locale, "vi">;
 type LanguageLevel = (typeof LANGUAGE_LEVELS)[number] | "";
 type EventDuration = (typeof EVENT_DURATIONS)[number] | "";
 type EventPaymentType = "free" | "paid" | "";
@@ -547,7 +549,7 @@ function getFlagEmoji(code: string): string {
 
 function resolveLanguageListValue(
   value: string,
-  labels: Record<Locale, string>
+  labels: Partial<Record<Locale, string>>
 ): string {
   const tokens = value
     .split(",")
@@ -598,14 +600,16 @@ function isAllowedSocialUrl(value: string, domains: string[]): boolean {
 function resolveInterestLabel(value: string, locale: Locale): string {
   const preset = INTEREST_PRESETS.find((item) => item.key === value);
   if (!preset) return value;
-  return preset.labels[locale] ?? preset.labels.en;
+  const labels = preset.labels as Partial<Record<Locale, string>>;
+  return labels[locale] ?? preset.labels.en;
 }
 
 function matchInterestPreset(value: string, locale: Locale): string | null {
   const normalized = value.trim().toLowerCase();
   if (!normalized) return null;
   for (const preset of INTEREST_PRESETS) {
-    const localized = (preset.labels[locale] ?? preset.labels.en).toLowerCase();
+    const labels = preset.labels as Partial<Record<Locale, string>>;
+    const localized = (labels[locale] ?? preset.labels.en).toLowerCase();
     const english = preset.labels.en.toLowerCase();
     if (normalized === localized || normalized === english) {
       return preset.key;
@@ -1219,7 +1223,7 @@ const ROUTE_PATHS: Record<Route, string> = {
   terms: "/terms",
 };
 
-const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
+const MESSAGES_BASE: Record<CoreLocale, Record<MessageKey, string>> = {
   de: {
     brandTag: "Sprachcafé",
     brandSub: "Treffen. Lernen. Reden. Üben.",
@@ -1455,7 +1459,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Users",
     searchEmpty: "No results found.",
     eventsButton: "Events",
-    logoutButton: "خروج",
+    logoutButton: "Sign out",
     adminButton: "ادمین",
     adminTitle: "پنل ادمین",
     adminSubtitle: "کاربران، رویدادها و پست‌ها را مدیریت کنید.",
@@ -1841,7 +1845,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Користувачі",
     searchEmpty: "Нічого не знайдено.",
     eventsButton: "Події",
-    logoutButton: "خروج",
+    logoutButton: "Вийти",
     adminButton: "ادمین",
     adminTitle: "پنل ادمین",
     adminSubtitle: "کاربران، رویدادها و پست‌ها را مدیریت کنید.",
@@ -2227,7 +2231,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "المستخدمون",
     searchEmpty: "لا توجد نتائج.",
     eventsButton: "الفعاليات",
-    logoutButton: "Sign out",
+    logoutButton: "تسجيل الخروج",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -2420,7 +2424,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Përdorues",
     searchEmpty: "Nuk u gjetën rezultate.",
     eventsButton: "Evente",
-    logoutButton: "Sign out",
+    logoutButton: "Dilni",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -2613,7 +2617,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Kullanıcılar",
     searchEmpty: "Sonuç bulunamadı.",
     eventsButton: "Etkinlikler",
-    logoutButton: "Sign out",
+    logoutButton: "Çıkış yap",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -2806,7 +2810,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Utilisateurs",
     searchEmpty: "Aucun résultat.",
     eventsButton: "Événements",
-    logoutButton: "Sign out",
+    logoutButton: "Se déconnecter",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -2999,7 +3003,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Usuarios",
     searchEmpty: "No se encontraron resultados.",
     eventsButton: "Eventos",
-    logoutButton: "Sign out",
+    logoutButton: "Cerrar sesión",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -3192,7 +3196,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Utenti",
     searchEmpty: "Nessun risultato.",
     eventsButton: "Eventi",
-    logoutButton: "Sign out",
+    logoutButton: "Esci",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -3385,7 +3389,7 @@ const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
     searchSectionUsers: "Użytkownicy",
     searchEmpty: "Brak wyników.",
     eventsButton: "Wydarzenia",
-    logoutButton: "Sign out",
+    logoutButton: "Wyloguj się",
     adminButton: "Admin",
     adminTitle: "Admin panel",
     adminSubtitle: "Manage users, events, and posts.",
@@ -3595,6 +3599,7 @@ function resolveInitialLocale(): Locale {
 const CHANGE_LANGUAGE_BUTTON_LABELS: Record<Locale, string> = {
   de: "Sprache ändern",
   en: "Change language",
+  vi: "Đổi ngôn ngữ",
   ru: "Сменить язык",
   uk: "Змінити мову",
   fa: "تغییر زبان",
@@ -3607,10 +3612,51 @@ const CHANGE_LANGUAGE_BUTTON_LABELS: Record<Locale, string> = {
   pl: "Zmień język",
 };
 
-const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
+const MESSAGES: Record<Locale, Record<MessageKey, string>> = {
+  ...MESSAGES_BASE,
+  vi: {
+    ...MESSAGES_BASE.en,
+    brandTag: "Quán cà phê ngôn ngữ",
+    brandSub: "Gặp gỡ. Học. Nói. Luyện tập.",
+    loginButton: "Đăng nhập",
+    registerButton: "Tạo tài khoản",
+    gmailButton: "Tiếp tục với Gmail",
+    forgotPassword: "Quên mật khẩu?",
+    createAccount: "Tạo tài khoản mới",
+    backToLogin: "Quay lại đăng nhập",
+    backButton: "Quay lại",
+    guestButton: "Tiếp tục với tư cách khách",
+    loadingLabel: "Đang kiểm tra...",
+    languageSubtitle: "Chọn ngôn ngữ giao diện.",
+    searchButton: "Tìm kiếm",
+    searchTitle: "Tìm kiếm",
+    searchSubtitle: "Tìm sự kiện, người tổ chức và người dùng.",
+    searchApply: "Tìm",
+    searchClear: "Đặt lại",
+    searchSectionEvents: "Sự kiện",
+    searchSectionOrganizers: "Người tổ chức",
+    searchSectionUsers: "Người dùng",
+    eventsButton: "Sự kiện",
+    logoutButton: "Đăng xuất",
+    eventsTitle: "Sự kiện",
+    eventsSubtitle: "Tạo và quản lý sự kiện của bạn.",
+    profileTitle: "Hoàn thiện hồ sơ",
+    profileSubtitle: "Giới thiệu ngắn về bạn.",
+    userPageTitle: "Hồ sơ của tôi",
+    profileEditButton: "Chỉnh sửa hồ sơ",
+    userActionOrganizer: "Trở thành người tổ chức",
+    organizerApplyTitle: "Đơn đăng ký người tổ chức",
+    organizerApplySubmit: "Gửi đơn",
+    profileSave: "Lưu hồ sơ",
+    profileSuccess: "Đã lưu hồ sơ.",
+  },
+};
+
+const LANGUAGE_LABELS: Record<Locale, Partial<Record<Locale, string>>> = {
   de: {
     de: "Deutsch",
     en: "Englisch",
+    vi: "Vietnamesisch",
     ru: "Russisch",
     uk: "Ukrainisch",
     fa: "Persisch",
@@ -3625,6 +3671,7 @@ const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   en: {
     de: "German",
     en: "English",
+    vi: "Vietnamese",
     ru: "Russian",
     uk: "Ukrainian",
     fa: "Persian",
@@ -3639,6 +3686,7 @@ const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   ru: {
     de: "Немецкий",
     en: "Английский",
+    vi: "Вьетнамский",
     ru: "Русский",
     uk: "Украинский",
     fa: "Персидский",
@@ -3653,6 +3701,7 @@ const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   uk: {
     de: "Німецька",
     en: "Англійська",
+    vi: "В'єтнамська",
     ru: "Російська",
     uk: "Українська",
     fa: "Перська",
@@ -3667,6 +3716,7 @@ const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   fa: {
     de: "آلمانی",
     en: "انگلیسی",
+    vi: "ویتنامی",
     ru: "روسی",
     uk: "اوکراینی",
     fa: "فارسی",
@@ -3681,6 +3731,7 @@ const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   ar: {
     de: "الألمانية",
     en: "الإنجليزية",
+    vi: "الفيتنامية",
     ru: "الروسية",
     uk: "الأوكرانية",
     fa: "الفارسية",
@@ -3695,6 +3746,7 @@ const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   sq: {
     de: "Gjermanisht",
     en: "Anglisht",
+    vi: "Vietnamisht",
     ru: "Rusisht",
     uk: "Ukrainisht",
     fa: "Persisht",
@@ -3709,6 +3761,7 @@ const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   tr: {
     de: "Almanca",
     en: "İngilizce",
+    vi: "Vietnamca",
     ru: "Rusça",
     uk: "Ukraynaca",
     fa: "Farsça",
@@ -3723,6 +3776,7 @@ const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   fr: {
     de: "Allemand",
     en: "Anglais",
+    vi: "Vietnamien",
     ru: "Russe",
     uk: "Ukrainien",
     fa: "Persan",
@@ -3737,6 +3791,7 @@ const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   es: {
     de: "Alemán",
     en: "Inglés",
+    vi: "Vietnamita",
     ru: "Ruso",
     uk: "Ucraniano",
     fa: "Persa",
@@ -3751,6 +3806,7 @@ const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   it: {
     de: "Tedesco",
     en: "Inglese",
+    vi: "Vietnamita",
     ru: "Russo",
     uk: "Ucraino",
     fa: "Persiano",
@@ -3765,6 +3821,7 @@ const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
   pl: {
     de: "Niemiecki",
     en: "Angielski",
+    vi: "Wietnamski",
     ru: "Rosyjski",
     uk: "Ukraiński",
     fa: "Perski",
@@ -3775,6 +3832,21 @@ const LANGUAGE_LABELS: Record<Locale, Record<Locale, string>> = {
     es: "Hiszpański",
     it: "Włoski",
     pl: "Polski",
+  },
+  vi: {
+    de: "Tiếng Đức",
+    en: "Tiếng Anh",
+    vi: "Tiếng Việt",
+    ru: "Tiếng Nga",
+    uk: "Tiếng Ukraina",
+    fa: "Tiếng Ba Tư",
+    ar: "Tiếng Ả Rập",
+    sq: "Tiếng Albania",
+    tr: "Tiếng Thổ Nhĩ Kỳ",
+    fr: "Tiếng Pháp",
+    es: "Tiếng Tây Ban Nha",
+    it: "Tiếng Ý",
+    pl: "Tiếng Ba Lan",
   },
 };
 
@@ -3802,7 +3874,7 @@ type LegalContent = {
   sections: PrivacySection[];
 };
 
-const PRIVACY_CONTENT: Record<Locale, LegalContent> = {
+const PRIVACY_CONTENT_BASE: Record<CoreLocale, LegalContent> = {
   de: {
     title: "Datenschutzerklärung",
     sections: [
@@ -5557,7 +5629,15 @@ const PRIVACY_CONTENT: Record<Locale, LegalContent> = {
   },
 };
 
-const IMPRESSUM_CONTENT: Record<Locale, LegalContent> = {
+const PRIVACY_CONTENT: Record<Locale, LegalContent> = {
+  ...PRIVACY_CONTENT_BASE,
+  vi: {
+    ...PRIVACY_CONTENT_BASE.en,
+    title: "Chính sách quyền riêng tư",
+  },
+};
+
+const IMPRESSUM_CONTENT_BASE: Record<CoreLocale, LegalContent> = {
   de: {
     title: "Impressum",
     sections: [
@@ -6097,6 +6177,14 @@ const IMPRESSUM_CONTENT: Record<Locale, LegalContent> = {
         paragraphs: ["E-mail: info@vela.cafe"],
       },
     ],
+  },
+};
+
+const IMPRESSUM_CONTENT: Record<Locale, LegalContent> = {
+  ...IMPRESSUM_CONTENT_BASE,
+  vi: {
+    ...IMPRESSUM_CONTENT_BASE.en,
+    title: "Thông tin pháp lý",
   },
 };
 
@@ -7330,7 +7418,7 @@ const TERMS_SECTIONS_PL: PrivacySection[] = [
   },
 ];
 
-const TERMS_CONTENT: Record<Locale, LegalContent> = {
+const TERMS_CONTENT_BASE: Record<CoreLocale, LegalContent> = {
   de: {
     title: "Nutzungsbedingungen (Terms of Service)",
     sections: TERMS_SECTIONS_DE,
@@ -7346,6 +7434,14 @@ const TERMS_CONTENT: Record<Locale, LegalContent> = {
   es: { title: "Términos de uso", sections: TERMS_SECTIONS_ES },
   it: { title: "Termini di utilizzo", sections: TERMS_SECTIONS_IT },
   pl: { title: "Warunki korzystania", sections: TERMS_SECTIONS_PL },
+};
+
+const TERMS_CONTENT: Record<Locale, LegalContent> = {
+  ...TERMS_CONTENT_BASE,
+  vi: {
+    title: "Điều khoản sử dụng",
+    sections: TERMS_SECTIONS_EN,
+  },
 };
 
 function renderLegalContent(title: string, sections: PrivacySection[]) {
@@ -15753,8 +15849,9 @@ export default function App() {
                       </span>
                       <div className="tagGrid">
                         {INTEREST_PRESETS.map((preset) => {
-                          const label =
-                            preset.labels[locale] ?? preset.labels.en;
+                          const labels =
+                            preset.labels as Partial<Record<Locale, string>>;
+                          const label = labels[locale] ?? preset.labels.en;
                           const isActive = profileInterests.includes(preset.key);
                           return (
                             <button
