@@ -8227,8 +8227,19 @@ export default function App() {
   useEffect(() => {
     if (typeof document !== "undefined") {
       const localeStrings = MESSAGES[locale] ?? MESSAGES[FALLBACK_LOCALE];
+      const localizedTitle = `VELA ${localeStrings.brandTag} — ${localeStrings.brandSub}`;
+      const localizedDescription = `VELA ${localeStrings.brandTag}. ${localeStrings.brandSub}`;
       document.documentElement.lang = locale;
-      document.title = `VELA ${localeStrings.brandTag} — ${localeStrings.brandSub}`;
+      document.title = localizedTitle;
+      let descriptionMeta = document.querySelector(
+        'meta[name="description"]'
+      ) as HTMLMetaElement | null;
+      if (!descriptionMeta) {
+        descriptionMeta = document.createElement("meta");
+        descriptionMeta.setAttribute("name", "description");
+        document.head.appendChild(descriptionMeta);
+      }
+      descriptionMeta.setAttribute("content", localizedDescription);
     }
     void setupKlaro(locale).then(() => {
       if (klaroAutoOpened.current) return;
@@ -14825,124 +14836,135 @@ export default function App() {
                           </>
                         );
                       })()}
-                      <div className="eventDetailActions">
-                        <button
-                          className={`btn${
-                            eventRsvpStatus === "going" ? " btnActive" : ""
-                          }`}
-                          type="button"
-                          onClick={() => handleEventRsvp("going")}
-                          disabled={eventRsvpLoading}
-                        >
-                          {strings.eventJoin}
-                        </button>
-                        <button
-                          className={`btn${
-                            eventRsvpStatus === "interested" ? " btnActive" : ""
-                          }`}
-                          type="button"
-                          onClick={() => handleEventRsvp("interested")}
-                          disabled={eventRsvpLoading}
-                        >
-                          {strings.eventInterested}
-                        </button>
-                        {eventOrganizer?.id &&
-                        eventOrganizer.id !== sessionUser?.id ? (
+                      <div className="eventEngagementPanel">
+                        <div className="eventDetailActions">
                           <button
                             className={`btn${
-                              organizerFollowMap[eventOrganizer.id]
-                                ? " btnActive"
-                                : ""
+                              eventRsvpStatus === "going" ? " btnActive" : ""
                             }`}
                             type="button"
-                            onClick={() =>
-                              handleToggleOrganizerFollow(
-                                eventOrganizer.id,
-                                {
-                                  route: "event",
-                                  eventId: eventDetails?.id,
-                                }
-                              )
-                            }
-                            disabled={
-                              organizerFollowLoading[eventOrganizer.id] === true
-                            }
+                            onClick={() => handleEventRsvp("going")}
+                            disabled={eventRsvpLoading}
                           >
-                            {organizerFollowMap[eventOrganizer.id]
-                              ? strings.userActionUnfollow
-                              : strings.userActionFollow}
+                            {strings.eventJoin}
                           </button>
+                          <button
+                            className={`btn${
+                              eventRsvpStatus === "interested" ? " btnActive" : ""
+                            }`}
+                            type="button"
+                            onClick={() => handleEventRsvp("interested")}
+                            disabled={eventRsvpLoading}
+                          >
+                            {strings.eventInterested}
+                          </button>
+                          {eventOrganizer?.id &&
+                          eventOrganizer.id !== sessionUser?.id ? (
+                            <button
+                              className={`btn${
+                                organizerFollowMap[eventOrganizer.id]
+                                  ? " btnActive"
+                                  : ""
+                              }`}
+                              type="button"
+                              onClick={() =>
+                                handleToggleOrganizerFollow(
+                                  eventOrganizer.id,
+                                  {
+                                    route: "event",
+                                    eventId: eventDetails?.id,
+                                  }
+                                )
+                              }
+                              disabled={
+                                organizerFollowLoading[eventOrganizer.id] === true
+                              }
+                            >
+                              {organizerFollowMap[eventOrganizer.id]
+                                ? strings.userActionUnfollow
+                                : strings.userActionFollow}
+                            </button>
+                          ) : null}
+                        </div>
+                        {(currentEventCheckInQrUrl &&
+                          eventRsvpStatus === "going") ||
+                        canManageEventCheckIn ? (
+                          <div className="eventCheckInGrid">
+                            {currentEventCheckInQrUrl &&
+                            eventRsvpStatus === "going" ? (
+                              <div className="eventCheckInSelfCard">
+                                <div className="eventCheckInSelfTitle">
+                                  {eventCheckInText.myQrTitle}
+                                </div>
+                                <div className="eventCheckInSelfHint">
+                                  {eventCheckInText.myQrHint}
+                                </div>
+                                <img
+                                  className="eventCheckInSelfQr"
+                                  src={currentEventCheckInQrUrl}
+                                  alt={eventCheckInText.myQrTitle}
+                                />
+                                <div className="eventCheckInSelfCode">
+                                  <span>{eventCheckInText.myQrCodeLabel}:</span>
+                                  <strong>{currentEventRsvp?.check_in_token}</strong>
+                                </div>
+                              </div>
+                            ) : null}
+                            {canManageEventCheckIn ? (
+                              <div className="eventCheckInManageCard">
+                                <div className="eventCheckInManageTitle">
+                                  {eventCheckInText.qrCheckInTitle}
+                                </div>
+                                <div className="eventCheckInManageHint">
+                                  {eventCheckInText.qrCheckInHint}
+                                </div>
+                                <form
+                                  className="eventCheckInManageForm"
+                                  onSubmit={handleEventCheckInSubmit}
+                                >
+                                  <input
+                                    className="input eventCheckInInput"
+                                    value={eventCheckInCode}
+                                    onChange={(event) =>
+                                      setEventCheckInCode(event.target.value)
+                                    }
+                                    placeholder={eventCheckInText.qrInputPlaceholder}
+                                  />
+                                  <button
+                                    className="btn eventCheckInSubmit"
+                                    type="submit"
+                                    disabled={eventCheckInLoading}
+                                  >
+                                    {eventCheckInText.qrCheckInSubmit}
+                                  </button>
+                                  <label className="eventCheckInScanLabel">
+                                    {eventCheckInText.qrScanFromPhoto}
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      capture="environment"
+                                      onChange={handleEventCheckInScanFile}
+                                      disabled={
+                                        eventQrScanLoading || eventCheckInLoading
+                                      }
+                                    />
+                                  </label>
+                                </form>
+                                {eventCheckInStatus.type === "error" ? (
+                                  <div className="authStatus authStatus--error">
+                                    {eventCheckInStatus.message}
+                                  </div>
+                                ) : null}
+                                {eventCheckInStatus.type === "success" ? (
+                                  <div className="authStatus authStatus--success">
+                                    {eventCheckInStatus.message}
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
                         ) : null}
                       </div>
-                      {currentEventCheckInQrUrl && eventRsvpStatus === "going" ? (
-                        <div className="eventCheckInSelfCard">
-                          <div className="eventCheckInSelfTitle">
-                            {eventCheckInText.myQrTitle}
-                          </div>
-                          <div className="eventCheckInSelfHint">
-                            {eventCheckInText.myQrHint}
-                          </div>
-                          <img
-                            className="eventCheckInSelfQr"
-                            src={currentEventCheckInQrUrl}
-                            alt={eventCheckInText.myQrTitle}
-                          />
-                          <div className="eventCheckInSelfCode">
-                            <span>{eventCheckInText.myQrCodeLabel}:</span>
-                            <strong>{currentEventRsvp?.check_in_token}</strong>
-                          </div>
-                        </div>
-                      ) : null}
-                      {canManageEventCheckIn ? (
-                        <div className="eventCheckInManageCard">
-                          <div className="eventCheckInManageTitle">
-                            {eventCheckInText.qrCheckInTitle}
-                          </div>
-                          <div className="eventCheckInManageHint">
-                            {eventCheckInText.qrCheckInHint}
-                          </div>
-                          <form
-                            className="eventCheckInManageForm"
-                            onSubmit={handleEventCheckInSubmit}
-                          >
-                            <input
-                              className="input"
-                              value={eventCheckInCode}
-                              onChange={(event) =>
-                                setEventCheckInCode(event.target.value)
-                              }
-                              placeholder={eventCheckInText.qrInputPlaceholder}
-                            />
-                            <button
-                              className="btn"
-                              type="submit"
-                              disabled={eventCheckInLoading}
-                            >
-                              {eventCheckInText.qrCheckInSubmit}
-                            </button>
-                            <label className="eventCheckInScanLabel">
-                              {eventCheckInText.qrScanFromPhoto}
-                              <input
-                                type="file"
-                                accept="image/*"
-                                capture="environment"
-                                onChange={handleEventCheckInScanFile}
-                                disabled={eventQrScanLoading || eventCheckInLoading}
-                              />
-                            </label>
-                          </form>
-                          {eventCheckInStatus.type === "error" ? (
-                            <div className="authStatus authStatus--error">
-                              {eventCheckInStatus.message}
-                            </div>
-                          ) : null}
-                          {eventCheckInStatus.type === "success" ? (
-                            <div className="authStatus authStatus--success">
-                              {eventCheckInStatus.message}
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
                       <div className="eventParticipants">
                         <div className="eventParticipantsHeader">
                           <div className="eventParticipantsTitle">
