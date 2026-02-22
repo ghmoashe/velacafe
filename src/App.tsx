@@ -31,6 +31,16 @@ const LANGUAGE_LIST = [
 const LANGUAGE_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 const EVENT_DURATIONS = [60, 90, 120] as const;
 const EVENT_IMAGE_LIMIT = 3;
+const EVENT_DEFAULT_TIME = "19:00";
+const EVENT_RECURRENCE_OPTIONS = [
+  "none",
+  "daily",
+  "monday",
+  "wednesday",
+  "thursday",
+] as const;
+const EVENT_RECURRENCE_DEFAULT_OCCURRENCES = 8;
+const EVENT_RECURRENCE_MAX_OCCURRENCES = 52;
 
 type LanguagePref = (typeof LANGUAGE_LIST)[number];
 type Locale = LanguagePref["locale"];
@@ -38,6 +48,7 @@ type CoreLocale = Exclude<Locale, "vi">;
 type LanguageLevel = (typeof LANGUAGE_LEVELS)[number] | "";
 type EventDuration = (typeof EVENT_DURATIONS)[number] | "";
 type EventPaymentType = "free" | "paid" | "";
+type EventRecurrence = (typeof EVENT_RECURRENCE_OPTIONS)[number];
 
 const INTEREST_PRESETS = [
   {
@@ -265,6 +276,9 @@ type EventRecord = {
   language_level_max?: LanguageLevel | null;
   event_date: string | null;
   event_time?: string | null;
+  recurrence_group_id?: string | null;
+  recurrence_rule?: EventRecurrence | null;
+  recurrence_occurrence?: number | null;
   duration_minutes?: number | null;
   is_paid?: boolean | null;
   price_amount?: number | null;
@@ -820,6 +834,19 @@ type EventCheckInText = {
   qrUnmarkButton: string;
 };
 
+type EventScheduleText = {
+  recurrenceLabel: string;
+  recurrencePlaceholder: string;
+  recurrenceDaily: string;
+  recurrenceMonday: string;
+  recurrenceWednesday: string;
+  recurrenceThursday: string;
+  recurrenceHint: string;
+  recurrenceCountLabel: string;
+  recurrenceCountHint: string;
+  recurrenceCountError: string;
+};
+
 function getEventPricingText(locale: Locale): EventPricingText {
   if (locale === "vi") {
     return {
@@ -1000,6 +1027,190 @@ function getEventCheckInText(locale: Locale): EventCheckInText {
     qrMarkButton: "Mark",
     qrUnmarkButton: "Unmark",
   };
+}
+
+function getEventScheduleText(locale: Locale): EventScheduleText {
+  if (locale === "ru") {
+    return {
+      recurrenceLabel: "Повторение",
+      recurrencePlaceholder: "Без повторения",
+      recurrenceDaily: "Каждый день",
+      recurrenceMonday: "Каждый понедельник",
+      recurrenceWednesday: "Каждую среду",
+      recurrenceThursday: "Каждый четверг",
+      recurrenceHint: "Дата и время подставлены автоматически.",
+      recurrenceCountLabel: "Количество событий",
+      recurrenceCountHint: "Сколько отдельных событий создать в серии.",
+      recurrenceCountError: `Укажите число от 1 до ${EVENT_RECURRENCE_MAX_OCCURRENCES}.`,
+    };
+  }
+  if (locale === "uk") {
+    return {
+      recurrenceLabel: "Повторення",
+      recurrencePlaceholder: "Без повторення",
+      recurrenceDaily: "Щодня",
+      recurrenceMonday: "Щопонеділка",
+      recurrenceWednesday: "Щосереди",
+      recurrenceThursday: "Щочетверга",
+      recurrenceHint: "Дату й час підставлено автоматично.",
+      recurrenceCountLabel: "Кількість подій",
+      recurrenceCountHint: "Скільки окремих подій створити в серії.",
+      recurrenceCountError: `Вкажіть число від 1 до ${EVENT_RECURRENCE_MAX_OCCURRENCES}.`,
+    };
+  }
+  if (locale === "vi") {
+    return {
+      recurrenceLabel: "Lặp lại",
+      recurrencePlaceholder: "Không lặp lại",
+      recurrenceDaily: "Mỗi ngày",
+      recurrenceMonday: "Mỗi thứ Hai",
+      recurrenceWednesday: "Mỗi thứ Tư",
+      recurrenceThursday: "Mỗi thứ Năm",
+      recurrenceHint: "Ngày và giờ được điền tự động.",
+      recurrenceCountLabel: "Số sự kiện",
+      recurrenceCountHint: "Tạo bao nhiêu sự kiện riêng trong chuỗi này.",
+      recurrenceCountError: `Nhập số từ 1 đến ${EVENT_RECURRENCE_MAX_OCCURRENCES}.`,
+    };
+  }
+  if (locale === "fa") {
+    return {
+      recurrenceLabel: "تکرار",
+      recurrencePlaceholder: "بدون تکرار",
+      recurrenceDaily: "هر روز",
+      recurrenceMonday: "هر دوشنبه",
+      recurrenceWednesday: "هر چهارشنبه",
+      recurrenceThursday: "هر پنج‌شنبه",
+      recurrenceHint: "تاریخ و ساعت به‌صورت خودکار تنظیم شد.",
+      recurrenceCountLabel: "تعداد رویدادها",
+      recurrenceCountHint: "چند رویداد جداگانه در این سری ساخته شود.",
+      recurrenceCountError: `عدد بین 1 تا ${EVENT_RECURRENCE_MAX_OCCURRENCES} وارد کنید.`,
+    };
+  }
+  return {
+    recurrenceLabel: "Repeat",
+    recurrencePlaceholder: "No repeat",
+    recurrenceDaily: "Every day",
+    recurrenceMonday: "Every Monday",
+    recurrenceWednesday: "Every Wednesday",
+    recurrenceThursday: "Every Thursday",
+    recurrenceHint: "Date and time were filled automatically.",
+    recurrenceCountLabel: "Events in series",
+    recurrenceCountHint: "How many separate events should be created.",
+    recurrenceCountError: `Enter a number from 1 to ${EVENT_RECURRENCE_MAX_OCCURRENCES}.`,
+  };
+}
+
+function formatDateInputValue(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getNextDateForWeekday(weekday: number, from = new Date()): string {
+  const target = new Date(from);
+  target.setHours(0, 0, 0, 0);
+  const offset = (weekday - target.getDay() + 7) % 7;
+  target.setDate(target.getDate() + offset);
+  return formatDateInputValue(target);
+}
+
+function getDateForRecurrence(
+  recurrence: EventRecurrence,
+  from = new Date()
+): string {
+  switch (recurrence) {
+    case "daily":
+      return formatDateInputValue(from);
+    case "monday":
+      return getNextDateForWeekday(1, from);
+    case "wednesday":
+      return getNextDateForWeekday(3, from);
+    case "thursday":
+      return getNextDateForWeekday(4, from);
+    default:
+      return "";
+  }
+}
+
+function parseDateInputValue(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [yearPart, monthPart, dayPart] = value.split("-");
+  const year = Number(yearPart);
+  const month = Number(monthPart);
+  const day = Number(dayPart);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return null;
+  }
+  const candidate = new Date(year, month - 1, day);
+  candidate.setHours(0, 0, 0, 0);
+  if (
+    candidate.getFullYear() !== year ||
+    candidate.getMonth() !== month - 1 ||
+    candidate.getDate() !== day
+  ) {
+    return null;
+  }
+  return candidate;
+}
+
+function getWeeklyRecurrenceWeekday(recurrence: EventRecurrence): number | null {
+  switch (recurrence) {
+    case "monday":
+      return 1;
+    case "wednesday":
+      return 3;
+    case "thursday":
+      return 4;
+    default:
+      return null;
+  }
+}
+
+function buildRecurringEventDates(
+  startDate: string,
+  recurrence: EventRecurrence,
+  occurrences: number
+): string[] {
+  const safeOccurrences = Number.isInteger(occurrences)
+    ? Math.max(1, occurrences)
+    : 1;
+  const parsedStartDate = parseDateInputValue(startDate);
+  if (!parsedStartDate) return [];
+
+  if (recurrence === "none") {
+    return [formatDateInputValue(parsedStartDate)];
+  }
+
+  if (recurrence === "daily") {
+    return Array.from({ length: safeOccurrences }, (_, index) => {
+      const next = new Date(parsedStartDate);
+      next.setDate(next.getDate() + index);
+      return formatDateInputValue(next);
+    });
+  }
+
+  const weekday = getWeeklyRecurrenceWeekday(recurrence);
+  if (weekday === null) {
+    return [formatDateInputValue(parsedStartDate)];
+  }
+
+  const firstDateValue = getNextDateForWeekday(weekday, parsedStartDate);
+  const firstDate = parseDateInputValue(firstDateValue);
+  if (!firstDate) return [];
+
+  return Array.from({ length: safeOccurrences }, (_, index) => {
+    const next = new Date(firstDate);
+    next.setDate(next.getDate() + index * 7);
+    return formatDateInputValue(next);
+  });
+}
+
+function generateRecurrenceGroupId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}`;
 }
 
 function buildEventCheckInPayload(
@@ -3593,7 +3804,7 @@ const POSTS_TABLE = "posts";
 const ORGANIZER_APPLICATIONS_TABLE = "organizer_applications";
 const POST_MEDIA_FOLDER = "posts";
 const EVENT_SELECT_FIELDS =
-  "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,duration_minutes,is_paid,price_amount,max_participants,format,created_at";
+  "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,recurrence_group_id,recurrence_rule,recurrence_occurrence,duration_minutes,is_paid,price_amount,max_participants,format,created_at";
 const LEARN_PRACTICE_EXCLUDED = new Set<Locale>([
   "ru",
   "uk",
@@ -7791,6 +8002,10 @@ export default function App() {
   const [eventLevelTo, setEventLevelTo] = useState<LanguageLevel>("");
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
+  const [eventRecurrence, setEventRecurrence] = useState<EventRecurrence>("none");
+  const [eventRecurrenceCount, setEventRecurrenceCount] = useState(
+    String(EVENT_RECURRENCE_DEFAULT_OCCURRENCES)
+  );
   const [eventDuration, setEventDuration] = useState<EventDuration>("");
   const [eventPaymentType, setEventPaymentType] = useState<EventPaymentType>("");
   const [eventPrice, setEventPrice] = useState("");
@@ -7889,6 +8104,7 @@ export default function App() {
   const strings = MESSAGES[locale] ?? MESSAGES[FALLBACK_LOCALE];
   const eventPricingText = getEventPricingText(locale);
   const eventCheckInText = getEventCheckInText(locale);
+  const eventScheduleText = getEventScheduleText(locale);
   const changeLanguageButtonLabel =
     CHANGE_LANGUAGE_BUTTON_LABELS[locale] ?? CHANGE_LANGUAGE_BUTTON_LABELS.en;
   const languageLabels =
@@ -9703,6 +9919,8 @@ export default function App() {
     setEventLevelTo("");
     setEventDate("");
     setEventTime("");
+    setEventRecurrence("none");
+    setEventRecurrenceCount(String(EVENT_RECURRENCE_DEFAULT_OCCURRENCES));
     setEventDuration("");
     setEventPaymentType("");
     setEventPrice("");
@@ -9742,6 +9960,21 @@ export default function App() {
     }
   }
 
+  function handleEventRecurrenceChange(value: EventRecurrence) {
+    setEventRecurrence(value);
+    if (value === "none") return;
+    if (!eventRecurrenceCount) {
+      setEventRecurrenceCount(String(EVENT_RECURRENCE_DEFAULT_OCCURRENCES));
+    }
+    const nextDate = getDateForRecurrence(value);
+    if (nextDate) {
+      setEventDate(nextDate);
+    }
+    if (!eventTime) {
+      setEventTime(EVENT_DEFAULT_TIME);
+    }
+  }
+
   function handleEditEvent(event: EventRecord) {
     revokeEventImagePreviews(eventImagePreviews);
     const existingUrls = getEventImageUrls(event);
@@ -9768,6 +10001,8 @@ export default function App() {
     setEventLevelTo(normalizedRange.to);
     setEventDate(event.event_date ?? "");
     setEventTime(event.event_time ?? "");
+    setEventRecurrence("none");
+    setEventRecurrenceCount(String(EVENT_RECURRENCE_DEFAULT_OCCURRENCES));
     const durationValue =
       event.duration_minutes &&
       EVENT_DURATIONS.includes(event.duration_minutes as typeof EVENT_DURATIONS[number])
@@ -10014,11 +10249,44 @@ export default function App() {
       });
       return;
     }
+    const isEditing = Boolean(eventEditingId);
+    const shouldCreateRecurringSeries = !isEditing && eventRecurrence !== "none";
+
+    const effectiveDate =
+      eventDate ||
+      (eventRecurrence !== "none" ? getDateForRecurrence(eventRecurrence) : "");
+    const effectiveTime =
+      eventTime || (eventRecurrence !== "none" ? EVENT_DEFAULT_TIME : "");
+    if (eventRecurrence !== "none") {
+      if (!eventDate && effectiveDate) {
+        setEventDate(effectiveDate);
+      }
+      if (!eventTime && effectiveTime) {
+        setEventTime(effectiveTime);
+      }
+    }
+
+    let recurrenceOccurrences = 1;
+    if (shouldCreateRecurringSeries) {
+      const parsedOccurrences = parsePositiveInteger(eventRecurrenceCount);
+      if (
+        !parsedOccurrences ||
+        parsedOccurrences > EVENT_RECURRENCE_MAX_OCCURRENCES
+      ) {
+        setEventStatus({
+          type: "error",
+          message: eventScheduleText.recurrenceCountError,
+        });
+        return;
+      }
+      recurrenceOccurrences = parsedOccurrences;
+    }
+
     if (
       !eventTitle.trim() ||
       !eventDescription.trim() ||
-      !eventDate ||
-      !eventTime ||
+      !effectiveDate ||
+      !effectiveTime ||
       !eventDuration ||
       !eventPaymentType ||
       !eventFormat ||
@@ -10073,7 +10341,6 @@ export default function App() {
       const adminOrganizerId = isAdminContext
         ? adminEventOrganizerId.trim()
         : "";
-      const isEditing = Boolean(eventEditingId);
       const existingImageUrls = eventExistingImageUrls;
       let nextImageUrls = existingImageUrls;
       if (eventImageFiles.length > 0) {
@@ -10141,8 +10408,8 @@ export default function App() {
         language_level: levelRangeValue || null,
         language_level_min: normalizedLevels.from || null,
         language_level_max: normalizedLevels.to || null,
-        event_date: eventDate || null,
-        event_time: eventTime || null,
+        event_date: effectiveDate || null,
+        event_time: effectiveTime || null,
         duration_minutes: eventDuration || null,
         is_paid: eventPaymentType === "paid",
         price_amount: eventPaymentType === "paid" ? priceAmount : null,
@@ -10153,7 +10420,7 @@ export default function App() {
         isAdminContext && adminOrganizerId
           ? { ...basePayload, organizer_id: adminOrganizerId }
           : basePayload;
-      let savedEvent: EventRecord | null = null;
+
       if (isEditing && eventEditingId) {
         const { data: updated, error } = await supabase
           .from("events")
@@ -10162,29 +10429,58 @@ export default function App() {
           .select(EVENT_SELECT_FIELDS)
           .single();
         if (error) throw error;
-        savedEvent = updated as EventRecord;
+        const savedEvent = updated as EventRecord;
         if (savedEvent) {
           setEventsList((prev) =>
-            prev.map((item) => (item.id === savedEvent?.id ? savedEvent : item))
+            prev.map((item) => (item.id === savedEvent.id ? savedEvent : item))
           );
         }
       } else {
-        const payload = {
+        const recurrenceDates = shouldCreateRecurringSeries
+          ? buildRecurringEventDates(
+              effectiveDate,
+              eventRecurrence,
+              recurrenceOccurrences
+            )
+          : [effectiveDate];
+        if (!recurrenceDates.length) {
+          setEventStatus({ type: "error", message: strings.errorRequired });
+          return;
+        }
+
+        const recurrenceGroupId = shouldCreateRecurringSeries
+          ? generateRecurrenceGroupId()
+          : null;
+        const targetOrganizerId = adminOrganizerId || user.id;
+        const createdAt = new Date().toISOString();
+
+        const payloads = recurrenceDates.map((dateValue, index) => ({
           ...updatePayload,
-          organizer_id: adminOrganizerId || user.id,
-          created_at: new Date().toISOString(),
-        };
-        const { data: inserted, error } = await supabase
+          organizer_id: targetOrganizerId,
+          created_at: createdAt,
+          event_date: dateValue,
+          recurrence_group_id: recurrenceGroupId,
+          recurrence_rule: shouldCreateRecurringSeries ? eventRecurrence : null,
+          recurrence_occurrence: shouldCreateRecurringSeries ? index + 1 : null,
+        }));
+
+        const { data: insertedRows, error } = await supabase
           .from("events")
-          .insert(payload)
-          .select(EVENT_SELECT_FIELDS)
-          .single();
+          .insert(payloads)
+          .select(EVENT_SELECT_FIELDS);
         if (error) throw error;
-        savedEvent = inserted as EventRecord;
-        if (savedEvent) {
-          setEventsList((prev) => [savedEvent as EventRecord, ...prev]);
+
+        const savedEvents = (insertedRows ?? []) as EventRecord[];
+        if (savedEvents.length) {
+          const sortedSavedEvents = [...savedEvents].sort((a, b) => {
+            const dateA = a.event_date ?? "";
+            const dateB = b.event_date ?? "";
+            return dateB.localeCompare(dateA);
+          });
+          setEventsList((prev) => [...sortedSavedEvents, ...prev]);
         }
       }
+
       const urlsToDelete = new Set(eventRemovedImageUrls);
       if (eventRemoveImage || eventImageFiles.length > 0) {
         existingImageUrls.forEach((url) => urlsToDelete.add(url));
@@ -11764,6 +12060,52 @@ export default function App() {
             ) : null}
           </div>
           <div className="eventsGrid">
+            <div className="field">
+              <label className="label" htmlFor="eventRecurrence">
+                {eventScheduleText.recurrenceLabel}
+              </label>
+              <select
+                className="input"
+                id="eventRecurrence"
+                value={eventRecurrence}
+                onChange={(event) =>
+                  handleEventRecurrenceChange(
+                    event.target.value as EventRecurrence
+                  )
+                }
+              >
+                <option value="none">{eventScheduleText.recurrencePlaceholder}</option>
+                <option value="daily">{eventScheduleText.recurrenceDaily}</option>
+                <option value="monday">{eventScheduleText.recurrenceMonday}</option>
+                <option value="wednesday">{eventScheduleText.recurrenceWednesday}</option>
+                <option value="thursday">{eventScheduleText.recurrenceThursday}</option>
+              </select>
+              {eventRecurrence !== "none" ? (
+                <span className="fieldHint">{eventScheduleText.recurrenceHint}</span>
+              ) : null}
+            </div>
+            {!eventEditingId && eventRecurrence !== "none" ? (
+              <div className="field">
+                <label className="label" htmlFor="eventRecurrenceCount">
+                  {withRequiredMark(eventScheduleText.recurrenceCountLabel)}
+                </label>
+                <input
+                  className="input"
+                  id="eventRecurrenceCount"
+                  type="number"
+                  required
+                  min={1}
+                  max={EVENT_RECURRENCE_MAX_OCCURRENCES}
+                  step={1}
+                  inputMode="numeric"
+                  value={eventRecurrenceCount}
+                  onChange={(event) =>
+                    setEventRecurrenceCount(event.target.value)
+                  }
+                />
+                <span className="fieldHint">{eventScheduleText.recurrenceCountHint}</span>
+              </div>
+            ) : null}
             <div className="field">
               <label className="label" htmlFor="eventDate">
                 {withRequiredMark(strings.searchDateLabel)}
@@ -14076,6 +14418,52 @@ export default function App() {
                           ) : null}
                         </div>
                         <div className="eventsGrid">
+                          <div className="field">
+                            <label className="label" htmlFor="eventRecurrence">
+                              {eventScheduleText.recurrenceLabel}
+                            </label>
+                            <select
+                              className="input"
+                              id="eventRecurrence"
+                              value={eventRecurrence}
+                              onChange={(event) =>
+                                handleEventRecurrenceChange(
+                                  event.target.value as EventRecurrence
+                                )
+                              }
+                            >
+                              <option value="none">{eventScheduleText.recurrencePlaceholder}</option>
+                              <option value="daily">{eventScheduleText.recurrenceDaily}</option>
+                              <option value="monday">{eventScheduleText.recurrenceMonday}</option>
+                              <option value="wednesday">{eventScheduleText.recurrenceWednesday}</option>
+                              <option value="thursday">{eventScheduleText.recurrenceThursday}</option>
+                            </select>
+                            {eventRecurrence !== "none" ? (
+                              <span className="fieldHint">{eventScheduleText.recurrenceHint}</span>
+                            ) : null}
+                          </div>
+                          {!eventEditingId && eventRecurrence !== "none" ? (
+                            <div className="field">
+                              <label className="label" htmlFor="eventRecurrenceCount">
+                                {withRequiredMark(eventScheduleText.recurrenceCountLabel)}
+                              </label>
+                              <input
+                                className="input"
+                                id="eventRecurrenceCount"
+                                type="number"
+                                required
+                                min={1}
+                                max={EVENT_RECURRENCE_MAX_OCCURRENCES}
+                                step={1}
+                                inputMode="numeric"
+                                value={eventRecurrenceCount}
+                                onChange={(event) =>
+                                  setEventRecurrenceCount(event.target.value)
+                                }
+                              />
+                              <span className="fieldHint">{eventScheduleText.recurrenceCountHint}</span>
+                            </div>
+                          ) : null}
                           <div className="field">
                             <label className="label" htmlFor="eventDate">
                               {withRequiredMark(strings.searchDateLabel)}
