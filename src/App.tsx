@@ -5206,7 +5206,7 @@ export default function App() {
             type: "loading",
             message: "Uploading video to Mux...",
           });
-            const directUpload = await createMuxDirectUpload(supabase, {
+            const directUpload = await createMuxDirectUpload({
               origin:
                 typeof window !== "undefined" ? window.location.origin : "http://localhost",
               filename: postFile.name,
@@ -5215,7 +5215,7 @@ export default function App() {
             }, accessToken);
             muxUploadId = directUpload.uploadId;
             await uploadFileToMux(directUpload.uploadUrl, postFile);
-            const muxStatus = await waitForMuxPlayback(supabase, directUpload.uploadId, {
+            const muxStatus = await waitForMuxPlayback(directUpload.uploadId, {
               accessToken,
               onProgress: (status) => {
                 const assetStatus = status.assetStatus ?? status.uploadStatus ?? "processing";
@@ -5330,7 +5330,7 @@ export default function App() {
         }
       }
         if (post.mux_asset_id) {
-          await deleteMuxAsset(supabase, post.mux_asset_id, accessToken);
+          await deleteMuxAsset(post.mux_asset_id, accessToken);
         }
       const { error } = await supabase
         .from(POSTS_TABLE)
@@ -5424,7 +5424,7 @@ export default function App() {
         }
         }
         if (post.mux_asset_id) {
-          await deleteMuxAsset(supabase, post.mux_asset_id, accessToken);
+          await deleteMuxAsset(post.mux_asset_id, accessToken);
         }
       const { error } = await supabase
         .from(POSTS_TABLE)

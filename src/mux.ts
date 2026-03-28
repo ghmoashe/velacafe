@@ -1,8 +1,9 @@
 import { createElement, useEffect } from "react";
 import type { CSSProperties } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 const MUX_FUNCTION_NAME = import.meta.env.VITE_MUX_FUNCTION_NAME ?? "mux-video";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
 const MUX_PLAYBACK_BASE_URL =
   import.meta.env.VITE_MUX_PLAYBACK_BASE_URL ?? "https://stream.mux.com";
 const MUX_PLAYER_SCRIPT_URL =
@@ -30,52 +31,70 @@ type MuxUploadStatusResponse = {
   playbackId: string | null;
 };
 
-function getFunctionInvokeHeaders(accessToken?: string) {
-  if (!accessToken?.trim()) return undefined;
-  return {
-    Authorization: `Bearer ${accessToken.trim()}`,
-  };
+function getMuxFunctionUrl() {
+  const baseUrl = SUPABASE_URL.trim().replace(/\/+$/, "");
+  if (!baseUrl) {
+    throw new Error("Supabase is not configured.");
+  }
+  return `${baseUrl}/functions/v1/${MUX_FUNCTION_NAME}`;
 }
 
-async function normalizeFunctionError(error: unknown) {
-  if (!error || typeof error !== "object") return new Error("Mux request failed.");
-  const context =
-    "context" in error ? (error as { context?: unknown }).context : null;
-  if (context && typeof context === "object") {
-    if ("json" in context && typeof context.json === "function") {
-      try {
-        const payload = await context.json();
-        if (payload && typeof payload === "object") {
-          const message =
-            "error" in payload && typeof payload.error === "string"
-              ? payload.error
-              : "message" in payload && typeof payload.message === "string"
-                ? payload.message
-                : "";
-          if (message.trim()) {
-            return new Error(message);
-          }
-        }
-      } catch {
-        // Ignore and fall back to text/message parsing below.
-      }
+async function invokeMuxFunction<T>(
+  body: Record<string, unknown>,
+  accessToken?: string
+) {
+  if (!SUPABASE_ANON_KEY.trim()) {
+    throw new Error("Supabase is not configured.");
+  }
+  if (!accessToken?.trim()) {
+    throw new Error("Your session is invalid or expired. Log out and sign in again.");
+  }
+
+  const response = await fetch(getMuxFunctionUrl(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_ANON_KEY.trim(),
+      Authorization: `Bearer ${accessToken.trim()}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const contentType = response.headers.get("content-type") ?? "";
+  let payload: unknown = null;
+  if (contentType.includes("application/json")) {
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
     }
-    if ("text" in context && typeof context.text === "function") {
-      try {
-        const message = await context.text();
-        if (typeof message === "string" && message.trim()) {
-          return new Error(message);
-        }
-      } catch {
-        // Ignore and fall back to message parsing below.
-      }
+  } else {
+    try {
+      payload = await response.text();
+    } catch {
+      payload = null;
     }
   }
-  const message =
-    "message" in error && typeof error.message === "string"
-      ? error.message
-      : "Mux request failed.";
-  return new Error(message);
+
+  if (!response.ok) {
+    if (payload && typeof payload === "object") {
+      const message =
+        "error" in payload && typeof payload.error === "string"
+          ? payload.error
+          : "message" in payload && typeof payload.message === "string"
+            ? payload.message
+            : "";
+      if (message.trim()) {
+        throw new Error(message);
+      }
+    }
+    if (typeof payload === "string" && payload.trim()) {
+      throw new Error(payload);
+    }
+    throw new Error(`Mux request failed with status ${response.status}.`);
+  }
+
+  return payload as T;
 }
 
 export function buildMuxPlaybackUrl(playbackId: string) {
@@ -171,53 +190,39 @@ export function MuxPlayer(props: {
 }
 
 export async function createMuxDirectUpload(
-  supabase: SupabaseClient,
   input: { origin: string; filename: string; contentType: string; userId: string },
   accessToken?: string
 ) {
-  const { data, error } = await supabase.functions.invoke(MUX_FUNCTION_NAME, {
-    headers: getFunctionInvokeHeaders(accessToken),
-    body: {
+  return await invokeMuxFunction<MuxCreateUploadResponse>(
+    {
       action: "create-upload",
       origin: input.origin,
       filename: input.filename,
       contentType: input.contentType,
       userId: input.userId,
     },
-  });
-  if (error) throw await normalizeFunctionError(error);
-  return data as MuxCreateUploadResponse;
+    accessToken
+  );
 }
 
-export async function getMuxUploadStatus(
-  supabase: SupabaseClient,
-  uploadId: string,
-  accessToken?: string
-) {
-  const { data, error } = await supabase.functions.invoke(MUX_FUNCTION_NAME, {
-    headers: getFunctionInvokeHeaders(accessToken),
-    body: {
+export async function getMuxUploadStatus(uploadId: string, accessToken?: string) {
+  return await invokeMuxFunction<MuxUploadStatusResponse>(
+    {
       action: "get-upload",
       uploadId,
     },
-  });
-  if (error) throw await normalizeFunctionError(error);
-  return data as MuxUploadStatusResponse;
+    accessToken
+  );
 }
 
-export async function deleteMuxAsset(
-  supabase: SupabaseClient,
-  assetId: string,
-  accessToken?: string
-) {
-  const { error } = await supabase.functions.invoke(MUX_FUNCTION_NAME, {
-    headers: getFunctionInvokeHeaders(accessToken),
-    body: {
+export async function deleteMuxAsset(assetId: string, accessToken?: string) {
+  await invokeMuxFunction<{ ok: boolean }>(
+    {
       action: "delete-asset",
       assetId,
     },
-  });
-  if (error) throw await normalizeFunctionError(error);
+    accessToken
+  );
 }
 
 export async function uploadFileToMux(uploadUrl: string, file: File) {
@@ -234,7 +239,6 @@ export async function uploadFileToMux(uploadUrl: string, file: File) {
 }
 
 export async function waitForMuxPlayback(
-  supabase: SupabaseClient,
   uploadId: string,
   options?: {
     accessToken?: string;
@@ -248,11 +252,7 @@ export async function waitForMuxPlayback(
   const startedAt = Date.now();
 
   for (;;) {
-    const status = await getMuxUploadStatus(
-      supabase,
-      uploadId,
-      options?.accessToken
-    );
+    const status = await getMuxUploadStatus(uploadId, options?.accessToken);
     options?.onProgress?.(status);
     if (status.assetStatus === "ready" && status.playbackId) {
       return status;
