@@ -1,4 +1,5 @@
 import type { CSSProperties, ChangeEventHandler, RefObject } from "react";
+import { extractMuxPlaybackId, MuxPlayer } from "./mux";
 
 type Route =
   | "login"
@@ -39,6 +40,9 @@ type UserPost = {
   media_type: "image" | "video" | "text";
   caption: string | null;
   created_at: string;
+  mux_playback_id?: string | null;
+  mux_asset_id?: string | null;
+  mux_upload_id?: string | null;
 };
 
 type UserPageProps = {
@@ -483,7 +487,23 @@ export default function UserPage(props: UserPageProps) {
                     />
                   ) : null}
                   {post.media_type === "video" && post.media_url ? (
-                    <video className="userPostMedia" src={post.media_url} controls />
+                    (() => {
+                      const muxPlaybackId =
+                        post.mux_playback_id ?? extractMuxPlaybackId(post.media_url);
+                      return muxPlaybackId ? (
+                        <MuxPlayer
+                          className="userPostMedia"
+                          playbackId={muxPlaybackId}
+                          controls
+                        />
+                      ) : (
+                        <video
+                          className="userPostMedia"
+                          src={post.media_url}
+                          controls
+                        />
+                      );
+                    })()
                   ) : null}
                   {post.caption ? (
                     <div className="userPostCaption">{post.caption}</div>
@@ -560,7 +580,19 @@ export default function UserPage(props: UserPageProps) {
             {videoPosts.map((post) =>
               post.media_url ? (
                 <div key={post.id} className="userMediaItem">
-                  <video src={post.media_url} controls />
+                  {(() => {
+                    const muxPlaybackId =
+                      post.mux_playback_id ?? extractMuxPlaybackId(post.media_url);
+                    return muxPlaybackId ? (
+                      <MuxPlayer
+                        className="userPostMedia"
+                        playbackId={muxPlaybackId}
+                        controls
+                      />
+                    ) : (
+                      <video src={post.media_url} controls />
+                    );
+                  })()}
                 </div>
               ) : null
             )}

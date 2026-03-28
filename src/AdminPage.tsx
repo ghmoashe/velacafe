@@ -1,4 +1,5 @@
 import EventsManager, { type EventsManagerSharedProps } from "./EventsManager";
+import { extractMuxPlaybackId, MuxPlayer } from "./mux";
 
 type Locale =
   | "de"
@@ -65,6 +66,9 @@ type UserPost = {
   media_type: "image" | "video" | "text";
   caption: string | null;
   created_at: string;
+  mux_playback_id?: string | null;
+  mux_asset_id?: string | null;
+  mux_upload_id?: string | null;
 };
 
 type LanguageLabels = Partial<Record<string, string>>;
@@ -670,11 +674,24 @@ export default function AdminPage(props: AdminPageProps) {
                                   ) : null}
                                   {post.media_type === "video" &&
                                   post.media_url ? (
-                                    <video
-                                      className="userPostMedia"
-                                      src={post.media_url}
-                                      controls
-                                    />
+                                    (() => {
+                                      const muxPlaybackId =
+                                        post.mux_playback_id ??
+                                        extractMuxPlaybackId(post.media_url);
+                                      return muxPlaybackId ? (
+                                        <MuxPlayer
+                                          className="userPostMedia"
+                                          playbackId={muxPlaybackId}
+                                          controls
+                                        />
+                                      ) : (
+                                        <video
+                                          className="userPostMedia"
+                                          src={post.media_url}
+                                          controls
+                                        />
+                                      );
+                                    })()
                                   ) : null}
                                   {isEditing ? (
                                     <textarea

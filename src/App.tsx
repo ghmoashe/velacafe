@@ -12,11 +12,19 @@ import {
   type PointerEvent,
 } from "react";
 import {
+  buildMuxPlaybackUrl,
+  createMuxDirectUpload,
+  deleteMuxAsset,
+  uploadFileToMux,
+  waitForMuxPlayback,
+} from "./mux";
+import {
   CHANGE_LANGUAGE_BUTTON_LABELS,
   LANGUAGE_LABELS,
   MESSAGES,
 } from "./i18nData";
 import { openKlaroSettings, setupKlaro } from "./klaro";
+import { getShortsText } from "./shortsText";
 import { getSupabaseClient } from "./supabaseClient";
 
 const LANGUAGE_LIST = [
@@ -228,6 +236,7 @@ type Route =
   | "register"
   | "forgot"
   | "search"
+  | "shorts"
   | "events"
   | "event"
   | "organizer"
@@ -256,6 +265,9 @@ type UserPost = {
   media_type: PostMediaType;
   caption: string | null;
   created_at: string;
+  mux_upload_id?: string | null;
+  mux_asset_id?: string | null;
+  mux_playback_id?: string | null;
 };
 
 type EventFormat = "online" | "offline";
@@ -1336,6 +1348,14 @@ function isMissingColumnError(error: unknown, columnName: string): boolean {
   return haystack.includes("does not exist") && haystack.includes(columnName.toLowerCase());
 }
 
+function isMissingPostMuxColumnsError(error: unknown) {
+  return (
+    isMissingColumnError(error, "mux_playback_id") ||
+    isMissingColumnError(error, "mux_asset_id") ||
+    isMissingColumnError(error, "mux_upload_id")
+  );
+}
+
 function parsePositiveInteger(value: string): number | null {
   const normalized = value.trim();
   if (!normalized) return null;
@@ -1419,6 +1439,8 @@ function resolveRoute(slug: string): Route | null {
       return "forgot";
     case "search":
       return "search";
+    case "shorts":
+      return "shorts";
     case "events":
       return "events";
     case "event":
@@ -1477,6 +1499,7 @@ const ROUTE_PATHS: Record<Route, string> = {
   register: "/register",
   forgot: "/forgot",
   search: "/search",
+  shorts: "/shorts",
   events: "/events",
   event: "/event",
   organizer: "/organizer",
@@ -1503,6 +1526,10 @@ const ORGANIZER_FOLLOWS_TABLE = "organizer_follows";
 const POSTS_TABLE = "posts";
 const ORGANIZER_APPLICATIONS_TABLE = "organizer_applications";
 const POST_MEDIA_FOLDER = "posts";
+const POST_SELECT_FIELDS =
+  "id,user_id,media_url,media_type,caption,created_at,mux_upload_id,mux_asset_id,mux_playback_id";
+const POST_SELECT_FIELDS_LEGACY =
+  "id,user_id,media_url,media_type,caption,created_at";
 const EVENT_SELECT_FIELDS =
   "id,organizer_id,title,description,image_url,image_urls,online_url,address,city,country,language,language_level,language_level_min,language_level_max,event_date,event_time,recurrence_group_id,recurrence_rule,recurrence_occurrence,duration_minutes,is_paid,price_amount,max_participants,format,created_at";
 const LEARN_PRACTICE_EXCLUDED = new Set<Locale>([
@@ -1577,6 +1604,7 @@ const LegalPage = lazy(() => import("./LegalPage"));
 const OrganizerPage = lazy(() => import("./OrganizerPage"));
 const ProfilePage = lazy(() => import("./ProfilePage"));
 const SearchPage = lazy(() => import("./SearchPage"));
+const ShortsPage = lazy(() => import("./ShortsPage"));
 const UserPage = lazy(() => import("./UserPage"));
 
 export default function App() {
@@ -1855,8 +1883,11 @@ export default function App() {
     type: "idle" | "loading" | "success" | "error";
     message: string;
   }>({ type: "idle", message: "" });
-  const strings = (MESSAGES[locale] ??
-    MESSAGES[FALLBACK_LOCALE]) as Record<MessageKey, string>;
+  const strings = {
+    ...MESSAGES[FALLBACK_LOCALE],
+    ...(MESSAGES[locale] ?? {}),
+  } as Record<MessageKey, string>;
+  const shortsText = getShortsText(locale);
   const eventPricingText = getEventPricingText(locale);
   const eventCheckInText = getEventCheckInText(locale);
   const eventScheduleText = getEventScheduleText(locale);
@@ -2208,8 +2239,10 @@ export default function App() {
 
   useEffect(() => {
     if (typeof document !== "undefined") {
-      const localeStrings = (MESSAGES[locale] ??
-        MESSAGES[FALLBACK_LOCALE]) as Record<MessageKey, string>;
+      const localeStrings = {
+        ...MESSAGES[FALLBACK_LOCALE],
+        ...(MESSAGES[locale] ?? {}),
+      } as Record<MessageKey, string>;
       const localizedTitle = `VELA ${localeStrings.brandTag} — ${localeStrings.brandSub}`;
       const localizedDescription = `VELA ${localeStrings.brandTag}. ${localeStrings.brandSub}`;
       document.documentElement.lang = locale;
@@ -2279,6 +2312,7 @@ export default function App() {
       "register",
       "forgot",
       "search",
+      "shorts",
       "events",
       "event",
       "organizer",
@@ -2540,11 +2574,23 @@ export default function App() {
     let active = true;
     (async () => {
       setPostsStatus({ type: "loading", message: "" });
-      const { data, error } = await supabase
+      const primaryPostsResult = await supabase
         .from(POSTS_TABLE)
-        .select("id, media_url, media_type, caption, created_at")
+        .select(POST_SELECT_FIELDS)
         .eq("user_id", sessionUser.id)
         .order("created_at", { ascending: false });
+      const fallbackPostsResult =
+        primaryPostsResult.error && isMissingPostMuxColumnsError(primaryPostsResult.error)
+          ? await supabase
+          .from(POSTS_TABLE)
+          .select(POST_SELECT_FIELDS_LEGACY)
+          .eq("user_id", sessionUser.id)
+          .order("created_at", { ascending: false })
+          : null;
+      const data = (fallbackPostsResult?.data ?? primaryPostsResult.data) as
+        | UserPost[]
+        | null;
+      const error = fallbackPostsResult?.error ?? primaryPostsResult.error;
       if (!active) return;
       if (error) {
         setPostsStatus({
@@ -2875,7 +2921,7 @@ export default function App() {
             .order("event_date", { ascending: false }),
         supabase
           .from(POSTS_TABLE)
-          .select("id,user_id,media_url,media_type,caption,created_at")
+          .select(POST_SELECT_FIELDS)
           .order("created_at", { ascending: false }),
         supabase
           .from(ORGANIZER_APPLICATIONS_TABLE)
@@ -2907,10 +2953,26 @@ export default function App() {
       }
       const { data: postsRows, error: postsError } = postsResult;
       if (postsError) {
-        setAdminPostsStatus({
-          type: "error",
-          message: getSupabaseErrorMessage(postsError),
-        });
+        if (isMissingPostMuxColumnsError(postsError)) {
+          const legacyPostsResult = await supabase
+            .from(POSTS_TABLE)
+            .select(POST_SELECT_FIELDS_LEGACY)
+            .order("created_at", { ascending: false });
+          if (legacyPostsResult.error) {
+            setAdminPostsStatus({
+              type: "error",
+              message: getSupabaseErrorMessage(legacyPostsResult.error),
+            });
+          } else {
+            setAdminPosts((legacyPostsResult.data ?? []) as UserPost[]);
+            setAdminPostsStatus({ type: "idle", message: "" });
+          }
+        } else {
+          setAdminPostsStatus({
+            type: "error",
+            message: getSupabaseErrorMessage(postsError),
+          });
+        }
       } else {
         setAdminPosts((postsRows ?? []) as UserPost[]);
         setAdminPostsStatus({ type: "idle", message: "" });
@@ -5125,40 +5187,80 @@ export default function App() {
       }
       let mediaUrl: string | null = null;
       let mediaType: PostMediaType = "text";
+      let muxUploadId: string | null = null;
+      let muxAssetId: string | null = null;
+      let muxPlaybackId: string | null = null;
       if (postFile) {
         mediaType = postFile.type.startsWith("video/") ? "video" : "image";
-        const extension =
-          postFile.name.split(".").pop() ??
-          (mediaType === "video" ? "mp4" : "jpg");
-        const fileName = `${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2, 8)}.${extension}`;
-        const filePath = `${user.id}/${POST_MEDIA_FOLDER}/${fileName}`;
-        const { error: uploadError } = await supabase.storage
-          .from(POSTS_BUCKET)
-          .upload(filePath, postFile, {
-            upsert: false,
-            contentType: postFile.type || "application/octet-stream",
+        if (mediaType === "video") {
+          setPostActionStatus({
+            type: "loading",
+            message: "Uploading video to Mux...",
           });
-        if (uploadError) throw uploadError;
-        const { data: publicData } = supabase.storage
-          .from(POSTS_BUCKET)
-          .getPublicUrl(filePath);
-        mediaUrl = publicData.publicUrl ?? null;
+          const directUpload = await createMuxDirectUpload(supabase, {
+            origin:
+              typeof window !== "undefined" ? window.location.origin : "http://localhost",
+            filename: postFile.name,
+            contentType: postFile.type || "video/mp4",
+            userId: user.id,
+          });
+          muxUploadId = directUpload.uploadId;
+          await uploadFileToMux(directUpload.uploadUrl, postFile);
+          const muxStatus = await waitForMuxPlayback(supabase, directUpload.uploadId, {
+            onProgress: (status) => {
+              const assetStatus = status.assetStatus ?? status.uploadStatus ?? "processing";
+              setPostActionStatus({
+                type: "loading",
+                message: `Processing video in Mux... (${assetStatus})`,
+              });
+            },
+          });
+          muxAssetId = muxStatus.assetId;
+          muxPlaybackId = muxStatus.playbackId;
+          if (!muxPlaybackId) {
+            throw new Error(
+              "Mux did not return a playback ID. Check the Mux upload configuration."
+            );
+          }
+          mediaUrl = buildMuxPlaybackUrl(muxPlaybackId);
+        } else {
+          const extension = postFile.name.split(".").pop() ?? "jpg";
+          const fileName = `${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2, 8)}.${extension}`;
+          const filePath = `${user.id}/${POST_MEDIA_FOLDER}/${fileName}`;
+          const { error: uploadError } = await supabase.storage
+            .from(POSTS_BUCKET)
+            .upload(filePath, postFile, {
+              upsert: false,
+              contentType: postFile.type || "application/octet-stream",
+            });
+          if (uploadError) throw uploadError;
+          const { data: publicData } = supabase.storage
+            .from(POSTS_BUCKET)
+            .getPublicUrl(filePath);
+          mediaUrl = publicData.publicUrl ?? null;
+        }
+      }
+      const insertPayload: Record<string, string | null> = {
+        user_id: user.id,
+        media_url: mediaUrl,
+        media_type: mediaType,
+        caption: trimmedCaption || null,
+      };
+      if (mediaType === "video") {
+        insertPayload.mux_upload_id = muxUploadId;
+        insertPayload.mux_asset_id = muxAssetId;
+        insertPayload.mux_playback_id = muxPlaybackId;
       }
       const { data: inserted, error } = await supabase
         .from(POSTS_TABLE)
-        .insert({
-          user_id: user.id,
-          media_url: mediaUrl,
-          media_type: mediaType,
-          caption: trimmedCaption || null,
-        })
-        .select("id, media_url, media_type, caption, created_at")
+        .insert(insertPayload)
+        .select(mediaType === "video" ? POST_SELECT_FIELDS : POST_SELECT_FIELDS_LEGACY)
         .single();
       if (error) throw error;
       if (inserted) {
-        setUserPosts((prev) => [inserted as UserPost, ...prev]);
+        setUserPosts((prev) => [((inserted as unknown) as UserPost), ...prev]);
       }
       setPostCaption("");
       setPostFile(null);
@@ -5173,7 +5275,9 @@ export default function App() {
     } catch (error) {
       setPostActionStatus({
         type: "error",
-        message: getSupabaseErrorMessage(error),
+        message: isMissingPostMuxColumnsError(error)
+          ? "Run supabase/posts_add_mux_video_fields.sql before publishing Mux videos."
+          : getSupabaseErrorMessage(error),
       });
     }
   }
@@ -5213,6 +5317,9 @@ export default function App() {
             .remove([path]);
           if (removeError) throw removeError;
         }
+      }
+      if (post.mux_asset_id) {
+        await deleteMuxAsset(supabase, post.mux_asset_id);
       }
       const { error } = await supabase
         .from(POSTS_TABLE)
@@ -5256,18 +5363,22 @@ export default function App() {
         .from(POSTS_TABLE)
         .update({ caption: adminPostCaption.trim() || null })
         .eq("id", post.id)
-        .select("id,user_id,media_url,media_type,caption,created_at")
+        .select(POST_SELECT_FIELDS)
         .single();
       if (error) throw error;
       setAdminPosts((prev) =>
-        prev.map((item) => (item.id === post.id ? (data as UserPost) : item))
+        prev.map((item) =>
+          item.id === post.id ? ((data as unknown) as UserPost) : item
+        )
       );
       cancelAdminPostEdit();
       setAdminPostsStatus({ type: "idle", message: "" });
     } catch (error) {
       setAdminPostsStatus({
         type: "error",
-        message: getSupabaseErrorMessage(error),
+        message: isMissingPostMuxColumnsError(error)
+          ? "Run supabase/posts_add_mux_video_fields.sql before editing Mux posts."
+          : getSupabaseErrorMessage(error),
       });
     }
   }
@@ -5296,6 +5407,9 @@ export default function App() {
             .remove([path]);
           if (removeError) throw removeError;
         }
+      }
+      if (post.mux_asset_id) {
+        await deleteMuxAsset(supabase, post.mux_asset_id);
       }
       const { error } = await supabase
         .from(POSTS_TABLE)
@@ -5797,6 +5911,7 @@ export default function App() {
   const isImpressumRoute = route === "impressum";
   const isTermsRoute = route === "terms";
   const isSearchRoute = route === "search";
+  const isShortsRoute = route === "shorts";
   const isEventsRoute = route === "events";
   const isEventRoute = route === "event";
   const isOrganizerRoute = route === "organizer";
@@ -5808,6 +5923,7 @@ export default function App() {
   const showConfirm = isAuthRoute && route === "register";
   const showBackButton = !isAuthRoute;
   const showSearchButton = !isAuthRoute;
+  const showShortsButton = !isAuthRoute;
   const showEventsButton = !isAuthRoute;
   const showLogoutButton = !isAuthRoute && !guestMode && Boolean(sessionUser?.id);
   const showUserQuickActions = isUserRoute && !guestMode;
@@ -6147,6 +6263,15 @@ export default function App() {
     organizerFollowersStatus,
     organizerFollowers,
   };
+  const shortsPageProps = {
+    locale,
+    languageLabels,
+    guestMode,
+    sessionUserId: sessionUser?.id ?? null,
+    requireAuth: () => redirectToLoginWithIntent({ route: "shorts" }),
+    goToOrganizer,
+    sharePath: ROUTE_PATHS.shorts,
+  };
   const userPageProps = {
     strings,
     profileCoverDisplay,
@@ -6326,6 +6451,15 @@ export default function App() {
                     onClick={() => navigate("search")}
                   >
                     {strings.searchButton}
+                  </button>
+                ) : null}
+                {showShortsButton ? (
+                  <button
+                    className={`btn${isShortsRoute ? " btnActive" : ""}`}
+                    type="button"
+                    onClick={() => navigate("shorts")}
+                  >
+                    {shortsText.navLabel}
                   </button>
                 ) : null}
                 {showEventsButton ? (
@@ -7122,6 +7256,10 @@ export default function App() {
             ) : isSearchRoute ? (
               <Suspense fallback={<div className="searchPage" />}>
                 <SearchPage {...searchPageProps} />
+              </Suspense>
+            ) : isShortsRoute ? (
+              <Suspense fallback={<div className="shortsPage" />}>
+                <ShortsPage {...shortsPageProps} />
               </Suspense>
             ) : isEventsRoute ? (
               <Suspense fallback={<div className="eventsPage" />}>

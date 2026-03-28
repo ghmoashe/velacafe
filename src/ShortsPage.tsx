@@ -1,0 +1,1024 @@
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type MutableRefObject,
+  type ReactNode,
+} from "react";
+import {
+  extractMuxPlaybackId,
+  MuxPlayer,
+  type MuxPlayerElement,
+} from "./mux";
+import { getShortsText } from "./shortsText";
+import { getSupabaseClient } from "./supabaseClient";
+
+type Status = {
+  type: "idle" | "loading" | "error";
+  message: string;
+};
+
+type OrganizerProfile = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  city: string | null;
+  country: string | null;
+  language: string | null;
+  bio: string | null;
+  is_organizer?: boolean | null;
+};
+
+type VideoPostRow = {
+  id: string;
+  user_id: string | null;
+  media_url: string | null;
+  caption: string | null;
+  created_at: string;
+  mux_playback_id?: string | null;
+};
+
+type VideoFeedItem = VideoPostRow & {
+  author: OrganizerProfile;
+};
+
+type LikeRow = {
+  post_id: string;
+  user_id: string | null;
+};
+
+type CommentRow = {
+  id: string;
+  post_id: string;
+  user_id: string | null;
+  comment: string;
+  created_at: string;
+};
+
+type ShareRow = {
+  post_id: string;
+};
+
+type FeedComment = {
+  id: string;
+  post_id: string;
+  user_id: string | null;
+  comment: string;
+  created_at: string;
+  authorName: string;
+  authorAvatar: string | null;
+};
+
+type PlayableMediaElement = HTMLVideoElement | MuxPlayerElement;
+
+type ShortsPageProps = {
+  locale: string;
+  languageLabels: Partial<Record<string, string>>;
+  guestMode: boolean;
+  sessionUserId: string | null;
+  requireAuth: () => void;
+  goToOrganizer: (organizerId: string) => void;
+  sharePath: string;
+};
+
+function getErrorMessage(error: unknown) {
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+  return "Unexpected error";
+}
+
+function isSchemaError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  const code = typeof candidate.code === "string" ? candidate.code : "";
+  const message =
+    typeof candidate.message === "string"
+      ? candidate.message.toLowerCase()
+      : "";
+  return (
+    code === "42P01" ||
+    code === "42703" ||
+    code === "PGRST204" ||
+    message.includes("does not exist") ||
+    message.includes("schema cache")
+  );
+}
+
+function getRequestedPostId() {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("post");
+  return id && id.trim() ? id.trim() : null;
+}
+
+function getInitial(value: string) {
+  return value.trim().charAt(0).toUpperCase() || "?";
+}
+
+function getAuthorName(author: OrganizerProfile) {
+  return author.full_name?.trim() || "Organizer";
+}
+
+function formatRelativeTime(value: string, locale: string) {
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return "";
+  const diffSeconds = Math.round((timestamp - Date.now()) / 1000);
+  const absoluteSeconds = Math.abs(diffSeconds);
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  if (absoluteSeconds < 60) return formatter.format(diffSeconds, "second");
+  const diffMinutes = Math.round(diffSeconds / 60);
+  if (Math.abs(diffMinutes) < 60) return formatter.format(diffMinutes, "minute");
+  const diffHours = Math.round(diffSeconds / 3600);
+  if (Math.abs(diffHours) < 24) return formatter.format(diffHours, "hour");
+  const diffDays = Math.round(diffSeconds / 86400);
+  if (Math.abs(diffDays) < 30) return formatter.format(diffDays, "day");
+  const diffMonths = Math.round(diffSeconds / 2_592_000);
+  if (Math.abs(diffMonths) < 12) return formatter.format(diffMonths, "month");
+  const diffYears = Math.round(diffSeconds / 31_536_000);
+  return formatter.format(diffYears, "year");
+}
+
+function buildCountMap(ids: string[]) {
+  return ids.reduce<Record<string, number>>((accumulator, id) => {
+    accumulator[id] = 0;
+    return accumulator;
+  }, {});
+}
+
+function updateRefMap<T>(
+  refMap: MutableRefObject<Record<string, T | null>>,
+  id: string,
+  node: T | null
+) {
+  if (node) {
+    refMap.current[id] = node;
+    return;
+  }
+  delete refMap.current[id];
+}
+
+function ShortsActionButton(props: {
+  label: string;
+  count: string;
+  active?: boolean;
+  busy?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  const { label, count, active = false, busy = false, onClick, children } = props;
+  return (
+    <button
+      className={`shortsAction${active ? " shortsAction--active" : ""}`}
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-label={label}
+      title={label}
+    >
+      <span className="shortsActionIcon" aria-hidden="true">
+        {children}
+      </span>
+      <span className="shortsActionCount">{count}</span>
+      <span className="shortsActionLabel">{label}</span>
+    </button>
+  );
+}
+
+export default function ShortsPage(props: ShortsPageProps) {
+  const {
+    locale,
+    languageLabels,
+    guestMode,
+    sessionUserId,
+    requireAuth,
+    goToOrganizer,
+    sharePath,
+  } = props;
+  const text = useMemo(() => getShortsText(locale), [locale]);
+  const numberFormatter = useMemo(() => new Intl.NumberFormat(locale), [locale]);
+  const [feedStatus, setFeedStatus] = useState<Status>({
+    type: "loading",
+    message: "",
+  });
+  const [videos, setVideos] = useState<VideoFeedItem[]>([]);
+  const [socialNotice, setSocialNotice] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
+  const [socialReady, setSocialReady] = useState(true);
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const [shareCounts, setShareCounts] = useState<Record<string, number>>({});
+  const [likedPostIds, setLikedPostIds] = useState<string[]>([]);
+  const [openCommentsPostId, setOpenCommentsPostId] = useState<string | null>(null);
+  const [commentsByPostId, setCommentsByPostId] = useState<
+    Record<string, FeedComment[]>
+  >({});
+  const [commentsLoadingPostId, setCommentsLoadingPostId] = useState<string | null>(
+    null
+  );
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [commentSubmittingPostId, setCommentSubmittingPostId] = useState<
+    string | null
+  >(null);
+  const [likeLoadingPostId, setLikeLoadingPostId] = useState<string | null>(null);
+  const [shareLoadingPostId, setShareLoadingPostId] = useState<string | null>(null);
+  const [activePostId, setActivePostId] = useState<string | null>(null);
+  const [soundOnPostId, setSoundOnPostId] = useState<string | null>(null);
+  const [pausedPostIds, setPausedPostIds] = useState<Record<string, boolean>>({});
+  const cardRefs = useRef<Record<string, HTMLElement | null>>({});
+  const videoRefs = useRef<Record<string, PlayableMediaElement | null>>({});
+  const likedPostIdSet = useMemo(() => new Set(likedPostIds), [likedPostIds]);
+
+  const setNotice = useCallback((message: string) => {
+    setActionNotice(message);
+  }, []);
+
+  const loadInteractionSummary = useCallback(
+    async (postIds: string[]) => {
+      const supabase = getSupabaseClient();
+      if (!supabase || postIds.length === 0) {
+        setLikeCounts(buildCountMap(postIds));
+        setCommentCounts(buildCountMap(postIds));
+        setShareCounts(buildCountMap(postIds));
+        setLikedPostIds([]);
+        return;
+      }
+      const [likesResult, commentsResult, sharesResult] = await Promise.all([
+        supabase.from("post_likes").select("post_id,user_id").in("post_id", postIds),
+        supabase.from("post_comments").select("post_id").in("post_id", postIds),
+        supabase
+          .from("post_share_events")
+          .select("post_id")
+          .in("post_id", postIds),
+      ]);
+      const interactionError =
+        likesResult.error ?? commentsResult.error ?? sharesResult.error;
+      if (interactionError) {
+        setSocialReady(false);
+        setSocialNotice(
+          isSchemaError(interactionError)
+            ? text.socialSetupHint
+            : getErrorMessage(interactionError)
+        );
+        setLikeCounts(buildCountMap(postIds));
+        setCommentCounts(buildCountMap(postIds));
+        setShareCounts(buildCountMap(postIds));
+        setLikedPostIds([]);
+        return;
+      }
+
+      const nextLikeCounts = buildCountMap(postIds);
+      const nextCommentCounts = buildCountMap(postIds);
+      const nextShareCounts = buildCountMap(postIds);
+      const nextLiked = new Set<string>();
+
+      for (const row of (likesResult.data ?? []) as LikeRow[]) {
+        nextLikeCounts[row.post_id] = (nextLikeCounts[row.post_id] ?? 0) + 1;
+        if (sessionUserId && row.user_id === sessionUserId) {
+          nextLiked.add(row.post_id);
+        }
+      }
+
+      for (const row of (commentsResult.data ?? []) as Array<{ post_id: string }>) {
+        nextCommentCounts[row.post_id] = (nextCommentCounts[row.post_id] ?? 0) + 1;
+      }
+
+      for (const row of (sharesResult.data ?? []) as ShareRow[]) {
+        nextShareCounts[row.post_id] = (nextShareCounts[row.post_id] ?? 0) + 1;
+      }
+
+      setSocialReady(true);
+      setSocialNotice("");
+      setLikeCounts(nextLikeCounts);
+      setCommentCounts(nextCommentCounts);
+      setShareCounts(nextShareCounts);
+      setLikedPostIds([...nextLiked]);
+    },
+    [sessionUserId, text.socialSetupHint]
+  );
+
+  const loadFeed = useCallback(async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setFeedStatus({ type: "error", message: text.notConfigured });
+      setVideos([]);
+      return;
+    }
+
+    setFeedStatus({ type: "loading", message: "" });
+    const primaryPostsResult = await supabase
+      .from("posts")
+      .select("id,user_id,media_url,caption,created_at,mux_playback_id")
+      .eq("media_type", "video")
+      .not("media_url", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(36);
+    const fallbackPostsResult =
+      primaryPostsResult.error && isSchemaError(primaryPostsResult.error)
+        ? await supabase
+        .from("posts")
+        .select("id,user_id,media_url,caption,created_at")
+        .eq("media_type", "video")
+        .not("media_url", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(36)
+        : null;
+    const postRows = (fallbackPostsResult?.data ?? primaryPostsResult.data) as
+      | VideoPostRow[]
+      | null;
+    const postError = fallbackPostsResult?.error ?? primaryPostsResult.error;
+
+    if (postError) {
+      setFeedStatus({ type: "error", message: getErrorMessage(postError) });
+      setVideos([]);
+      return;
+    }
+
+    const posts = (postRows ?? []) as VideoPostRow[];
+    const organizerIds = [
+      ...new Set(
+        posts
+          .map((item) => item.user_id)
+          .filter((value): value is string => Boolean(value))
+      ),
+    ];
+
+    if (organizerIds.length === 0) {
+      setVideos([]);
+      setFeedStatus({ type: "idle", message: "" });
+      setLikeCounts({});
+      setCommentCounts({});
+      setShareCounts({});
+      return;
+    }
+
+    const { data: profileRows, error: profileError } = await supabase
+      .from("profiles")
+      .select("id,full_name,avatar_url,city,country,language,bio,is_organizer")
+      .in("id", organizerIds)
+      .eq("is_organizer", true);
+
+    if (profileError) {
+      setFeedStatus({ type: "error", message: getErrorMessage(profileError) });
+      setVideos([]);
+      return;
+    }
+
+    const profileMap = new Map(
+      ((profileRows ?? []) as OrganizerProfile[]).map((profile) => [profile.id, profile])
+    );
+    const requestedPostId = getRequestedPostId();
+    const filteredVideos = posts
+      .filter((post): post is VideoPostRow & { user_id: string } =>
+        Boolean(
+          post.user_id &&
+            profileMap.has(post.user_id) &&
+            (post.mux_playback_id || post.media_url)
+        )
+      )
+      .map((post) => ({
+        ...post,
+        author: profileMap.get(post.user_id)!,
+      }));
+
+    if (requestedPostId) {
+      filteredVideos.sort((left, right) => {
+        if (left.id === requestedPostId) return -1;
+        if (right.id === requestedPostId) return 1;
+        return 0;
+      });
+    }
+
+    setVideos(filteredVideos);
+    setActivePostId(filteredVideos[0]?.id ?? null);
+    setFeedStatus({ type: "idle", message: "" });
+    await loadInteractionSummary(filteredVideos.map((item) => item.id));
+  }, [loadInteractionSummary, text.notConfigured]);
+
+  const loadComments = useCallback(
+    async (postId: string) => {
+      if (!socialReady) {
+        setNotice(text.socialSetupHint);
+        return;
+      }
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        setNotice(text.notConfigured);
+        return;
+      }
+
+      setCommentsLoadingPostId(postId);
+      const { data: commentRows, error: commentError } = await supabase
+        .from("post_comments")
+        .select("id,post_id,user_id,comment,created_at")
+        .eq("post_id", postId)
+        .order("created_at", { ascending: true });
+
+      if (commentError) {
+        setCommentsLoadingPostId(null);
+        setNotice(
+          isSchemaError(commentError)
+            ? text.socialSetupHint
+            : getErrorMessage(commentError)
+        );
+        return;
+      }
+
+      const comments = (commentRows ?? []) as CommentRow[];
+      const userIds = [
+        ...new Set(
+          comments
+            .map((item) => item.user_id)
+            .filter((value): value is string => Boolean(value))
+        ),
+      ];
+      let profileMap = new Map<string, OrganizerProfile>();
+      if (userIds.length > 0) {
+        const { data: profileRows, error: profileError } = await supabase
+          .from("profiles")
+          .select("id,full_name,avatar_url")
+          .in("id", userIds);
+        if (!profileError) {
+          profileMap = new Map(
+            ((profileRows ?? []) as OrganizerProfile[]).map((profile) => [
+              profile.id,
+              profile,
+            ])
+          );
+        }
+      }
+
+      setCommentsByPostId((prev) => ({
+        ...prev,
+        [postId]: comments.map((comment) => {
+          const profile = comment.user_id ? profileMap.get(comment.user_id) : null;
+          return {
+            id: comment.id,
+            post_id: comment.post_id,
+            user_id: comment.user_id,
+            comment: comment.comment,
+            created_at: comment.created_at,
+            authorName: profile?.full_name?.trim() || "Member",
+            authorAvatar: profile?.avatar_url ?? null,
+          };
+        }),
+      }));
+      setCommentsLoadingPostId(null);
+    },
+    [setNotice, socialReady, text.notConfigured, text.socialSetupHint]
+  );
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void loadFeed();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [loadFeed]);
+
+  useEffect(() => {
+    if (!actionNotice || typeof window === "undefined") return undefined;
+    const id = window.setTimeout(() => setActionNotice(""), 3200);
+    return () => window.clearTimeout(id);
+  }, [actionNotice]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || videos.length === 0) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntry = [...entries]
+          .filter((entry) => entry.isIntersecting)
+          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
+        const nextId = visibleEntry?.target.getAttribute("data-post-id");
+        if (nextId) {
+          setActivePostId(nextId);
+        }
+      },
+      { threshold: [0.45, 0.7, 0.9] }
+    );
+
+    for (const video of videos) {
+      const node = cardRefs.current[video.id];
+      if (node) observer.observe(node);
+    }
+
+    return () => observer.disconnect();
+  }, [videos]);
+
+  useEffect(() => {
+    for (const video of videos) {
+      const element = videoRefs.current[video.id];
+      if (!element) continue;
+      if ("muted" in element) {
+        element.muted = soundOnPostId !== video.id;
+      }
+      if (typeof element.play !== "function" || typeof element.pause !== "function") {
+        continue;
+      }
+      if (video.id === activePostId && !pausedPostIds[video.id]) {
+        const playResult = element.play();
+        if (playResult && typeof playResult.catch === "function") {
+          playResult.catch(() => {});
+        }
+      } else {
+        element.pause();
+      }
+    }
+  }, [activePostId, pausedPostIds, soundOnPostId, videos]);
+
+  const handleToggleComments = useCallback(
+    async (postId: string) => {
+      if (openCommentsPostId === postId) {
+        setOpenCommentsPostId(null);
+        return;
+      }
+      setOpenCommentsPostId(postId);
+      if (!commentsByPostId[postId]) {
+        await loadComments(postId);
+      }
+    },
+    [commentsByPostId, loadComments, openCommentsPostId]
+  );
+
+  const handleToggleLike = useCallback(
+    async (postId: string) => {
+      if (!sessionUserId) {
+        requireAuth();
+        return;
+      }
+      if (!socialReady) {
+        setNotice(text.socialSetupHint);
+        return;
+      }
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        setNotice(text.notConfigured);
+        return;
+      }
+
+      const liked = likedPostIdSet.has(postId);
+      setLikeLoadingPostId(postId);
+      if (liked) {
+        const { error } = await supabase
+          .from("post_likes")
+          .delete()
+          .eq("post_id", postId)
+          .eq("user_id", sessionUserId);
+        setLikeLoadingPostId(null);
+        if (error) {
+          setNotice(
+            isSchemaError(error) ? text.socialSetupHint : getErrorMessage(error)
+          );
+          return;
+        }
+        setLikedPostIds((prev) => prev.filter((id) => id !== postId));
+        setLikeCounts((prev) => ({
+          ...prev,
+          [postId]: Math.max(0, (prev[postId] ?? 0) - 1),
+        }));
+        return;
+      }
+
+      const { error } = await supabase.from("post_likes").insert({
+        post_id: postId,
+        user_id: sessionUserId,
+      });
+      setLikeLoadingPostId(null);
+      if (error) {
+        setNotice(isSchemaError(error) ? text.socialSetupHint : getErrorMessage(error));
+        return;
+      }
+      setLikedPostIds((prev) => [...prev, postId]);
+      setLikeCounts((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] ?? 0) + 1,
+      }));
+    },
+    [
+      likedPostIdSet,
+      requireAuth,
+      sessionUserId,
+      setNotice,
+      socialReady,
+      text.notConfigured,
+      text.socialSetupHint,
+    ]
+  );
+
+  const handleCommentSubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>, postId: string) => {
+      event.preventDefault();
+      if (!sessionUserId) {
+        requireAuth();
+        return;
+      }
+      if (!socialReady) {
+        setNotice(text.socialSetupHint);
+        return;
+      }
+      const draft = commentDrafts[postId]?.trim() ?? "";
+      if (!draft) return;
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        setNotice(text.notConfigured);
+        return;
+      }
+
+      setCommentSubmittingPostId(postId);
+      const { error } = await supabase.from("post_comments").insert({
+        post_id: postId,
+        user_id: sessionUserId,
+        comment: draft,
+      });
+      setCommentSubmittingPostId(null);
+
+      if (error) {
+        setNotice(isSchemaError(error) ? text.socialSetupHint : getErrorMessage(error));
+        return;
+      }
+
+      setCommentDrafts((prev) => ({ ...prev, [postId]: "" }));
+      setCommentCounts((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] ?? 0) + 1,
+      }));
+      await loadComments(postId);
+      setOpenCommentsPostId(postId);
+    },
+    [
+      commentDrafts,
+      loadComments,
+      requireAuth,
+      sessionUserId,
+      setNotice,
+      socialReady,
+      text.notConfigured,
+      text.socialSetupHint,
+    ]
+  );
+
+  const handleShare = useCallback(
+    async (post: VideoFeedItem) => {
+      if (typeof window === "undefined") return;
+      const shareUrl = new URL(window.location.href);
+      shareUrl.pathname = sharePath;
+      shareUrl.search = "";
+      shareUrl.searchParams.set("post", post.id);
+
+      const payload = {
+        title: `${getAuthorName(post.author)} - ${text.navLabel}`,
+        text: post.caption?.trim() || text.subtitle,
+        url: shareUrl.toString(),
+      };
+
+      let shared = false;
+      try {
+        if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+          await navigator.share(payload);
+          setNotice(text.shareDone);
+          shared = true;
+        } else if (
+          typeof navigator !== "undefined" &&
+          navigator.clipboard &&
+          typeof navigator.clipboard.writeText === "function"
+        ) {
+          await navigator.clipboard.writeText(payload.url);
+          setNotice(text.shareCopied);
+          shared = true;
+        } else {
+          window.prompt(text.sharePrompt, payload.url);
+          shared = true;
+        }
+      } catch (error) {
+        const message = getErrorMessage(error);
+        if (!message.toLowerCase().includes("abort")) {
+          setNotice(message);
+        }
+        return;
+      }
+
+      if (!shared) return;
+      setShareLoadingPostId(post.id);
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        const { error } = await supabase.from("post_share_events").insert({
+          post_id: post.id,
+          user_id: sessionUserId,
+          channel:
+            typeof navigator !== "undefined" && typeof navigator.share === "function"
+              ? "native_share"
+              : "copy_link",
+        });
+        if (!error) {
+          setShareCounts((prev) => ({
+            ...prev,
+            [post.id]: (prev[post.id] ?? 0) + 1,
+          }));
+        } else if (!isSchemaError(error)) {
+          setNotice(getErrorMessage(error));
+        }
+      }
+      setShareLoadingPostId(null);
+    },
+    [
+      sessionUserId,
+      setNotice,
+      sharePath,
+      text.navLabel,
+      text.shareCopied,
+      text.shareDone,
+      text.sharePrompt,
+      text.subtitle,
+    ]
+  );
+
+  const handleTogglePlayback = useCallback((postId: string) => {
+    const element = videoRefs.current[postId];
+    if (
+      !element ||
+      typeof element.play !== "function" ||
+      typeof element.pause !== "function"
+    ) {
+      return;
+    }
+    setActivePostId(postId);
+    if (!("paused" in element) || element.paused) {
+      setPausedPostIds((prev) => ({ ...prev, [postId]: false }));
+      const playResult = element.play();
+      if (playResult && typeof playResult.catch === "function") {
+        playResult.catch(() => {});
+      }
+      return;
+    }
+    element.pause();
+    setPausedPostIds((prev) => ({ ...prev, [postId]: true }));
+  }, []);
+
+  const handleToggleSound = useCallback((postId: string) => {
+    setSoundOnPostId((prev) => (prev === postId ? null : postId));
+  }, []);
+
+  return (
+    <div className="shortsPage">
+      <div className="shortsHeader">
+        <div className="shortsTitle">{text.title}</div>
+        <div className="shortsSubtitle">{text.subtitle}</div>
+      </div>
+
+      {socialNotice ? (
+        <div className="shortsNotice shortsNotice--warning">{socialNotice}</div>
+      ) : null}
+      {actionNotice ? <div className="shortsNotice">{actionNotice}</div> : null}
+      {guestMode ? (
+        <div className="shortsNotice shortsNotice--ghost">{text.signInHint}</div>
+      ) : null}
+
+      {feedStatus.type === "loading" ? (
+        <div className="shortsEmptyCard">{text.loading}</div>
+      ) : feedStatus.type === "error" ? (
+        <div className="shortsEmptyCard">
+          <div>{feedStatus.message}</div>
+          <button className="btn" type="button" onClick={() => void loadFeed()}>
+            {text.retry}
+          </button>
+        </div>
+      ) : videos.length === 0 ? (
+        <div className="shortsEmptyCard">{text.empty}</div>
+      ) : (
+        <div className="shortsFeed">
+          {videos.map((post) => {
+            const authorName = getAuthorName(post.author);
+            const authorInitial = getInitial(authorName);
+            const muxPlaybackId =
+              post.mux_playback_id ?? extractMuxPlaybackId(post.media_url);
+            const locationLabel = [post.author.city, post.author.country]
+              .filter(Boolean)
+              .join(", ");
+            const languageLabel =
+              post.author.language &&
+              (languageLabels[post.author.language] ?? post.author.language);
+            const comments = commentsByPostId[post.id] ?? [];
+            const commentsOpen = openCommentsPostId === post.id;
+            const paused = Boolean(pausedPostIds[post.id]);
+
+            return (
+              <article
+                key={post.id}
+                ref={(node) => updateRefMap(cardRefs, post.id, node)}
+                className="shortsCard"
+                data-post-id={post.id}
+              >
+                <div className="shortsStage">
+                  {muxPlaybackId ? (
+                    <MuxPlayer
+                      playerRef={(node) => updateRefMap(videoRefs, post.id, node)}
+                      className="shortsVideo"
+                      playbackId={muxPlaybackId}
+                      loop
+                      muted
+                      onClick={() => handleTogglePlayback(post.id)}
+                    />
+                  ) : (
+                    <video
+                      ref={(node) => updateRefMap(videoRefs, post.id, node)}
+                      className="shortsVideo"
+                      src={post.media_url ?? undefined}
+                      loop
+                      muted
+                      playsInline
+                      preload="metadata"
+                      onClick={() => handleTogglePlayback(post.id)}
+                    />
+                  )}
+                  <div className="shortsStageShade" />
+                  <div className="shortsStageTop">
+                    <button
+                      className="shortsAuthor"
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        goToOrganizer(post.author.id);
+                      }}
+                      title={text.viewProfile}
+                    >
+                      {post.author.avatar_url ? (
+                        <img
+                          className="shortsAuthorAvatar"
+                          src={post.author.avatar_url}
+                          alt={authorName}
+                        />
+                      ) : (
+                        <span className="shortsAuthorAvatar shortsAuthorAvatar--placeholder">
+                          {authorInitial}
+                        </span>
+                      )}
+                      <span className="shortsAuthorCopy">
+                        <span className="shortsBadge">{text.organizerBadge}</span>
+                        <span className="shortsAuthorName">{authorName}</span>
+                        {locationLabel || languageLabel ? (
+                          <span className="shortsAuthorMeta">
+                            {[locationLabel, languageLabel].filter(Boolean).join(" • ")}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                    <button
+                      className="shortsSoundButton"
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleToggleSound(post.id);
+                      }}
+                    >
+                      {soundOnPostId === post.id ? text.audioOn : text.audioOff}
+                    </button>
+                  </div>
+                  <div className="shortsRail">
+                    <ShortsActionButton
+                      label={text.likeLabel}
+                      count={numberFormatter.format(likeCounts[post.id] ?? 0)}
+                      active={likedPostIdSet.has(post.id)}
+                      busy={likeLoadingPostId === post.id}
+                      onClick={() => void handleToggleLike(post.id)}
+                    >
+                      <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                        <path
+                          d="M12 21s-6.7-4.2-9.2-8C1.3 10.2 2.2 6.8 5.2 5.5c2.1-.9 4.3-.1 5.4 1.5 1.1-1.6 3.4-2.4 5.4-1.5 3 1.3 3.9 4.7 2.4 7.5C18.7 16.8 12 21 12 21Z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    </ShortsActionButton>
+                    <ShortsActionButton
+                      label={text.commentLabel}
+                      count={numberFormatter.format(commentCounts[post.id] ?? 0)}
+                      active={commentsOpen}
+                      onClick={() => void handleToggleComments(post.id)}
+                    >
+                      <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                        <path
+                          d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v7A2.5 2.5 0 0 1 17.5 15H9l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 12.5v-7Z"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </ShortsActionButton>
+                    <ShortsActionButton
+                      label={text.shareLabel}
+                      count={numberFormatter.format(shareCounts[post.id] ?? 0)}
+                      busy={shareLoadingPostId === post.id}
+                      onClick={() => void handleShare(post)}
+                    >
+                      <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                        <path
+                          d="M15 5l5 4.5-5 4.5V11c-5 0-8.2 1.7-11 6 1-6.7 4.7-10 11-10V5Z"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </ShortsActionButton>
+                  </div>
+                  <div className="shortsStageBottom">
+                    <div className="shortsTime">
+                      {formatRelativeTime(post.created_at, locale)}
+                    </div>
+                    {post.caption?.trim() ? (
+                      <div className="shortsCaption">{post.caption.trim()}</div>
+                    ) : null}
+                    {post.author.bio?.trim() ? (
+                      <div className="shortsBio">{post.author.bio.trim()}</div>
+                    ) : null}
+                    <div className="shortsHint">
+                      {paused ? text.resumeHint : text.tapHint}
+                    </div>
+                  </div>
+                </div>
+                {commentsOpen ? (
+                  <div className="shortsComments">
+                    <div className="shortsCommentsHeader">{text.commentsTitle}</div>
+                    {commentsLoadingPostId === post.id ? (
+                      <div className="shortsCommentsEmpty">{text.loading}</div>
+                    ) : comments.length === 0 ? (
+                      <div className="shortsCommentsEmpty">{text.noComments}</div>
+                    ) : (
+                      <div className="shortsCommentsList">
+                        {comments.map((comment) => (
+                          <div key={comment.id} className="shortsComment">
+                            {comment.authorAvatar ? (
+                              <img
+                                className="shortsCommentAvatar"
+                                src={comment.authorAvatar}
+                                alt={comment.authorName}
+                              />
+                            ) : (
+                              <div className="shortsCommentAvatar shortsCommentAvatar--placeholder">
+                                {getInitial(comment.authorName)}
+                              </div>
+                            )}
+                            <div className="shortsCommentBody">
+                              <div className="shortsCommentMeta">
+                                <span className="shortsCommentAuthor">
+                                  {comment.authorName}
+                                </span>
+                                <span className="shortsCommentTime">
+                                  {formatRelativeTime(comment.created_at, locale)}
+                                </span>
+                              </div>
+                              <div className="shortsCommentText">{comment.comment}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <form
+                      className="shortsCommentForm"
+                      onSubmit={(event) => void handleCommentSubmit(event, post.id)}
+                    >
+                      <textarea
+                        className="input shortsCommentInput"
+                        rows={2}
+                        placeholder={text.commentPlaceholder}
+                        value={commentDrafts[post.id] ?? ""}
+                        onChange={(event) =>
+                          setCommentDrafts((prev) => ({
+                            ...prev,
+                            [post.id]: event.target.value,
+                          }))
+                        }
+                        maxLength={280}
+                        disabled={commentSubmittingPostId === post.id}
+                      />
+                      <div className="shortsCommentFooter">
+                        {!sessionUserId ? (
+                          <button className="btn" type="button" onClick={requireAuth}>
+                            {text.signInHint}
+                          </button>
+                        ) : null}
+                        <button
+                          className="btn shortsCommentSend"
+                          type="submit"
+                          disabled={commentSubmittingPostId === post.id}
+                        >
+                          {text.commentSend}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
