@@ -80,7 +80,9 @@ Deno.serve(async (req) => {
         method: req.method,
         authError,
       });
-      return json(401, { error: "Unauthorized" });
+      return json(401, {
+        error: authError || "Unauthorized",
+      });
     }
 
     const body = await req.json();

@@ -5185,13 +5185,22 @@ export default function App() {
         const { data: sessionData, error: sessionError } =
           await supabase.auth.getSession();
         if (sessionError) throw sessionError;
-        const accessToken = sessionData.session?.access_token;
-        const user = sessionData.session?.user;
+        const { data: refreshedSessionData, error: refreshError } =
+          await supabase.auth.refreshSession();
+        const accessToken =
+          refreshedSessionData.session?.access_token ??
+          sessionData.session?.access_token ??
+          undefined;
+        const user =
+          refreshedSessionData.session?.user ?? sessionData.session?.user;
+        if (refreshError && !accessToken) {
+          throw refreshError;
+        }
         if (!user) {
           setPostActionStatus({
             type: "error",
             message: strings.profileAuthRequired,
-        });
+          });
         return;
       }
       let mediaUrl: string | null = null;
@@ -5311,13 +5320,22 @@ export default function App() {
         const { data: sessionData, error: sessionError } =
           await supabase.auth.getSession();
         if (sessionError) throw sessionError;
-        const accessToken = sessionData.session?.access_token;
-        const user = sessionData.session?.user;
+        const { data: refreshedSessionData, error: refreshError } =
+          await supabase.auth.refreshSession();
+        const accessToken =
+          refreshedSessionData.session?.access_token ??
+          sessionData.session?.access_token ??
+          undefined;
+        const user =
+          refreshedSessionData.session?.user ?? sessionData.session?.user;
+        if (refreshError && !accessToken) {
+          throw refreshError;
+        }
         if (!user) {
           setPostActionStatus({
             type: "error",
             message: strings.profileAuthRequired,
-        });
+          });
         return;
       }
       if (post.media_url) {
@@ -5413,7 +5431,15 @@ export default function App() {
         const { data: sessionData, error: sessionError } =
           await supabase.auth.getSession();
         if (sessionError) throw sessionError;
-        const accessToken = sessionData.session?.access_token;
+        const { data: refreshedSessionData, error: refreshError } =
+          await supabase.auth.refreshSession();
+        const accessToken =
+          refreshedSessionData.session?.access_token ??
+          sessionData.session?.access_token ??
+          undefined;
+        if (refreshError && !accessToken) {
+          throw refreshError;
+        }
         if (post.media_url) {
           const path = getStoragePathFromUrl(post.media_url, POSTS_BUCKET);
           if (path) {
