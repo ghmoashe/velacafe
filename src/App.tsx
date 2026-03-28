@@ -5181,15 +5181,16 @@ export default function App() {
       return;
     }
     setPostActionStatus({ type: "loading", message: strings.loadingLabel });
-    try {
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      const user = sessionData.session?.user;
-      if (!user) {
-        setPostActionStatus({
-          type: "error",
-          message: strings.profileAuthRequired,
+      try {
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const accessToken = sessionData.session?.access_token;
+        const user = sessionData.session?.user;
+        if (!user) {
+          setPostActionStatus({
+            type: "error",
+            message: strings.profileAuthRequired,
         });
         return;
       }
@@ -5205,21 +5206,22 @@ export default function App() {
             type: "loading",
             message: "Uploading video to Mux...",
           });
-          const directUpload = await createMuxDirectUpload(supabase, {
-            origin:
-              typeof window !== "undefined" ? window.location.origin : "http://localhost",
-            filename: postFile.name,
-            contentType: postFile.type || "video/mp4",
-            userId: user.id,
-          });
-          muxUploadId = directUpload.uploadId;
-          await uploadFileToMux(directUpload.uploadUrl, postFile);
-          const muxStatus = await waitForMuxPlayback(supabase, directUpload.uploadId, {
-            onProgress: (status) => {
-              const assetStatus = status.assetStatus ?? status.uploadStatus ?? "processing";
-              setPostActionStatus({
-                type: "loading",
-                message: `Processing video in Mux... (${assetStatus})`,
+            const directUpload = await createMuxDirectUpload(supabase, {
+              origin:
+                typeof window !== "undefined" ? window.location.origin : "http://localhost",
+              filename: postFile.name,
+              contentType: postFile.type || "video/mp4",
+              userId: user.id,
+            }, accessToken);
+            muxUploadId = directUpload.uploadId;
+            await uploadFileToMux(directUpload.uploadUrl, postFile);
+            const muxStatus = await waitForMuxPlayback(supabase, directUpload.uploadId, {
+              accessToken,
+              onProgress: (status) => {
+                const assetStatus = status.assetStatus ?? status.uploadStatus ?? "processing";
+                setPostActionStatus({
+                  type: "loading",
+                  message: `Processing video in Mux... (${assetStatus})`,
               });
             },
           });
@@ -5305,15 +5307,16 @@ export default function App() {
       if (!confirmed) return;
     }
     setPostActionStatus({ type: "loading", message: strings.loadingLabel });
-    try {
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      const user = sessionData.session?.user;
-      if (!user) {
-        setPostActionStatus({
-          type: "error",
-          message: strings.profileAuthRequired,
+      try {
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const accessToken = sessionData.session?.access_token;
+        const user = sessionData.session?.user;
+        if (!user) {
+          setPostActionStatus({
+            type: "error",
+            message: strings.profileAuthRequired,
         });
         return;
       }
@@ -5326,9 +5329,9 @@ export default function App() {
           if (removeError) throw removeError;
         }
       }
-      if (post.mux_asset_id) {
-        await deleteMuxAsset(supabase, post.mux_asset_id);
-      }
+        if (post.mux_asset_id) {
+          await deleteMuxAsset(supabase, post.mux_asset_id, accessToken);
+        }
       const { error } = await supabase
         .from(POSTS_TABLE)
         .delete()
@@ -5405,20 +5408,24 @@ export default function App() {
       const confirmed = window.confirm(strings.userPostDeleteConfirm);
       if (!confirmed) return;
     }
-    setAdminPostsStatus({ type: "loading", message: "" });
-    try {
-      if (post.media_url) {
-        const path = getStoragePathFromUrl(post.media_url, POSTS_BUCKET);
-        if (path) {
-          const { error: removeError } = await supabase.storage
-            .from(POSTS_BUCKET)
+      setAdminPostsStatus({ type: "loading", message: "" });
+      try {
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const accessToken = sessionData.session?.access_token;
+        if (post.media_url) {
+          const path = getStoragePathFromUrl(post.media_url, POSTS_BUCKET);
+          if (path) {
+            const { error: removeError } = await supabase.storage
+              .from(POSTS_BUCKET)
             .remove([path]);
           if (removeError) throw removeError;
         }
-      }
-      if (post.mux_asset_id) {
-        await deleteMuxAsset(supabase, post.mux_asset_id);
-      }
+        }
+        if (post.mux_asset_id) {
+          await deleteMuxAsset(supabase, post.mux_asset_id, accessToken);
+        }
       const { error } = await supabase
         .from(POSTS_TABLE)
         .delete()

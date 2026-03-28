@@ -30,6 +30,13 @@ type MuxUploadStatusResponse = {
   playbackId: string | null;
 };
 
+function getFunctionInvokeHeaders(accessToken?: string) {
+  if (!accessToken?.trim()) return undefined;
+  return {
+    Authorization: `Bearer ${accessToken.trim()}`,
+  };
+}
+
 async function normalizeFunctionError(error: unknown) {
   if (!error || typeof error !== "object") return new Error("Mux request failed.");
   const context =
@@ -165,9 +172,11 @@ export function MuxPlayer(props: {
 
 export async function createMuxDirectUpload(
   supabase: SupabaseClient,
-  input: { origin: string; filename: string; contentType: string; userId: string }
+  input: { origin: string; filename: string; contentType: string; userId: string },
+  accessToken?: string
 ) {
   const { data, error } = await supabase.functions.invoke(MUX_FUNCTION_NAME, {
+    headers: getFunctionInvokeHeaders(accessToken),
     body: {
       action: "create-upload",
       origin: input.origin,
@@ -182,9 +191,11 @@ export async function createMuxDirectUpload(
 
 export async function getMuxUploadStatus(
   supabase: SupabaseClient,
-  uploadId: string
+  uploadId: string,
+  accessToken?: string
 ) {
   const { data, error } = await supabase.functions.invoke(MUX_FUNCTION_NAME, {
+    headers: getFunctionInvokeHeaders(accessToken),
     body: {
       action: "get-upload",
       uploadId,
@@ -196,9 +207,11 @@ export async function getMuxUploadStatus(
 
 export async function deleteMuxAsset(
   supabase: SupabaseClient,
-  assetId: string
+  assetId: string,
+  accessToken?: string
 ) {
   const { error } = await supabase.functions.invoke(MUX_FUNCTION_NAME, {
+    headers: getFunctionInvokeHeaders(accessToken),
     body: {
       action: "delete-asset",
       assetId,
@@ -224,6 +237,7 @@ export async function waitForMuxPlayback(
   supabase: SupabaseClient,
   uploadId: string,
   options?: {
+    accessToken?: string;
     timeoutMs?: number;
     intervalMs?: number;
     onProgress?: (status: MuxUploadStatusResponse) => void;
@@ -234,7 +248,11 @@ export async function waitForMuxPlayback(
   const startedAt = Date.now();
 
   for (;;) {
-    const status = await getMuxUploadStatus(supabase, uploadId);
+    const status = await getMuxUploadStatus(
+      supabase,
+      uploadId,
+      options?.accessToken
+    );
     options?.onProgress?.(status);
     if (status.assetStatus === "ready" && status.playbackId) {
       return status;
