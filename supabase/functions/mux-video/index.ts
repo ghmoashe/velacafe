@@ -20,7 +20,12 @@ function json(status: number, body: unknown) {
 async function requireUser(req: Request) {
   const authHeader = req.headers.get("Authorization") ?? "";
   if (!authHeader || !supabaseUrl || !supabaseAnonKey) {
-    return null;
+    return {
+      user: null,
+      error: !authHeader
+        ? "Missing Authorization header."
+        : "SUPABASE_URL or SUPABASE_ANON_KEY is missing.",
+    };
   }
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     global: {
@@ -30,8 +35,13 @@ async function requireUser(req: Request) {
     },
   });
   const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return null;
-  return data.user;
+  if (error || !data.user) {
+    return {
+      user: null,
+      error: error?.message ?? "No user resolved from access token.",
+    };
+  }
+  return { user: data.user, error: null };
 }
 
 async function muxFetch(path: string, init?: RequestInit) {
@@ -48,6 +58,11 @@ async function muxFetch(path: string, init?: RequestInit) {
   });
   if (!response.ok) {
     const message = await response.text();
+    console.error("[mux-video] Mux API request failed", {
+      path,
+      status: response.status,
+      message,
+    });
     throw new Error(message || `Mux request failed with status ${response.status}.`);
   }
   if (response.status === 204) return null;
@@ -59,14 +74,23 @@ Deno.serve(async (req) => {
     if (req.method === "OPTIONS") {
       return new Response("ok", { headers: corsHeaders });
     }
-    const user = await requireUser(req);
+    const { user, error: authError } = await requireUser(req);
     if (!user) {
+      console.warn("[mux-video] Unauthorized request", {
+        method: req.method,
+        authError,
+      });
       return json(401, { error: "Unauthorized" });
     }
 
     const body = await req.json();
     const action =
       typeof body?.action === "string" ? body.action.toLowerCase() : "";
+    console.log("[mux-video] Request received", {
+      method: req.method,
+      action,
+      userId: user.id,
+    });
 
     if (action === "create-upload") {
       const origin =
@@ -136,6 +160,10 @@ Deno.serve(async (req) => {
 
     return json(400, { error: "Unsupported action" });
   } catch (error) {
+    console.error("[mux-video] Request failed", {
+      message: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : null,
+    });
     return json(500, {
       error: error instanceof Error ? error.message : "Unknown error",
     });

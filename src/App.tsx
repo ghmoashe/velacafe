@@ -2046,6 +2046,14 @@ export default function App() {
     if (error && typeof error === "object" && "message" in error) {
       const message = (error as { message?: unknown }).message;
       if (typeof message === "string" && message.trim()) {
+        const normalizedMessage = message.trim().toLowerCase();
+        if (
+          normalizedMessage.includes("invalid jwt") ||
+          normalizedMessage.includes("jwt") ||
+          normalizedMessage.includes("jwd")
+        ) {
+          return "Your session is invalid or expired. Log out and sign in again.";
+        }
         return message;
       }
     }
