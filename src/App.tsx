@@ -5011,9 +5011,32 @@ export default function App() {
     const supabase = getSupabaseClient();
     if (!supabase) return undefined;
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
-      setSessionUser(data.session?.user ?? null);
+      const session = data.session;
+      if (!session?.user || !session.access_token) {
+        setSessionUser(null);
+        return;
+      }
+      const { data: userData, error: userError } = await supabase.auth.getUser(
+        session.access_token
+      );
+      if (!active) return;
+      if (userError || !userData.user) {
+        await supabase.auth.signOut();
+        if (!active) return;
+        setSessionUser(null);
+        setProfileIsOrganizer(false);
+        setProfileIsAdmin(false);
+        profileLoaded.current = false;
+        setAuthState({
+          type: "error",
+          message: "Your session expired. Please sign in again.",
+        });
+        navigate("login");
+        return;
+      }
+      setSessionUser(userData.user);
     });
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
@@ -5040,7 +5063,7 @@ export default function App() {
       active = false;
       data.subscription.unsubscribe();
     };
-  }, [guestMode, handlePostAuthRedirect, strings.successLogin, upsertProfile]);
+  }, [guestMode, handlePostAuthRedirect, navigate, strings.successLogin, upsertProfile]);
 
   async function handlePrimaryAction() {
     if (authState.type === "loading") return;
