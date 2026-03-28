@@ -30,6 +30,47 @@ type MuxUploadStatusResponse = {
   playbackId: string | null;
 };
 
+async function normalizeFunctionError(error: unknown) {
+  if (!error || typeof error !== "object") return new Error("Mux request failed.");
+  const context =
+    "context" in error ? (error as { context?: unknown }).context : null;
+  if (context && typeof context === "object") {
+    if ("json" in context && typeof context.json === "function") {
+      try {
+        const payload = await context.json();
+        if (payload && typeof payload === "object") {
+          const message =
+            "error" in payload && typeof payload.error === "string"
+              ? payload.error
+              : "message" in payload && typeof payload.message === "string"
+                ? payload.message
+                : "";
+          if (message.trim()) {
+            return new Error(message);
+          }
+        }
+      } catch {
+        // Ignore and fall back to text/message parsing below.
+      }
+    }
+    if ("text" in context && typeof context.text === "function") {
+      try {
+        const message = await context.text();
+        if (typeof message === "string" && message.trim()) {
+          return new Error(message);
+        }
+      } catch {
+        // Ignore and fall back to message parsing below.
+      }
+    }
+  }
+  const message =
+    "message" in error && typeof error.message === "string"
+      ? error.message
+      : "Mux request failed.";
+  return new Error(message);
+}
+
 export function buildMuxPlaybackUrl(playbackId: string) {
   return `${MUX_PLAYBACK_BASE_URL.replace(/\/+$/, "")}/${playbackId}.m3u8`;
 }
@@ -135,7 +176,7 @@ export async function createMuxDirectUpload(
       userId: input.userId,
     },
   });
-  if (error) throw error;
+  if (error) throw await normalizeFunctionError(error);
   return data as MuxCreateUploadResponse;
 }
 
@@ -149,7 +190,7 @@ export async function getMuxUploadStatus(
       uploadId,
     },
   });
-  if (error) throw error;
+  if (error) throw await normalizeFunctionError(error);
   return data as MuxUploadStatusResponse;
 }
 
@@ -163,7 +204,7 @@ export async function deleteMuxAsset(
       assetId,
     },
   });
-  if (error) throw error;
+  if (error) throw await normalizeFunctionError(error);
 }
 
 export async function uploadFileToMux(uploadUrl: string, file: File) {
