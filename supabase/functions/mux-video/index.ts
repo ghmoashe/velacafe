@@ -19,22 +19,18 @@ function json(status: number, body: unknown) {
 
 async function requireUser(req: Request) {
   const authHeader = req.headers.get("Authorization") ?? "";
-  if (!authHeader || !supabaseUrl || !supabaseAnonKey) {
+  const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+  const accessToken = tokenMatch?.[1]?.trim() ?? "";
+  if (!accessToken || !supabaseUrl || !supabaseAnonKey) {
     return {
       user: null,
-      error: !authHeader
-        ? "Missing Authorization header."
+      error: !accessToken
+        ? "Missing or invalid Bearer token."
         : "SUPABASE_URL or SUPABASE_ANON_KEY is missing.",
     };
   }
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: authHeader,
-      },
-    },
-  });
-  const { data, error } = await supabase.auth.getUser();
+  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  const { data, error } = await supabase.auth.getUser(accessToken);
   if (error || !data.user) {
     return {
       user: null,
