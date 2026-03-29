@@ -467,6 +467,14 @@ export default function ShortsPage(props: ShortsPageProps) {
             ? text.socialSetupHint
             : getErrorMessage(interactionError)
         );
+        if (items?.length) {
+          setVideos(items);
+          setActivePostId((current) =>
+            current && items.some((item) => item.id === current)
+              ? current
+              : items[0]?.id ?? null
+          );
+        }
         setLikeCounts(buildCountMap(postIds));
         setCommentCounts(buildCountMap(postIds));
         setShareCounts(buildCountMap(postIds));
@@ -523,7 +531,11 @@ export default function ShortsPage(props: ShortsPageProps) {
           }
         );
         setVideos(rankedItems);
-        setActivePostId(rankedItems[0]?.id ?? null);
+        setActivePostId((current) =>
+          current && rankedItems.some((item) => item.id === current)
+            ? current
+            : rankedItems[0]?.id ?? null
+        );
       }
 
       setSocialReady(true);
@@ -638,9 +650,6 @@ export default function ShortsPage(props: ShortsPageProps) {
         ...post,
         author: profileMap.get(post.user_id)!,
       }));
-
-    setVideos(filteredVideos);
-    setActivePostId(filteredVideos[0]?.id ?? null);
     setFeedStatus({ type: "idle", message: "" });
     await loadInteractionSummary(
       filteredVideos.map((item) => item.id),
