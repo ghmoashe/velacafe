@@ -17,6 +17,8 @@ export type MuxPlayerElement = HTMLElement & {
   pause: () => void;
   muted: boolean;
   paused: boolean;
+  currentTime?: number;
+  duration?: number;
 };
 
 type MuxCreateUploadResponse = {
@@ -29,6 +31,9 @@ type MuxUploadStatusResponse = {
   assetStatus: string | null;
   assetId: string | null;
   playbackId: string | null;
+  durationSeconds?: number | null;
+  aspectRatio?: number | null;
+  thumbnailUrl?: string | null;
 };
 
 function getMuxFunctionUrl() {

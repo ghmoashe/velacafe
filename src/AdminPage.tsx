@@ -70,6 +70,7 @@ type UserPost = {
   mux_playback_id?: string | null;
   mux_asset_id?: string | null;
   mux_upload_id?: string | null;
+  shorts_hidden?: boolean | null;
 };
 
 type LanguageLabels = Partial<Record<string, string>>;
@@ -113,6 +114,7 @@ type AdminPageProps = {
   cancelAdminPostEdit: () => void;
   startAdminPostEdit: (post: UserPost) => void;
   handleAdminDeletePost: (post: UserPost) => Promise<void> | void;
+  handleAdminToggleShortHidden: (post: UserPost) => Promise<void> | void;
 };
 
 export default function AdminPage(props: AdminPageProps) {
@@ -151,6 +153,7 @@ export default function AdminPage(props: AdminPageProps) {
     cancelAdminPostEdit,
     startAdminPostEdit,
     handleAdminDeletePost,
+    handleAdminToggleShortHidden,
   } = props;
 
   return (
@@ -736,6 +739,18 @@ export default function AdminPage(props: AdminPageProps) {
                                         >
                                           {strings.eventEdit}
                                         </button>
+                                        {post.media_type === "video" ? (
+                                          <button
+                                            className="btn btnGhost"
+                                            type="button"
+                                            onClick={() => void handleAdminToggleShortHidden(post)}
+                                            disabled={adminPostsStatus.type === "loading"}
+                                          >
+                                            {post.shorts_hidden
+                                              ? "Show in Shorts"
+                                              : "Hide from Shorts"}
+                                          </button>
+                                        ) : null}
                                         <button
                                           className="userPostDelete"
                                           type="button"

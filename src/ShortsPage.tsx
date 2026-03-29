@@ -41,6 +41,10 @@ type VideoPostRow = {
   created_at: string;
   cover_url?: string | null;
   mux_playback_id?: string | null;
+  mux_thumbnail_url?: string | null;
+  shorts_visibility?: string | null;
+  shorts_hidden?: boolean | null;
+  shorts_deleted_at?: string | null;
 };
 
 type VideoFeedItem = VideoPostRow & {
@@ -68,6 +72,10 @@ type ViewRow = {
   post_id: string;
 };
 
+type ReportRow = {
+  post_id: string;
+};
+
 type FeedComment = {
   id: string;
   post_id: string;
@@ -85,10 +93,16 @@ type ShortsPageProps = {
   languageLabels: Partial<Record<string, string>>;
   guestMode: boolean;
   sessionUserId: string | null;
+  viewerLanguage: string | null;
+  viewerCity: string | null;
+  followingOrganizerIds: string[];
   requireAuth: () => void;
   goToOrganizer: (organizerId: string) => void;
   sharePath: string;
 };
+
+const RECENT_VIEWS_STORAGE_KEY = "vela-shorts-recent-views";
+const RECENT_VIEW_COOLDOWN_MS = 1000 * 60 * 60 * 18;
 
 function getErrorMessage(error: unknown) {
   if (error && typeof error === "object" && "message" in error) {
@@ -178,9 +192,50 @@ function getFeedViewerKey(sessionUserId: string | null) {
   return `guest:${generated}`;
 }
 
+function getRecentViewedAtMap() {
+  if (typeof window === "undefined") {
+    return new Map<string, number>();
+  }
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(RECENT_VIEWS_STORAGE_KEY) ?? "{}"
+    ) as Record<string, unknown>;
+    const now = Date.now();
+    const entries = Object.entries(parsed).filter(([, value]) => {
+      return typeof value === "number" && now - value < RECENT_VIEW_COOLDOWN_MS;
+    });
+    const map = new Map<string, number>(
+      entries.map(([postId, value]) => [postId, value as number])
+    );
+    window.localStorage.setItem(
+      RECENT_VIEWS_STORAGE_KEY,
+      JSON.stringify(Object.fromEntries(map))
+    );
+    return map;
+  } catch {
+    return new Map<string, number>();
+  }
+}
+
+function persistRecentViewedAt(postId: string) {
+  if (typeof window === "undefined") return;
+  const map = getRecentViewedAtMap();
+  map.set(postId, Date.now());
+  window.localStorage.setItem(
+    RECENT_VIEWS_STORAGE_KEY,
+    JSON.stringify(Object.fromEntries(map))
+  );
+}
+
 function getVideoRankScore(
   post: VideoFeedItem,
-  metrics: { likes: number; comments: number; shares: number; views: number }
+  metrics: { likes: number; comments: number; shares: number; views: number },
+  context: {
+    viewerLanguage: string | null;
+    viewerCity: string | null;
+    followingOrganizerIds: Set<string>;
+    recentViewedAt: Map<string, number>;
+  }
 ) {
   const createdAt = new Date(post.created_at).getTime();
   const ageHours = Number.isNaN(createdAt)
@@ -192,7 +247,27 @@ function getVideoRankScore(
     metrics.comments * 6 +
     metrics.shares * 8 +
     Math.log10(metrics.views + 1) * 18;
-  return freshnessBoost + engagementBoost;
+  const languageBoost =
+    context.viewerLanguage &&
+    post.author.language &&
+    context.viewerLanguage === post.author.language
+      ? 26
+      : 0;
+  const cityBoost =
+    context.viewerCity &&
+    post.author.city &&
+    context.viewerCity.trim().toLowerCase() === post.author.city.trim().toLowerCase()
+      ? 18
+      : 0;
+  const followBoost = context.followingOrganizerIds.has(post.author.id) ? 42 : 0;
+  const viewedAt = context.recentViewedAt.get(post.id);
+  const cooldownPenalty = viewedAt
+    ? Math.max(
+        8,
+        Math.round((RECENT_VIEW_COOLDOWN_MS - (Date.now() - viewedAt)) / 3_600_000) * 10
+      )
+    : 0;
+  return freshnessBoost + engagementBoost + languageBoost + cityBoost + followBoost - cooldownPenalty;
 }
 
 function rankFeedVideos(
@@ -201,7 +276,13 @@ function rankFeedVideos(
   commentCounts: Record<string, number>,
   shareCounts: Record<string, number>,
   viewCounts: Record<string, number>,
-  requestedPostId: string | null
+  requestedPostId: string | null,
+  context: {
+    viewerLanguage: string | null;
+    viewerCity: string | null;
+    followingOrganizerIds: Set<string>;
+    recentViewedAt: Map<string, number>;
+  }
 ) {
   return [...items].sort((left, right) => {
     if (requestedPostId) {
@@ -214,13 +295,13 @@ function rankFeedVideos(
         comments: commentCounts[right.id] ?? 0,
         shares: shareCounts[right.id] ?? 0,
         views: viewCounts[right.id] ?? 0,
-      }) -
+      }, context) -
       getVideoRankScore(left, {
         likes: likeCounts[left.id] ?? 0,
         comments: commentCounts[left.id] ?? 0,
         shares: shareCounts[left.id] ?? 0,
         views: viewCounts[left.id] ?? 0,
-      });
+      }, context);
     if (scoreDiff !== 0) {
       return scoreDiff;
     }
@@ -232,6 +313,9 @@ function getVideoCoverUrl(post: VideoPostRow) {
   const playbackId = post.mux_playback_id ?? extractMuxPlaybackId(post.media_url);
   if (post.cover_url?.trim()) {
     return post.cover_url.trim();
+  }
+  if (post.mux_thumbnail_url?.trim()) {
+    return post.mux_thumbnail_url.trim();
   }
   return playbackId ? buildMuxThumbnailUrl(playbackId) : null;
 }
@@ -270,7 +354,7 @@ function ShortsActionButton(props: {
       <span className="shortsActionIcon" aria-hidden="true">
         {children}
       </span>
-      <span className="shortsActionCount">{count}</span>
+      {count ? <span className="shortsActionCount">{count}</span> : null}
       <span className="shortsActionLabel">{label}</span>
     </button>
   );
@@ -282,6 +366,9 @@ export default function ShortsPage(props: ShortsPageProps) {
     languageLabels,
     guestMode,
     sessionUserId,
+    viewerLanguage,
+    viewerCity,
+    followingOrganizerIds,
     requireAuth,
     goToOrganizer,
     sharePath,
@@ -314,6 +401,8 @@ export default function ShortsPage(props: ShortsPageProps) {
   >(null);
   const [likeLoadingPostId, setLikeLoadingPostId] = useState<string | null>(null);
   const [shareLoadingPostId, setShareLoadingPostId] = useState<string | null>(null);
+  const [reportLoadingPostId, setReportLoadingPostId] = useState<string | null>(null);
+  const [reportedPostIds, setReportedPostIds] = useState<string[]>([]);
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [soundOnPostId, setSoundOnPostId] = useState<string | null>(null);
   const [pausedPostIds, setPausedPostIds] = useState<Record<string, boolean>>({});
@@ -321,7 +410,17 @@ export default function ShortsPage(props: ShortsPageProps) {
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
   const videoRefs = useRef<Record<string, PlayableMediaElement | null>>({});
   const recordedViewIdsRef = useRef<Set<string>>(new Set());
+  const watchSessionRef = useRef<{
+    postId: string;
+    startedAt: number;
+    startedPlaybackTime: number;
+  } | null>(null);
+  const followingOrganizerIdSet = useMemo(
+    () => new Set(followingOrganizerIds),
+    [followingOrganizerIds]
+  );
   const likedPostIdSet = useMemo(() => new Set(likedPostIds), [likedPostIds]);
+  const reportedPostIdSet = useMemo(() => new Set(reportedPostIds), [reportedPostIds]);
 
   const setNotice = useCallback((message: string) => {
     setActionNotice(message);
@@ -336,22 +435,31 @@ export default function ShortsPage(props: ShortsPageProps) {
         setShareCounts(buildCountMap(postIds));
         setViewCounts(buildCountMap(postIds));
         setLikedPostIds([]);
+        setReportedPostIds([]);
         return;
       }
-      const [likesResult, commentsResult, sharesResult, viewsResult] = await Promise.all([
-        supabase.from("post_likes").select("post_id,user_id").in("post_id", postIds),
-        supabase.from("post_comments").select("post_id").in("post_id", postIds),
-        supabase
-          .from("post_share_events")
-          .select("post_id")
-          .in("post_id", postIds),
-        supabase.from("post_view_events").select("post_id").in("post_id", postIds),
-      ]);
+      const viewerKey = getFeedViewerKey(sessionUserId);
+      const [likesResult, commentsResult, sharesResult, viewsResult, reportsResult] =
+        await Promise.all([
+          supabase.from("post_likes").select("post_id,user_id").in("post_id", postIds),
+          supabase.from("post_comments").select("post_id").in("post_id", postIds),
+          supabase
+            .from("post_share_events")
+            .select("post_id")
+            .in("post_id", postIds),
+          supabase.from("post_view_events").select("post_id").in("post_id", postIds),
+          supabase
+            .from("post_reports")
+            .select("post_id")
+            .eq("viewer_key", viewerKey)
+            .in("post_id", postIds),
+        ]);
       const interactionError =
         likesResult.error ??
         commentsResult.error ??
         sharesResult.error ??
-        viewsResult.error;
+        viewsResult.error ??
+        reportsResult.error;
       if (interactionError) {
         setSocialReady(false);
         setSocialNotice(
@@ -364,6 +472,7 @@ export default function ShortsPage(props: ShortsPageProps) {
         setShareCounts(buildCountMap(postIds));
         setViewCounts(buildCountMap(postIds));
         setLikedPostIds([]);
+        setReportedPostIds([]);
         return;
       }
 
@@ -392,15 +501,26 @@ export default function ShortsPage(props: ShortsPageProps) {
         nextViewCounts[row.post_id] = (nextViewCounts[row.post_id] ?? 0) + 1;
       }
 
+      const nextReportedPostIds = ((reportsResult.data ?? []) as ReportRow[]).map(
+        (row) => row.post_id
+      );
+
       const requestedPostId = getRequestedPostId();
       if (items?.length) {
+        const recentViewedAt = getRecentViewedAtMap();
         const rankedItems = rankFeedVideos(
           items,
           nextLikeCounts,
           nextCommentCounts,
           nextShareCounts,
           nextViewCounts,
-          requestedPostId
+          requestedPostId,
+          {
+            viewerLanguage,
+            viewerCity,
+            followingOrganizerIds: followingOrganizerIdSet,
+            recentViewedAt,
+          }
         );
         setVideos(rankedItems);
         setActivePostId(rankedItems[0]?.id ?? null);
@@ -413,8 +533,9 @@ export default function ShortsPage(props: ShortsPageProps) {
       setShareCounts(nextShareCounts);
       setViewCounts(nextViewCounts);
       setLikedPostIds([...nextLiked]);
+      setReportedPostIds(nextReportedPostIds);
     },
-    [sessionUserId, text.socialSetupHint]
+    [followingOrganizerIdSet, sessionUserId, text.socialSetupHint, viewerCity, viewerLanguage]
   );
 
   const loadFeed = useCallback(async () => {
@@ -429,7 +550,9 @@ export default function ShortsPage(props: ShortsPageProps) {
     setFeedStatus({ type: "loading", message: "" });
     const primaryPostsResult = await supabase
       .from("posts")
-      .select("id,user_id,media_url,caption,created_at,cover_url,mux_playback_id")
+      .select(
+        "id,user_id,media_url,caption,created_at,cover_url,mux_playback_id,mux_thumbnail_url,shorts_visibility,shorts_hidden,shorts_deleted_at"
+      )
       .eq("media_type", "video")
       .not("media_url", "is", null)
       .order("created_at", { ascending: false })
@@ -499,6 +622,18 @@ export default function ShortsPage(props: ShortsPageProps) {
             (post.mux_playback_id || post.media_url)
         )
       )
+      .filter((post) => {
+        if (post.shorts_deleted_at || post.shorts_hidden) {
+          return false;
+        }
+        if (!post.shorts_visibility || post.shorts_visibility === "public") {
+          return true;
+        }
+        if (post.shorts_visibility === "followers") {
+          return followingOrganizerIdSet.has(post.user_id);
+        }
+        return false;
+      })
       .map((post) => ({
         ...post,
         author: profileMap.get(post.user_id)!,
@@ -511,7 +646,7 @@ export default function ShortsPage(props: ShortsPageProps) {
       filteredVideos.map((item) => item.id),
       filteredVideos
     );
-  }, [loadInteractionSummary, text.notConfigured]);
+  }, [followingOrganizerIdSet, loadInteractionSummary, text.notConfigured]);
 
   const loadComments = useCallback(
     async (postId: string) => {
@@ -616,12 +751,58 @@ export default function ShortsPage(props: ShortsPageProps) {
       }
 
       recordedViewIdsRef.current.add(postId);
+      persistRecentViewedAt(postId);
       setViewCounts((prev) => ({
         ...prev,
         [postId]: (prev[postId] ?? 0) + 1,
       }));
     },
     [sessionUserId, socialReady, text.socialSetupHint]
+  );
+
+  const flushWatchSession = useCallback(
+    async (postId?: string | null) => {
+      const current = watchSessionRef.current;
+      if (!current) return;
+      if (postId && current.postId !== postId) return;
+      watchSessionRef.current = null;
+
+      const element = videoRefs.current[current.postId];
+      const currentTime =
+        typeof element?.currentTime === "number" && Number.isFinite(element.currentTime)
+          ? element.currentTime
+          : current.startedPlaybackTime;
+      const duration =
+        typeof element?.duration === "number" && Number.isFinite(element.duration) && element.duration > 0
+          ? element.duration
+          : null;
+      const watchedSeconds = Math.max(0, currentTime - current.startedPlaybackTime);
+      if (watchedSeconds < 1.2) {
+        return;
+      }
+
+      const supabase = getSupabaseClient();
+      if (!supabase) return;
+      const completionRatio = duration
+        ? Math.min(1, Math.max(0, currentTime / duration))
+        : 0;
+      const { error } = await supabase.from("post_watch_sessions").insert({
+        post_id: current.postId,
+        user_id: sessionUserId,
+        viewer_key: getFeedViewerKey(sessionUserId),
+        watched_seconds: watchedSeconds,
+        completion_ratio: completionRatio,
+        completed: completionRatio >= 0.85,
+        source: "shorts",
+        started_at: new Date(current.startedAt).toISOString(),
+        ended_at: new Date().toISOString(),
+      });
+      if (error && isSchemaError(error)) {
+        setSocialReady(false);
+        setSocialNotice(text.socialSetupHint);
+      }
+    },
+    [sessionUserId, text.socialSetupHint]
   );
 
   useEffect(() => {
@@ -687,12 +868,39 @@ export default function ShortsPage(props: ShortsPageProps) {
   }, [activePostId, pausedPostIds, soundOnPostId, videos]);
 
   useEffect(() => {
+    const currentSession = watchSessionRef.current;
+    if (currentSession?.postId && currentSession.postId !== activePostId) {
+      void flushWatchSession(currentSession.postId);
+    }
+    if (!activePostId) return;
+    if (watchSessionRef.current?.postId === activePostId) return;
+    const element = videoRefs.current[activePostId];
+    watchSessionRef.current = {
+      postId: activePostId,
+      startedAt: Date.now(),
+      startedPlaybackTime:
+        typeof element?.currentTime === "number" && Number.isFinite(element.currentTime)
+          ? element.currentTime
+          : 0,
+    };
+  }, [activePostId, flushWatchSession]);
+
+  useEffect(() => {
     if (!activePostId || typeof window === "undefined") return undefined;
     const id = window.setTimeout(() => {
       void recordView(activePostId);
     }, 1400);
     return () => window.clearTimeout(id);
   }, [activePostId, recordView]);
+
+  useEffect(() => {
+    return () => {
+      const activeSessionPostId = watchSessionRef.current?.postId ?? null;
+      if (activeSessionPostId) {
+        void flushWatchSession(activeSessionPostId);
+      }
+    };
+  }, [flushWatchSession]);
 
   const handleToggleComments = useCallback(
     async (postId: string) => {
@@ -897,6 +1105,53 @@ export default function ShortsPage(props: ShortsPageProps) {
       text.shareDone,
       text.sharePrompt,
       text.subtitle,
+    ]
+  );
+
+  const handleReport = useCallback(
+    async (post: VideoFeedItem) => {
+      if (reportedPostIdSet.has(post.id)) {
+        setNotice(text.reportDuplicate);
+        return;
+      }
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        setNotice(text.notConfigured);
+        return;
+      }
+      setReportLoadingPostId(post.id);
+      const viewerKey = getFeedViewerKey(sessionUserId);
+      const { error } = await supabase.from("post_reports").insert({
+        post_id: post.id,
+        user_id: sessionUserId,
+        viewer_key: viewerKey,
+      });
+      setReportLoadingPostId(null);
+      if (error) {
+        const message = typeof error.message === "string" ? error.message.toLowerCase() : "";
+        if (error.code === "23505" || message.includes("duplicate key")) {
+          setReportedPostIds((prev) => (prev.includes(post.id) ? prev : [...prev, post.id]));
+          setNotice(text.reportDuplicate);
+          return;
+        }
+        if (isSchemaError(error)) {
+          setNotice(text.socialSetupHint);
+          return;
+        }
+        setNotice(getErrorMessage(error));
+        return;
+      }
+      setReportedPostIds((prev) => [...prev, post.id]);
+      setNotice(text.reportSent);
+    },
+    [
+      reportedPostIdSet,
+      sessionUserId,
+      setNotice,
+      text.notConfigured,
+      text.reportDuplicate,
+      text.reportSent,
+      text.socialSetupHint,
     ]
   );
 
@@ -1133,6 +1388,24 @@ export default function ShortsPage(props: ShortsPageProps) {
                           fill="none"
                           stroke="currentColor"
                           strokeWidth="1.8"
+                        />
+                      </svg>
+                    </ShortsActionButton>
+                    <ShortsActionButton
+                      label={text.reportLabel}
+                      count=""
+                      active={reportedPostIdSet.has(post.id)}
+                      busy={reportLoadingPostId === post.id}
+                      onClick={() => void handleReport(post)}
+                    >
+                      <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                        <path
+                          d="M6 3.5h9.5L14 8l1.5 4.5H6v8"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
                         />
                       </svg>
                     </ShortsActionButton>

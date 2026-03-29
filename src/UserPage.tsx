@@ -1,5 +1,5 @@
 import type { CSSProperties, ChangeEventHandler, RefObject } from "react";
-import { extractMuxPlaybackId, MuxPlayer } from "./mux";
+import { buildMuxThumbnailUrl, extractMuxPlaybackId, MuxPlayer } from "./mux";
 
 type Route =
   | "login"
@@ -17,7 +17,14 @@ type Route =
   | "impressum"
   | "terms";
 
-type UserTab = "about" | "following" | "posts" | "photos" | "videos" | "tagged";
+type UserTab =
+  | "about"
+  | "following"
+  | "posts"
+  | "photos"
+  | "videos"
+  | "shorts"
+  | "tagged";
 
 type Status = {
   type: "idle" | "loading" | "error";
@@ -44,6 +51,9 @@ type UserPost = {
   mux_playback_id?: string | null;
   mux_asset_id?: string | null;
   mux_upload_id?: string | null;
+  mux_thumbnail_url?: string | null;
+  shorts_hidden?: boolean | null;
+  shorts_deleted_at?: string | null;
 };
 
 type UserPageProps = {
@@ -104,6 +114,12 @@ type UserPageProps = {
   handleDeletePost: (post: UserPost) => Promise<void> | void;
   photoPosts: UserPost[];
   videoPosts: UserPost[];
+  shortVideoPosts: UserPost[];
+  profileIsOrganizer: boolean;
+  profilePinnedShortPostId: string | null;
+  pinShortLoadingId: string | null;
+  pinShortStatus: Status;
+  handlePinShortPost: (postId: string | null) => Promise<void> | void;
 };
 
 export default function UserPage(props: UserPageProps) {
@@ -162,7 +178,20 @@ export default function UserPage(props: UserPageProps) {
     handleDeletePost,
     photoPosts,
     videoPosts,
+    shortVideoPosts,
+    profileIsOrganizer,
+    profilePinnedShortPostId,
+    pinShortLoadingId,
+    pinShortStatus,
+    handlePinShortPost,
   } = props;
+
+  const getPostCoverUrl = (post: UserPost) => {
+    if (post.cover_url?.trim()) return post.cover_url.trim();
+    if (post.mux_thumbnail_url?.trim()) return post.mux_thumbnail_url.trim();
+    const playbackId = post.mux_playback_id ?? extractMuxPlaybackId(post.media_url);
+    return playbackId ? buildMuxThumbnailUrl(playbackId) : null;
+  };
 
   return (
     <div className="userPage">
@@ -638,6 +667,91 @@ export default function UserPage(props: UserPageProps) {
                 </div>
               ) : null
             )}
+          </div>
+        )
+      ) : userTab === "shorts" ? (
+        !profileIsOrganizer ? (
+          <div className="userPostEmpty">{strings.userPostEmpty}</div>
+        ) : postsStatus.type === "loading" ? (
+          <div
+            className="authStatus authStatus--loading"
+            role="status"
+            aria-live="polite"
+          >
+            {strings.loadingLabel}
+          </div>
+        ) : postsStatus.type === "error" ? (
+          <div
+            className="authStatus authStatus--error"
+            role="status"
+            aria-live="polite"
+          >
+            {postsStatus.message}
+          </div>
+        ) : shortVideoPosts.length === 0 ? (
+          <div className="userPostEmpty">{strings.userPostEmpty}</div>
+        ) : (
+          <div className="userShortsList">
+            {pinShortStatus.type === "error" ? (
+              <div
+                className="authStatus authStatus--error"
+                role="status"
+                aria-live="polite"
+              >
+                {pinShortStatus.message}
+              </div>
+            ) : null}
+            {shortVideoPosts.map((post) => {
+              const muxPlaybackId =
+                post.mux_playback_id ?? extractMuxPlaybackId(post.media_url);
+              const isPinned = profilePinnedShortPostId === post.id;
+              const coverUrl = getPostCoverUrl(post);
+              return (
+                <div key={post.id} className="userPostCard userShortCard">
+                  <div className="userShortMeta">
+                    <span className="userInfoLabel">{strings.userTabShorts}</span>
+                    {isPinned ? (
+                      <span className="userShortBadge">{strings.userPinnedShortLabel}</span>
+                    ) : null}
+                  </div>
+                  {coverUrl ? (
+                    <div className="userShortCover">
+                      <img src={coverUrl} alt={post.caption || strings.userTabShorts} />
+                    </div>
+                  ) : null}
+                  {muxPlaybackId ? (
+                    <MuxPlayer
+                      className="userPostMedia"
+                      playbackId={muxPlaybackId}
+                      controls
+                    />
+                  ) : post.media_url ? (
+                    <video className="userPostMedia" src={post.media_url} controls />
+                  ) : null}
+                  {post.caption ? (
+                    <div className="userPostCaption">{post.caption}</div>
+                  ) : null}
+                  <div className="userPostActions userShortActions">
+                    <button
+                      className="btn btnGhost"
+                      type="button"
+                      onClick={() => void handlePinShortPost(isPinned ? null : post.id)}
+                      disabled={pinShortLoadingId === post.id || pinShortLoadingId === "__clear__"}
+                    >
+                      {isPinned ? strings.userUnpinShort : strings.userPinShort}
+                    </button>
+                    <button
+                      className="userPostDelete"
+                      type="button"
+                      onClick={() => handleDeletePost(post)}
+                      disabled={postActionStatus.type === "loading"}
+                    >
+                      {strings.userPostDelete}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )
       ) : (

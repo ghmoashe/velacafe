@@ -1872,6 +1872,30 @@ button:focus-visible {
   gap: 10px;
 }
 
+.organizerTabsRow {
+  justify-content: flex-start;
+}
+
+.organizerShortsSection {
+  display: grid;
+  gap: 14px;
+}
+
+.organizerPinnedShort {
+  max-width: 720px;
+}
+
+.organizerShortsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.organizerShortItem {
+  aspect-ratio: auto;
+  min-height: 220px;
+}
+
 .organizerFollowersTitle {
   font-size: 12px;
   text-transform: uppercase;
@@ -2558,6 +2582,52 @@ button:focus-visible {
   justify-content: flex-end;
 }
 
+.userShortsList {
+  display: grid;
+  gap: 14px;
+}
+
+.userShortMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.userShortBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(200, 106, 59, 0.35);
+  background: rgba(200, 106, 59, 0.12);
+  color: #8e4a2a;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.userShortActions {
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.userShortCover {
+  width: min(220px, 100%);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(234, 222, 211, 0.9);
+  background: rgba(248, 244, 238, 0.8);
+}
+
+.userShortCover img {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+}
+
 .userPostDelete {
   padding: 6px 14px;
   border-radius: 999px;
@@ -2663,6 +2733,10 @@ button:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .organizerShortsGrid {
+    grid-template-columns: 1fr;
+  }
+
   .userPostFooter {
     flex-direction: column;
     align-items: stretch;
@@ -2711,6 +2785,11 @@ button:focus-visible {
 
   .organizerActions {
     justify-self: center;
+  }
+
+  .userShortActions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .userFollowingSearch {

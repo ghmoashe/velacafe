@@ -17,6 +17,7 @@ import {
   buildMuxThumbnailUrl,
   createMuxDirectUpload,
   deleteMuxAsset,
+  extractMuxPlaybackId,
   uploadFileToMux,
   waitForMuxPlayback,
 } from "./mux";
@@ -256,7 +257,14 @@ type SessionUser = {
   user_metadata?: Record<string, unknown>;
 };
 
-type UserTab = "about" | "following" | "photos" | "videos" | "posts" | "tagged";
+type UserTab =
+  | "about"
+  | "following"
+  | "photos"
+  | "videos"
+  | "shorts"
+  | "posts"
+  | "tagged";
 
 type PostMediaType = "image" | "video" | "text";
 
@@ -271,6 +279,14 @@ type UserPost = {
   mux_upload_id?: string | null;
   mux_asset_id?: string | null;
   mux_playback_id?: string | null;
+  mux_asset_status?: string | null;
+  mux_thumbnail_url?: string | null;
+  mux_duration_seconds?: number | null;
+  mux_aspect_ratio?: number | null;
+  shorts_visibility?: string | null;
+  shorts_hidden?: boolean | null;
+  shorts_hidden_reason?: string | null;
+  shorts_deleted_at?: string | null;
 };
 
 type EventFormat = "online" | "offline";
@@ -354,6 +370,7 @@ type ProfileRecord = {
   cover_url?: string | null;
   is_organizer?: boolean | null;
   is_admin?: boolean | null;
+  pinned_short_post_id?: string | null;
 };
 
 type SearchProfile = {
@@ -369,6 +386,7 @@ type SearchProfile = {
   bio?: string | null;
   is_organizer?: boolean | null;
   is_admin?: boolean | null;
+  pinned_short_post_id?: string | null;
 };
 
 type MessageKey =
@@ -487,12 +505,17 @@ type MessageKey =
   | "userTabAbout"
   | "userTabPhotos"
   | "userTabVideos"
+  | "userTabShorts"
   | "userTabPosts"
   | "userTabTagged"
   | "userTabFollowing"
   | "userFollowingEmpty"
   | "userFollowingSearchPlaceholder"
   | "organizerPageTitle"
+  | "organizerShortsEmpty"
+  | "userPinnedShortLabel"
+  | "userPinShort"
+  | "userUnpinShort"
   | "organizerFollowersEmpty"
   | "userBioPlaceholder"
   | "userActionOrganizer"
@@ -1358,8 +1381,20 @@ function isMissingPostMuxColumnsError(error: unknown) {
     isMissingColumnError(error, "mux_playback_id") ||
     isMissingColumnError(error, "mux_asset_id") ||
     isMissingColumnError(error, "mux_upload_id") ||
-    isMissingColumnError(error, "cover_url")
+    isMissingColumnError(error, "cover_url") ||
+    isMissingColumnError(error, "mux_asset_status") ||
+    isMissingColumnError(error, "mux_thumbnail_url") ||
+    isMissingColumnError(error, "mux_duration_seconds") ||
+    isMissingColumnError(error, "mux_aspect_ratio") ||
+    isMissingColumnError(error, "shorts_visibility") ||
+    isMissingColumnError(error, "shorts_hidden") ||
+    isMissingColumnError(error, "shorts_hidden_reason") ||
+    isMissingColumnError(error, "shorts_deleted_at")
   );
+}
+
+function isMissingPinnedShortColumnError(error: unknown) {
+  return isMissingColumnError(error, "pinned_short_post_id");
 }
 
 function parsePositiveInteger(value: string): number | null {
@@ -1533,7 +1568,7 @@ const POSTS_TABLE = "posts";
 const ORGANIZER_APPLICATIONS_TABLE = "organizer_applications";
 const POST_MEDIA_FOLDER = "posts";
 const POST_SELECT_FIELDS =
-  "id,user_id,media_url,media_type,caption,created_at,cover_url,mux_upload_id,mux_asset_id,mux_playback_id";
+  "id,user_id,media_url,media_type,caption,created_at,cover_url,mux_upload_id,mux_asset_id,mux_playback_id,mux_asset_status,mux_thumbnail_url,mux_duration_seconds,mux_aspect_ratio,shorts_visibility,shorts_hidden,shorts_hidden_reason,shorts_deleted_at";
 const POST_SELECT_FIELDS_LEGACY =
   "id,user_id,media_url,media_type,caption,created_at";
 const EVENT_SELECT_FIELDS =
@@ -1546,6 +1581,30 @@ const LEARN_PRACTICE_EXCLUDED = new Set<Locale>([
   "sq",
   "pl",
 ]);
+
+function getVisibleShortPosts(
+  posts: UserPost[],
+  options?: {
+    includeHidden?: boolean;
+    allowFollowersVisibility?: boolean;
+  }
+) {
+  return posts.filter((post) => {
+    if (post.media_type !== "video" || !post.media_url) {
+      return false;
+    }
+    if (post.shorts_deleted_at) {
+      return false;
+    }
+    if (!options?.includeHidden && post.shorts_hidden) {
+      return false;
+    }
+    if (options?.allowFollowersVisibility) {
+      return post.shorts_visibility !== "hidden";
+    }
+    return !post.shorts_visibility || post.shorts_visibility === "public";
+  });
+}
 const LEARN_PRACTICE_LANGS = LANGUAGE_LIST.filter(
   (lang) => !LEARN_PRACTICE_EXCLUDED.has(lang.locale)
 );
@@ -1636,6 +1695,11 @@ export default function App() {
     message: string;
   }>({ type: "idle", message: "" });
   const [postActionStatus, setPostActionStatus] = useState<{
+    type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
+  const [pinShortLoadingId, setPinShortLoadingId] = useState<string | null>(null);
+  const [pinShortStatus, setPinShortStatus] = useState<{
     type: "idle" | "loading" | "error";
     message: string;
   }>({ type: "idle", message: "" });
@@ -1734,6 +1798,11 @@ export default function App() {
     type: "idle" | "loading" | "error";
     message: string;
   }>({ type: "idle", message: "" });
+  const [organizerShorts, setOrganizerShorts] = useState<UserPost[]>([]);
+  const [organizerShortsStatus, setOrganizerShortsStatus] = useState<{
+    type: "idle" | "loading" | "error";
+    message: string;
+  }>({ type: "idle", message: "" });
   const [eventRsvpStatus, setEventRsvpStatus] = useState<
     "going" | "interested" | null
   >(null);
@@ -1818,6 +1887,9 @@ export default function App() {
   const [profileInstagram, setProfileInstagram] = useState("");
   const [profileIsOrganizer, setProfileIsOrganizer] = useState(false);
   const [profileIsAdmin, setProfileIsAdmin] = useState(false);
+  const [profilePinnedShortPostId, setProfilePinnedShortPostId] = useState<string | null>(
+    null
+  );
   const [organizerApplyOpen, setOrganizerApplyOpen] = useState(false);
   const [organizerApplyType, setOrganizerApplyType] = useState<
     "" | "person" | "organization"
@@ -2001,20 +2073,45 @@ export default function App() {
     { label: strings.userStatsFollowers, value: String(sessionOrganizerFollowers) },
     { label: strings.userStatsFollowing, value: String(followingCount) },
   ];
-  const userTabs = [
-    { id: "about" as const, label: strings.userTabAbout },
-    { id: "following" as const, label: strings.userTabFollowing },
-    { id: "posts" as const, label: strings.userTabPosts },
-    { id: "photos" as const, label: strings.userTabPhotos },
-    { id: "videos" as const, label: strings.userTabVideos },
-    { id: "tagged" as const, label: strings.userTabTagged },
-  ];
+  const userTabs = useMemo(
+    () => [
+      { id: "about" as const, label: strings.userTabAbout },
+      { id: "following" as const, label: strings.userTabFollowing },
+      { id: "posts" as const, label: strings.userTabPosts },
+      { id: "photos" as const, label: strings.userTabPhotos },
+      { id: "videos" as const, label: strings.userTabVideos },
+      ...(profileIsOrganizer || userPosts.some((post) => post.media_type === "video")
+        ? [{ id: "shorts" as const, label: strings.userTabShorts }]
+        : []),
+      { id: "tagged" as const, label: strings.userTabTagged },
+    ],
+    [
+      profileIsOrganizer,
+      strings.userTabAbout,
+      strings.userTabFollowing,
+      strings.userTabPhotos,
+      strings.userTabPosts,
+      strings.userTabShorts,
+      strings.userTabTagged,
+      strings.userTabVideos,
+      userPosts,
+    ]
+  );
   const photoPosts = userPosts.filter(
     (post) => post.media_type === "image" && post.media_url
   );
   const videoPosts = userPosts.filter(
     (post) => post.media_type === "video" && post.media_url
   );
+  const shortVideoPosts = videoPosts.filter(
+    (post) =>
+      Boolean(post.mux_playback_id ?? extractMuxPlaybackId(post.media_url)) &&
+      !post.shorts_deleted_at
+  );
+  useEffect(() => {
+    if (userTabs.some((tab) => tab.id === userTab)) return;
+    setUserTab("posts");
+  }, [userTab, userTabs]);
   const profileGenderLabel =
     profileGender === "female"
       ? strings.profileGenderFemale
@@ -2176,6 +2273,7 @@ export default function App() {
       setSessionUser(null);
       setProfileIsOrganizer(false);
       setProfileIsAdmin(false);
+      setProfilePinnedShortPostId(null);
       profileLoaded.current = false;
       setAuthState({
         type: "error",
@@ -2556,13 +2654,28 @@ export default function App() {
       }
       const user = sessionData.session?.user;
       if (!user) return;
-      const { data, error } = await supabase
+      const primaryProfileResult = await supabase
         .from("profiles")
         .select(
-          "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram,is_organizer,is_admin"
+          "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram,is_organizer,is_admin,pinned_short_post_id"
         )
         .eq("id", user.id)
         .maybeSingle();
+      const fallbackProfileResult =
+        primaryProfileResult.error &&
+        isMissingPinnedShortColumnError(primaryProfileResult.error)
+          ? await supabase
+              .from("profiles")
+              .select(
+                "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram,is_organizer,is_admin"
+              )
+              .eq("id", user.id)
+              .maybeSingle()
+          : null;
+      const data = (fallbackProfileResult?.data ?? primaryProfileResult.data) as
+        | ProfileRecord
+        | null;
+      const error = fallbackProfileResult?.error ?? primaryProfileResult.error;
       if (!active) return;
       if (error) {
         setProfileStatus({
@@ -2619,6 +2732,7 @@ export default function App() {
         setProfileInstagram(data.instagram ?? "");
         setProfileIsOrganizer(Boolean(data.is_organizer));
         setProfileIsAdmin(Boolean(data.is_admin));
+        setProfilePinnedShortPostId(data.pinned_short_post_id ?? null);
         setProfileCoverUrl(data.cover_url ?? null);
         setProfileCoverPreview(data.cover_url ?? null);
         setProfileCoverPhoto(null);
@@ -2634,6 +2748,7 @@ export default function App() {
         }
       } else {
         setProfileIsAdmin(false);
+        setProfilePinnedShortPostId(null);
       }
       profileLoaded.current = true;
     })();
@@ -3268,14 +3383,17 @@ export default function App() {
     if (route !== "organizer") {
       setOrganizerDetails(null);
       setOrganizerFollowers([]);
+      setOrganizerShorts([]);
       setOrganizerDetailsStatus({ type: "idle", message: "" });
       setOrganizerFollowersStatus({ type: "idle", message: "" });
+      setOrganizerShortsStatus({ type: "idle", message: "" });
       return;
     }
     const organizerId = activeOrganizerId;
     if (!organizerId) {
       setOrganizerDetails(null);
       setOrganizerFollowers([]);
+      setOrganizerShorts([]);
       setOrganizerDetailsStatus({
         type: "error",
         message: strings.searchEmpty,
@@ -3293,13 +3411,27 @@ export default function App() {
     let active = true;
     (async () => {
       setOrganizerDetailsStatus({ type: "loading", message: "" });
-      const { data: profileRow, error } = await supabase
+      const primaryProfileResult = await supabase
         .from("profiles")
         .select(
-          "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,is_organizer,bio"
+          "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,is_organizer,bio,pinned_short_post_id"
         )
         .eq("id", organizerId)
         .maybeSingle();
+      const fallbackProfileResult =
+        primaryProfileResult.error &&
+        isMissingPinnedShortColumnError(primaryProfileResult.error)
+          ? await supabase
+              .from("profiles")
+              .select(
+                "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,is_organizer,bio"
+              )
+              .eq("id", organizerId)
+              .maybeSingle()
+          : null;
+      const profileRow = (fallbackProfileResult?.data ??
+        primaryProfileResult.data) as SearchProfile | null;
+      const error = fallbackProfileResult?.error ?? primaryProfileResult.error;
       if (!active) return;
       if (error || !profileRow) {
         setOrganizerDetailsStatus({
@@ -3308,6 +3440,7 @@ export default function App() {
         });
         setOrganizerDetails(null);
         setOrganizerFollowers([]);
+        setOrganizerShorts([]);
         return;
       }
       setOrganizerDetails(profileRow as SearchProfile);
@@ -3322,6 +3455,49 @@ export default function App() {
       }
       if (Object.keys(followMap).length) {
         setOrganizerFollowMap((prev) => ({ ...prev, ...followMap }));
+      }
+      setOrganizerShortsStatus({ type: "loading", message: "" });
+      const primaryShortsResult = await supabase
+        .from(POSTS_TABLE)
+        .select(POST_SELECT_FIELDS)
+        .eq("user_id", organizerId)
+        .eq("media_type", "video")
+        .order("created_at", { ascending: false });
+      const fallbackShortsResult =
+        primaryShortsResult.error &&
+        isMissingPostMuxColumnsError(primaryShortsResult.error)
+          ? await supabase
+              .from(POSTS_TABLE)
+              .select(POST_SELECT_FIELDS_LEGACY)
+              .eq("user_id", organizerId)
+              .eq("media_type", "video")
+              .order("created_at", { ascending: false })
+          : null;
+      if (!active) return;
+      const shortsRows = (fallbackShortsResult?.data ??
+        primaryShortsResult.data) as UserPost[] | null;
+      const shortsError = fallbackShortsResult?.error ?? primaryShortsResult.error;
+      if (shortsError) {
+        setOrganizerShortsStatus({
+          type: "error",
+          message: getSupabaseErrorMessage(shortsError),
+        });
+        setOrganizerShorts([]);
+      } else {
+        const visibleShorts = getVisibleShortPosts(shortsRows ?? [], {
+          includeHidden: profileIsAdmin || sessionUser?.id === organizerId,
+          allowFollowersVisibility: true,
+        });
+        const pinnedShortId = profileRow.pinned_short_post_id ?? null;
+        const sortedShorts = [...visibleShorts].sort((left, right) => {
+          if (pinnedShortId) {
+            if (left.id === pinnedShortId) return -1;
+            if (right.id === pinnedShortId) return 1;
+          }
+          return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+        });
+        setOrganizerShorts(sortedShorts);
+        setOrganizerShortsStatus({ type: "idle", message: "" });
       }
       setOrganizerFollowersStatus({ type: "loading", message: "" });
       const { data: followerRows, error: followersError } = await supabase
@@ -3378,7 +3554,9 @@ export default function App() {
     fetchOrganizerFollowStatus,
     fetchOrganizerFollowerCounts,
     getSupabaseErrorMessage,
+    profileIsAdmin,
     route,
+    sessionUser?.id,
     strings.searchEmpty,
   ]);
 
@@ -5318,6 +5496,10 @@ export default function App() {
       let muxUploadId: string | null = null;
       let muxAssetId: string | null = null;
       let muxPlaybackId: string | null = null;
+      let muxAssetStatus: string | null = null;
+      let muxThumbnailUrl: string | null = null;
+      let muxDurationSeconds: number | null = null;
+      let muxAspectRatio: number | null = null;
       let coverUrl: string | null = null;
       if (postFile) {
         mediaType = postFile.type.startsWith("video/") ? "video" : "image";
@@ -5347,6 +5529,16 @@ export default function App() {
           });
           muxAssetId = muxStatus.assetId;
           muxPlaybackId = muxStatus.playbackId;
+          muxAssetStatus = muxStatus.assetStatus ?? "ready";
+          muxThumbnailUrl = muxStatus.thumbnailUrl ?? null;
+          muxDurationSeconds =
+            typeof muxStatus.durationSeconds === "number"
+              ? muxStatus.durationSeconds
+              : null;
+          muxAspectRatio =
+            typeof muxStatus.aspectRatio === "number"
+              ? muxStatus.aspectRatio
+              : null;
           if (!muxPlaybackId) {
             throw new Error(
               "Mux did not return a playback ID. Check the Mux upload configuration."
@@ -5392,7 +5584,7 @@ export default function App() {
           mediaUrl = publicData.publicUrl ?? null;
         }
       }
-      const insertPayload: Record<string, string | null> = {
+      const insertPayload: Record<string, string | number | boolean | null> = {
         user_id: user.id,
         media_url: mediaUrl,
         media_type: mediaType,
@@ -5403,6 +5595,11 @@ export default function App() {
         insertPayload.mux_upload_id = muxUploadId;
         insertPayload.mux_asset_id = muxAssetId;
         insertPayload.mux_playback_id = muxPlaybackId;
+        insertPayload.mux_asset_status = muxAssetStatus;
+        insertPayload.mux_thumbnail_url = muxThumbnailUrl;
+        insertPayload.mux_duration_seconds = muxDurationSeconds;
+        insertPayload.mux_aspect_ratio = muxAspectRatio;
+        insertPayload.shorts_visibility = "public";
       }
       const { data: inserted, error } = await supabase
         .from(POSTS_TABLE)
@@ -5492,6 +5689,13 @@ export default function App() {
         .eq("id", post.id)
         .eq("user_id", user.id);
       if (error) throw error;
+      if (profilePinnedShortPostId === post.id) {
+        await supabase
+          .from("profiles")
+          .update({ pinned_short_post_id: null })
+          .eq("id", user.id);
+        setProfilePinnedShortPostId(null);
+      }
       setUserPosts((prev) => prev.filter((item) => item.id !== post.id));
       setPostActionStatus({ type: "idle", message: "" });
     } catch (error) {
@@ -5552,6 +5756,45 @@ export default function App() {
     }
   }
 
+  async function handlePinShortPost(postId: string | null) {
+    if (!sessionUser?.id || !profileIsOrganizer || pinShortLoadingId) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setPinShortStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    setPinShortLoadingId(postId ?? "__clear__");
+    setPinShortStatus({ type: "loading", message: strings.loadingLabel });
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ pinned_short_post_id: postId })
+        .eq("id", sessionUser.id);
+      if (error) {
+        throw error;
+      }
+      setProfilePinnedShortPostId(postId);
+      setOrganizerDetails((prev) =>
+        prev && prev.id === sessionUser.id
+          ? { ...prev, pinned_short_post_id: postId }
+          : prev
+      );
+      setPinShortStatus({ type: "idle", message: "" });
+    } catch (error) {
+      setPinShortStatus({
+        type: "error",
+        message: isMissingPinnedShortColumnError(error)
+          ? "Run supabase/posts_shorts_feed_features.sql before pinning organizer shorts."
+          : getSupabaseErrorMessage(error),
+      });
+    } finally {
+      setPinShortLoadingId(null);
+    }
+  }
+
   async function handleAdminDeletePost(post: UserPost) {
     if (!profileIsAdmin || adminPostsStatus.type === "loading") return;
     const supabase = getSupabaseClient();
@@ -5595,6 +5838,10 @@ export default function App() {
         .delete()
         .eq("id", post.id);
       if (error) throw error;
+      await supabase
+        .from("profiles")
+        .update({ pinned_short_post_id: null })
+        .eq("pinned_short_post_id", post.id);
       setAdminPosts((prev) => prev.filter((item) => item.id !== post.id));
       if (adminPostEditId === post.id) {
         cancelAdminPostEdit();
@@ -5608,6 +5855,49 @@ export default function App() {
       setAdminPostsStatus({
         type: "error",
         message: getSupabaseErrorMessage(error),
+      });
+    }
+  }
+
+  async function handleAdminToggleShortHidden(post: UserPost) {
+    if (!profileIsAdmin || adminPostsStatus.type === "loading") return;
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setAdminPostsStatus({
+        type: "error",
+        message: "Supabase is not configured.",
+      });
+      return;
+    }
+    const nextHidden = !(post.shorts_hidden === true);
+    setAdminPostsStatus({ type: "loading", message: "" });
+    try {
+      const payload = nextHidden
+        ? {
+            shorts_hidden: true,
+            shorts_hidden_reason: "Hidden from admin moderation",
+          }
+        : {
+            shorts_hidden: false,
+            shorts_hidden_reason: null,
+          };
+      const { data, error } = await supabase
+        .from(POSTS_TABLE)
+        .update(payload)
+        .eq("id", post.id)
+        .select(POST_SELECT_FIELDS)
+        .single();
+      if (error) throw error;
+      setAdminPosts((prev) =>
+        prev.map((item) => (item.id === post.id ? ((data as unknown) as UserPost) : item))
+      );
+      setAdminPostsStatus({ type: "idle", message: "" });
+    } catch (error) {
+      setAdminPostsStatus({
+        type: "error",
+        message: isMissingPostMuxColumnsError(error)
+          ? "Run supabase/posts_add_mux_video_fields.sql and supabase/posts_shorts_feed_features.sql before moderating shorts."
+          : getSupabaseErrorMessage(error),
       });
     }
   }
@@ -6339,6 +6629,7 @@ export default function App() {
     cancelAdminPostEdit,
     startAdminPostEdit,
     handleAdminDeletePost,
+    handleAdminToggleShortHidden,
   };
   const searchPageProps = {
     strings,
@@ -6436,6 +6727,8 @@ export default function App() {
     strings,
     organizerDetailsStatus,
     organizerDetails,
+    organizerShortsStatus,
+    organizerShorts,
     isSupportedLocale,
     languageLabels,
     organizerFollowerCounts,
@@ -6451,6 +6744,9 @@ export default function App() {
     languageLabels,
     guestMode,
     sessionUserId: sessionUser?.id ?? null,
+    viewerLanguage: profileLanguage || null,
+    viewerCity: profileCity.trim() || null,
+    followingOrganizerIds: followingOrganizers.map((profile) => profile.id),
     requireAuth: () => redirectToLoginWithIntent({ route: "shorts" }),
     goToOrganizer,
     sharePath: ROUTE_PATHS.shorts,
@@ -6510,6 +6806,12 @@ export default function App() {
     handleDeletePost,
     photoPosts,
     videoPosts,
+    shortVideoPosts,
+    profileIsOrganizer,
+    profilePinnedShortPostId,
+    pinShortLoadingId,
+    pinShortStatus,
+    handlePinShortPost,
   };
   const profilePageProps = {
     strings,

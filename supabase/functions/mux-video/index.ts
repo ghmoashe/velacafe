@@ -17,6 +17,24 @@ function json(status: number, body: unknown) {
   });
 }
 
+function buildMuxThumbnailUrl(playbackId: string) {
+  return `https://image.mux.com/${playbackId}/thumbnail.webp?time=1`;
+}
+
+function getAspectRatio(payload: Record<string, unknown>) {
+  const aspect = payload.aspect_ratio;
+  if (typeof aspect === "number" && Number.isFinite(aspect)) {
+    return aspect;
+  }
+  if (typeof aspect === "string" && aspect.includes(":")) {
+    const [width, height] = aspect.split(":").map((value) => Number(value));
+    if (Number.isFinite(width) && Number.isFinite(height) && height > 0) {
+      return width / height;
+    }
+  }
+  return null;
+}
+
 async function requireUser(req: Request) {
   const authHeader = req.headers.get("Authorization") ?? "";
   const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
@@ -144,6 +162,10 @@ Deno.serve(async (req) => {
         assetStatus: asset?.data?.status ?? null,
         assetId,
         playbackId,
+        durationSeconds:
+          typeof asset?.data?.duration === "number" ? asset.data.duration : null,
+        aspectRatio: getAspectRatio(asset?.data ?? {}),
+        thumbnailUrl: playbackId ? buildMuxThumbnailUrl(playbackId) : null,
       });
     }
 
