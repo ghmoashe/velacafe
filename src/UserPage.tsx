@@ -106,6 +106,8 @@ type UserPageProps = {
   handlePostPublish: () => Promise<void> | void;
   postActionStatus: Status;
   postHasContent: boolean;
+  canUploadPostMedia: boolean;
+  mediaPostAccessMessage: string;
   postPreviewUrl: string | null;
   postCoverPreviewUrl: string | null;
   postPreviewIsVideo: boolean;
@@ -170,6 +172,8 @@ export default function UserPage(props: UserPageProps) {
     handlePostPublish,
     postActionStatus,
     postHasContent,
+    canUploadPostMedia,
+    mediaPostAccessMessage,
     postPreviewUrl,
     postCoverPreviewUrl,
     postPreviewIsVideo,
@@ -442,22 +446,26 @@ export default function UserPage(props: UserPageProps) {
               placeholder={strings.userPostCaptionPlaceholder}
               value={postCaption}
               onChange={(event) => updatePostCaption(event.target.value)}
-            />
-            <div className="userPostFooter">
-              <label className="userPostUpload">
-                <input
-                  ref={postFileInputRef}
-                  type="file"
-                  accept="image/*,video/*"
-                  onChange={handlePostFileChange}
-                />
-                <span className="userPostUploadText">
-                  {strings.userPostFileHint}
-                </span>
-              </label>
-              <button
-                className="userAction userAction--primary userPostPublish"
-                type="button"
+              />
+              <div className="userPostFooter">
+                {canUploadPostMedia ? (
+                  <label className="userPostUpload">
+                    <input
+                      ref={postFileInputRef}
+                      type="file"
+                      accept="image/*,video/*"
+                      onChange={handlePostFileChange}
+                    />
+                    <span className="userPostUploadText">
+                      {strings.userPostFileHint}
+                    </span>
+                  </label>
+                ) : (
+                  <div className="userPostEmpty">{mediaPostAccessMessage}</div>
+                )}
+                <button
+                  className="userAction userAction--primary userPostPublish"
+                  type="button"
                 onClick={handlePostPublish}
                 disabled={
                   postActionStatus.type === "loading" || !postHasContent
@@ -468,10 +476,10 @@ export default function UserPage(props: UserPageProps) {
                   : strings.userPostPublish}
               </button>
             </div>
-            {postPreviewIsVideo ? (
-              <div className="userPostCoverRow">
-                <label className="userPostUpload userPostUpload--secondary">
-                  <input
+              {canUploadPostMedia && postPreviewIsVideo ? (
+                <div className="userPostCoverRow">
+                  <label className="userPostUpload userPostUpload--secondary">
+                    <input
                     ref={postCoverInputRef}
                     type="file"
                     accept="image/*"

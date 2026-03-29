@@ -2152,6 +2152,13 @@ export default function App() {
     postFile && postFile.type.startsWith("video/")
   );
   const postHasContent = Boolean(postCaption.trim() || postFile);
+  const canUploadPostMedia = profileIsOrganizer || profileIsAdmin;
+  const mediaPostAccessMessage =
+    locale === "ru"
+      ? "Только аккаунты organizer могут добавлять фото и видео."
+      : locale === "uk"
+        ? "Лише акаунти organizer можуть додавати фото й відео."
+        : "Only organizer accounts can upload photos and videos.";
   const getSupabaseErrorMessage = useCallback((error: unknown) => {
     if (error && typeof error === "object" && "message" in error) {
       const message = (error as { message?: unknown }).message;
@@ -3839,10 +3846,21 @@ export default function App() {
   }
 
   function handlePostFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    if (postPreviewUrl?.startsWith("blob:")) {
-      URL.revokeObjectURL(postPreviewUrl);
-    }
+      const file = event.target.files?.[0] ?? null;
+      if (file && !canUploadPostMedia) {
+        if (postPreviewUrl?.startsWith("blob:")) {
+          URL.revokeObjectURL(postPreviewUrl);
+        }
+        clearPostCoverSelection();
+        setPostFile(null);
+        setPostPreviewUrl(null);
+        event.target.value = "";
+        setPostActionStatus({ type: "error", message: mediaPostAccessMessage });
+        return;
+      }
+      if (postPreviewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(postPreviewUrl);
+      }
     clearPostCoverSelection();
     setPostFile(file);
     resetPostActionStatus();
@@ -3850,15 +3868,21 @@ export default function App() {
       setPostPreviewUrl(null);
       return;
     }
-    const previewUrl = URL.createObjectURL(file);
-    setPostPreviewUrl(previewUrl);
-  }
-
+      const previewUrl = URL.createObjectURL(file);
+      setPostPreviewUrl(previewUrl);
+    }
+  
   function handlePostCoverFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    clearPostCoverSelection();
-    resetPostActionStatus();
-    if (!file) return;
+      const file = event.target.files?.[0] ?? null;
+      if (file && !canUploadPostMedia) {
+        clearPostCoverSelection();
+        event.target.value = "";
+        setPostActionStatus({ type: "error", message: mediaPostAccessMessage });
+        return;
+      }
+      clearPostCoverSelection();
+      resetPostActionStatus();
+      if (!file) return;
     setPostCoverFile(file);
     setPostCoverPreviewUrl(URL.createObjectURL(file));
   }
@@ -5477,14 +5501,21 @@ export default function App() {
       return;
     }
     const trimmedCaption = postCaption.trim();
-    if (!trimmedCaption && !postFile) {
-      setPostActionStatus({
-        type: "error",
-        message: strings.errorRequired,
-      });
-      return;
-    }
-    setPostActionStatus({ type: "loading", message: strings.loadingLabel });
+      if (!trimmedCaption && !postFile) {
+        setPostActionStatus({
+          type: "error",
+          message: strings.errorRequired,
+        });
+        return;
+      }
+      if (postFile && !canUploadPostMedia) {
+        setPostActionStatus({
+          type: "error",
+          message: mediaPostAccessMessage,
+        });
+        return;
+      }
+      setPostActionStatus({ type: "loading", message: strings.loadingLabel });
     let coverStoragePath: string | null = null;
       try {
         const { accessToken, user } = await getVerifiedSupabaseSession(supabase);
@@ -6798,13 +6829,15 @@ export default function App() {
     postCoverInputRef,
     handlePostFileChange,
     handlePostCoverFileChange,
-    clearPostCoverSelection,
-    handlePostPublish,
-    postActionStatus,
-    postHasContent,
-    postPreviewUrl,
-    postCoverPreviewUrl,
-    postPreviewIsVideo,
+      clearPostCoverSelection,
+      handlePostPublish,
+      postActionStatus,
+      postHasContent,
+      canUploadPostMedia,
+      mediaPostAccessMessage,
+      postPreviewUrl,
+      postCoverPreviewUrl,
+      postPreviewIsVideo,
     postsStatus,
     userPosts,
     handleDeletePost,
