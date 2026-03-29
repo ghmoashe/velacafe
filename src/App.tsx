@@ -2065,6 +2065,10 @@ export default function App() {
     followingOrganizers.length === 0
       ? strings.userFollowingEmpty
       : strings.searchEmpty;
+  const followingOrganizerIds = useMemo(
+    () => followingOrganizers.map((profile) => profile.id),
+    [followingOrganizers]
+  );
   const sessionOrganizerFollowers = sessionUser?.id
     ? organizerFollowerCounts[sessionUser.id] ?? 0
     : 0;
@@ -6746,7 +6750,7 @@ export default function App() {
     sessionUserId: sessionUser?.id ?? null,
     viewerLanguage: profileLanguage || null,
     viewerCity: profileCity.trim() || null,
-    followingOrganizerIds: followingOrganizers.map((profile) => profile.id),
+    followingOrganizerIds,
     requireAuth: () => redirectToLoginWithIntent({ route: "shorts" }),
     goToOrganizer,
     sharePath: ROUTE_PATHS.shorts,
