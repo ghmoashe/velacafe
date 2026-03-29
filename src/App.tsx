@@ -5210,14 +5210,15 @@ export default function App() {
         if (sessionError) throw sessionError;
         const { data: refreshedSessionData, error: refreshError } =
           await supabase.auth.refreshSession();
-        const accessToken =
-          refreshedSessionData.session?.access_token ??
-          sessionData.session?.access_token ??
-          undefined;
-        const user =
-          refreshedSessionData.session?.user ?? sessionData.session?.user;
-        if (refreshError && !accessToken) {
-          throw refreshError;
+        if (refreshError) {
+          await supabase.auth.signOut();
+          throw new Error("Your session expired. Please sign in again.");
+        }
+        const accessToken = refreshedSessionData.session?.access_token;
+        const user = refreshedSessionData.session?.user ?? sessionData.session?.user;
+        if (!accessToken) {
+          await supabase.auth.signOut();
+          throw new Error("Your session expired. Please sign in again.");
         }
         if (!user) {
           setPostActionStatus({
@@ -5345,14 +5346,15 @@ export default function App() {
         if (sessionError) throw sessionError;
         const { data: refreshedSessionData, error: refreshError } =
           await supabase.auth.refreshSession();
-        const accessToken =
-          refreshedSessionData.session?.access_token ??
-          sessionData.session?.access_token ??
-          undefined;
-        const user =
-          refreshedSessionData.session?.user ?? sessionData.session?.user;
-        if (refreshError && !accessToken) {
-          throw refreshError;
+        if (refreshError) {
+          await supabase.auth.signOut();
+          throw new Error("Your session expired. Please sign in again.");
+        }
+        const accessToken = refreshedSessionData.session?.access_token;
+        const user = refreshedSessionData.session?.user ?? sessionData.session?.user;
+        if (!accessToken) {
+          await supabase.auth.signOut();
+          throw new Error("Your session expired. Please sign in again.");
         }
         if (!user) {
           setPostActionStatus({
@@ -5451,17 +5453,18 @@ export default function App() {
     }
       setAdminPostsStatus({ type: "loading", message: "" });
       try {
-        const { data: sessionData, error: sessionError } =
-          await supabase.auth.getSession();
+        const { error: sessionError } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;
         const { data: refreshedSessionData, error: refreshError } =
           await supabase.auth.refreshSession();
-        const accessToken =
-          refreshedSessionData.session?.access_token ??
-          sessionData.session?.access_token ??
-          undefined;
-        if (refreshError && !accessToken) {
-          throw refreshError;
+        if (refreshError) {
+          await supabase.auth.signOut();
+          throw new Error("Your session expired. Please sign in again.");
+        }
+        const accessToken = refreshedSessionData.session?.access_token;
+        if (!accessToken) {
+          await supabase.auth.signOut();
+          throw new Error("Your session expired. Please sign in again.");
         }
         if (post.media_url) {
           const path = getStoragePathFromUrl(post.media_url, POSTS_BUCKET);
