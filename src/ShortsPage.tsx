@@ -730,11 +730,17 @@ export default function ShortsPage(props: ShortsPageProps) {
       if (!supabase) return;
 
       const viewerKey = getFeedViewerKey(sessionUserId);
-      const { error } = await supabase.from("post_view_events").insert({
-        post_id: postId,
-        user_id: sessionUserId,
-        viewer_key: viewerKey,
-      });
+      const { error } = await supabase.from("post_view_events").upsert(
+        {
+          post_id: postId,
+          user_id: sessionUserId,
+          viewer_key: viewerKey,
+        },
+        {
+          onConflict: "post_id,viewer_key",
+          ignoreDuplicates: true,
+        }
+      );
 
       if (error) {
         const message =
@@ -822,28 +828,50 @@ export default function ShortsPage(props: ShortsPageProps) {
     if (typeof window === "undefined" || videos.length === 0 || !feedRef.current) {
       return undefined;
     }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visibleEntry = [...entries]
-          .filter((entry) => entry.isIntersecting)
-          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
-        const nextId = visibleEntry?.target.getAttribute("data-post-id");
-        if (nextId) {
-          setActivePostId(nextId);
-          setOpenCommentsPostId((current) =>
-            current && current !== nextId ? null : current
-          );
+    const feedNode = feedRef.current;
+    let frameId = 0;
+
+    const syncActiveCard = () => {
+      frameId = 0;
+      const viewportCenter = feedNode.scrollTop + feedNode.clientHeight / 2;
+      let nearestId: string | null = null;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+
+      for (const video of videos) {
+        const node = cardRefs.current[video.id];
+        if (!node) continue;
+        const cardCenter = node.offsetTop + node.offsetHeight / 2;
+        const distance = Math.abs(cardCenter - viewportCenter);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestId = video.id;
         }
-      },
-      { root: feedRef.current, threshold: [0.55, 0.75, 0.92] }
-    );
+      }
 
-    for (const video of videos) {
-      const node = cardRefs.current[video.id];
-      if (node) observer.observe(node);
-    }
+      if (nearestId) {
+        setActivePostId((current) => (current === nearestId ? current : nearestId));
+        setOpenCommentsPostId((current) =>
+          current && current !== nearestId ? null : current
+        );
+      }
+    };
 
-    return () => observer.disconnect();
+    const handleScroll = () => {
+      if (frameId) return;
+      frameId = window.requestAnimationFrame(syncActiveCard);
+    };
+
+    syncActiveCard();
+    feedNode.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll);
+
+    return () => {
+      feedNode.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
   }, [videos]);
 
   useEffect(() => {
@@ -1121,11 +1149,17 @@ export default function ShortsPage(props: ShortsPageProps) {
       }
       setReportLoadingPostId(post.id);
       const viewerKey = getFeedViewerKey(sessionUserId);
-      const { error } = await supabase.from("post_reports").insert({
-        post_id: post.id,
-        user_id: sessionUserId,
-        viewer_key: viewerKey,
-      });
+      const { error } = await supabase.from("post_reports").upsert(
+        {
+          post_id: post.id,
+          user_id: sessionUserId,
+          viewer_key: viewerKey,
+        },
+        {
+          onConflict: "post_id,viewer_key",
+          ignoreDuplicates: true,
+        }
+      );
       setReportLoadingPostId(null);
       if (error) {
         const message = typeof error.message === "string" ? error.message.toLowerCase() : "";
