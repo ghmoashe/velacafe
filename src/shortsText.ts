@@ -19,11 +19,13 @@ export type ShortsText = {
   audioOff: string;
   tapHint: string;
   resumeHint: string;
+  swipeHint: string;
   shareCopied: string;
   shareDone: string;
   notConfigured: string;
   socialSetupHint: string;
   sharePrompt: string;
+  closeComments: string;
 };
 
 const SHORTS_TEXT: ShortsText = {
@@ -48,12 +50,14 @@ const SHORTS_TEXT: ShortsText = {
   audioOff: "Muted",
   tapHint: "Tap the video to pause or resume.",
   resumeHint: "Tap the video to continue playback.",
+  swipeHint: "Swipe up or down for the next video.",
   shareCopied: "Video link copied to clipboard.",
   shareDone: "Video link shared.",
   notConfigured: "Supabase is not configured.",
   socialSetupHint:
     "Likes and comments need the SQL in supabase/posts_social_features.sql to be enabled.",
   sharePrompt: "Copy this video link:",
+  closeComments: "Close comments",
 };
 
 export function getShortsText(locale: string): ShortsText {

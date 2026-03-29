@@ -231,6 +231,7 @@ export default function ShortsPage(props: ShortsPageProps) {
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [soundOnPostId, setSoundOnPostId] = useState<string | null>(null);
   const [pausedPostIds, setPausedPostIds] = useState<Record<string, boolean>>({});
+  const feedRef = useRef<HTMLDivElement | null>(null);
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
   const videoRefs = useRef<Record<string, PlayableMediaElement | null>>({});
   const likedPostIdSet = useMemo(() => new Set(likedPostIds), [likedPostIds]);
@@ -488,7 +489,9 @@ export default function ShortsPage(props: ShortsPageProps) {
   }, [actionNotice]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || videos.length === 0) return undefined;
+    if (typeof window === "undefined" || videos.length === 0 || !feedRef.current) {
+      return undefined;
+    }
     const observer = new IntersectionObserver(
       (entries) => {
         const visibleEntry = [...entries]
@@ -497,9 +500,12 @@ export default function ShortsPage(props: ShortsPageProps) {
         const nextId = visibleEntry?.target.getAttribute("data-post-id");
         if (nextId) {
           setActivePostId(nextId);
+          setOpenCommentsPostId((current) =>
+            current && current !== nextId ? null : current
+          );
         }
       },
-      { threshold: [0.45, 0.7, 0.9] }
+      { root: feedRef.current, threshold: [0.55, 0.75, 0.92] }
     );
 
     for (const video of videos) {
@@ -765,32 +771,40 @@ export default function ShortsPage(props: ShortsPageProps) {
 
   return (
     <div className="shortsPage">
-      <div className="shortsHeader">
-        <div className="shortsTitle">{text.title}</div>
-        <div className="shortsSubtitle">{text.subtitle}</div>
+      <div className="shortsHud">
+        <div className="shortsHeader">
+          <div className="shortsTitle">{text.title}</div>
+          <div className="shortsSubtitle">{text.subtitle}</div>
+        </div>
+
+        {socialNotice ? (
+          <div className="shortsNotice shortsNotice--warning">{socialNotice}</div>
+        ) : null}
+        {actionNotice ? <div className="shortsNotice">{actionNotice}</div> : null}
+        {guestMode ? (
+          <div className="shortsNotice shortsNotice--ghost">{text.signInHint}</div>
+        ) : null}
       </div>
 
-      {socialNotice ? (
-        <div className="shortsNotice shortsNotice--warning">{socialNotice}</div>
-      ) : null}
-      {actionNotice ? <div className="shortsNotice">{actionNotice}</div> : null}
-      {guestMode ? (
-        <div className="shortsNotice shortsNotice--ghost">{text.signInHint}</div>
-      ) : null}
-
       {feedStatus.type === "loading" ? (
-        <div className="shortsEmptyCard">{text.loading}</div>
+        <div className="shortsFeedState">
+          <div className="shortsEmptyCard shortsEmptyCard--viewport">{text.loading}</div>
+        </div>
       ) : feedStatus.type === "error" ? (
-        <div className="shortsEmptyCard">
-          <div>{feedStatus.message}</div>
-          <button className="btn" type="button" onClick={() => void loadFeed()}>
-            {text.retry}
-          </button>
+        <div className="shortsFeedState">
+          <div className="shortsEmptyCard shortsEmptyCard--viewport">
+            <div>{feedStatus.message}</div>
+            <button className="btn" type="button" onClick={() => void loadFeed()}>
+              {text.retry}
+            </button>
+          </div>
         </div>
       ) : videos.length === 0 ? (
-        <div className="shortsEmptyCard">{text.empty}</div>
+        <div className="shortsFeedState">
+          <div className="shortsEmptyCard shortsEmptyCard--viewport">{text.empty}</div>
+        </div>
       ) : (
-        <div className="shortsFeed">
+        <div className="shortsFeed" ref={feedRef}>
           {videos.map((post) => {
             const authorName = getAuthorName(post.author);
             const authorInitial = getInitial(authorName);
@@ -805,12 +819,15 @@ export default function ShortsPage(props: ShortsPageProps) {
             const comments = commentsByPostId[post.id] ?? [];
             const commentsOpen = openCommentsPostId === post.id;
             const paused = Boolean(pausedPostIds[post.id]);
+            const playbackHint = paused
+              ? `${text.resumeHint} ${text.swipeHint}`
+              : `${text.tapHint} ${text.swipeHint}`;
 
             return (
               <article
                 key={post.id}
                 ref={(node) => updateRefMap(cardRefs, post.id, node)}
-                className="shortsCard"
+                className={`shortsCard${commentsOpen ? " shortsCard--commentsOpen" : ""}`}
                 data-post-id={post.id}
               >
                 <div className="shortsStage">
@@ -937,83 +954,106 @@ export default function ShortsPage(props: ShortsPageProps) {
                     {post.author.bio?.trim() ? (
                       <div className="shortsBio">{post.author.bio.trim()}</div>
                     ) : null}
-                    <div className="shortsHint">
-                      {paused ? text.resumeHint : text.tapHint}
-                    </div>
+                    <div className="shortsHint">{playbackHint}</div>
                   </div>
-                </div>
-                {commentsOpen ? (
-                  <div className="shortsComments">
-                    <div className="shortsCommentsHeader">{text.commentsTitle}</div>
-                    {commentsLoadingPostId === post.id ? (
-                      <div className="shortsCommentsEmpty">{text.loading}</div>
-                    ) : comments.length === 0 ? (
-                      <div className="shortsCommentsEmpty">{text.noComments}</div>
-                    ) : (
-                      <div className="shortsCommentsList">
-                        {comments.map((comment) => (
-                          <div key={comment.id} className="shortsComment">
-                            {comment.authorAvatar ? (
-                              <img
-                                className="shortsCommentAvatar"
-                                src={comment.authorAvatar}
-                                alt={comment.authorName}
-                              />
-                            ) : (
-                              <div className="shortsCommentAvatar shortsCommentAvatar--placeholder">
-                                {getInitial(comment.authorName)}
-                              </div>
-                            )}
-                            <div className="shortsCommentBody">
-                              <div className="shortsCommentMeta">
-                                <span className="shortsCommentAuthor">
-                                  {comment.authorName}
-                                </span>
-                                <span className="shortsCommentTime">
-                                  {formatRelativeTime(comment.created_at, locale)}
-                                </span>
-                              </div>
-                              <div className="shortsCommentText">{comment.comment}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <form
-                      className="shortsCommentForm"
-                      onSubmit={(event) => void handleCommentSubmit(event, post.id)}
-                    >
-                      <textarea
-                        className="input shortsCommentInput"
-                        rows={2}
-                        placeholder={text.commentPlaceholder}
-                        value={commentDrafts[post.id] ?? ""}
-                        onChange={(event) =>
-                          setCommentDrafts((prev) => ({
-                            ...prev,
-                            [post.id]: event.target.value,
-                          }))
-                        }
-                        maxLength={280}
-                        disabled={commentSubmittingPostId === post.id}
+                  {commentsOpen ? (
+                    <>
+                      <button
+                        className="shortsCommentsBackdrop"
+                        type="button"
+                        aria-label={text.closeComments}
+                        onClick={() => setOpenCommentsPostId(null)}
                       />
-                      <div className="shortsCommentFooter">
-                        {!sessionUserId ? (
-                          <button className="btn" type="button" onClick={requireAuth}>
-                            {text.signInHint}
+                      <div
+                        className="shortsComments"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <div className="shortsCommentsBar">
+                          <div className="shortsCommentsHeader">{text.commentsTitle}</div>
+                          <button
+                            className="shortsCommentsClose"
+                            type="button"
+                            onClick={() => setOpenCommentsPostId(null)}
+                            aria-label={text.closeComments}
+                          >
+                            x
                           </button>
-                        ) : null}
-                        <button
-                          className="btn shortsCommentSend"
-                          type="submit"
-                          disabled={commentSubmittingPostId === post.id}
+                        </div>
+                        <div className="shortsCommentsBody">
+                          {commentsLoadingPostId === post.id ? (
+                            <div className="shortsCommentsEmpty">{text.loading}</div>
+                          ) : comments.length === 0 ? (
+                            <div className="shortsCommentsEmpty">{text.noComments}</div>
+                          ) : (
+                            <div className="shortsCommentsList">
+                              {comments.map((comment) => (
+                                <div key={comment.id} className="shortsComment">
+                                  {comment.authorAvatar ? (
+                                    <img
+                                      className="shortsCommentAvatar"
+                                      src={comment.authorAvatar}
+                                      alt={comment.authorName}
+                                    />
+                                  ) : (
+                                    <div className="shortsCommentAvatar shortsCommentAvatar--placeholder">
+                                      {getInitial(comment.authorName)}
+                                    </div>
+                                  )}
+                                  <div className="shortsCommentBody">
+                                    <div className="shortsCommentMeta">
+                                      <span className="shortsCommentAuthor">
+                                        {comment.authorName}
+                                      </span>
+                                      <span className="shortsCommentTime">
+                                        {formatRelativeTime(comment.created_at, locale)}
+                                      </span>
+                                    </div>
+                                    <div className="shortsCommentText">
+                                      {comment.comment}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <form
+                          className="shortsCommentForm"
+                          onSubmit={(event) => void handleCommentSubmit(event, post.id)}
                         >
-                          {text.commentSend}
-                        </button>
+                          <textarea
+                            className="input shortsCommentInput"
+                            rows={2}
+                            placeholder={text.commentPlaceholder}
+                            value={commentDrafts[post.id] ?? ""}
+                            onChange={(event) =>
+                              setCommentDrafts((prev) => ({
+                                ...prev,
+                                [post.id]: event.target.value,
+                              }))
+                            }
+                            maxLength={280}
+                            disabled={commentSubmittingPostId === post.id}
+                          />
+                          <div className="shortsCommentFooter">
+                            {!sessionUserId ? (
+                              <button className="btn" type="button" onClick={requireAuth}>
+                                {text.signInHint}
+                              </button>
+                            ) : null}
+                            <button
+                              className="btn shortsCommentSend"
+                              type="submit"
+                              disabled={commentSubmittingPostId === post.id}
+                            >
+                              {text.commentSend}
+                            </button>
+                          </div>
+                        </form>
                       </div>
-                    </form>
-                  </div>
-                ) : null}
+                    </>
+                  ) : null}
+                </div>
               </article>
             );
           })}
