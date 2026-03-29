@@ -2141,6 +2141,43 @@ export default function App() {
     [navigate]
   );
 
+  const isAuthSessionError = useCallback((error: unknown) => {
+    if (!error || typeof error !== "object" || !("message" in error)) return false;
+    const message = (error as { message?: unknown }).message;
+    if (typeof message !== "string") return false;
+    const normalized = message.trim().toLowerCase();
+    return (
+      normalized.includes("invalid jwt") ||
+      normalized.includes("jwt") ||
+      normalized.includes("jwd") ||
+      normalized.includes("session expired") ||
+      normalized.includes("missing authorization header") ||
+      normalized.includes("missing or invalid bearer token")
+    );
+  }, []);
+
+  const forceSessionReset = useCallback(
+    async (supabase: SupabaseClient | null) => {
+      if (supabase) {
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // Ignore sign-out errors during forced session reset.
+        }
+      }
+      setSessionUser(null);
+      setProfileIsOrganizer(false);
+      setProfileIsAdmin(false);
+      profileLoaded.current = false;
+      setAuthState({
+        type: "error",
+        message: "Your session expired. Please sign in again.",
+      });
+      navigate("login");
+    },
+    [navigate]
+  );
+
   const goToEvent = useCallback(
     (eventId: string) => {
       if (typeof window !== "undefined") {
@@ -5328,6 +5365,10 @@ export default function App() {
       }
       setPostActionStatus({ type: "idle", message: "" });
     } catch (error) {
+      if (isAuthSessionError(error)) {
+        await forceSessionReset(supabase);
+        return;
+      }
       setPostActionStatus({
         type: "error",
         message: isMissingPostMuxColumnsError(error)
@@ -5382,6 +5423,10 @@ export default function App() {
       setUserPosts((prev) => prev.filter((item) => item.id !== post.id));
       setPostActionStatus({ type: "idle", message: "" });
     } catch (error) {
+      if (isAuthSessionError(error)) {
+        await forceSessionReset(supabase);
+        return;
+      }
       setPostActionStatus({
         type: "error",
         message: getSupabaseErrorMessage(error),
@@ -5475,6 +5520,10 @@ export default function App() {
       }
       setAdminPostsStatus({ type: "idle", message: "" });
     } catch (error) {
+      if (isAuthSessionError(error)) {
+        await forceSessionReset(supabase);
+        return;
+      }
       setAdminPostsStatus({
         type: "error",
         message: getSupabaseErrorMessage(error),
