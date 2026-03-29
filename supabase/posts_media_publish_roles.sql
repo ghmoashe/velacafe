@@ -3,6 +3,9 @@
 
 begin;
 
+alter table if exists public.profiles
+  add column if not exists is_teacher boolean not null default false;
+
 create or replace function public.can_user_publish_media_posts(target_user_id uuid)
 returns boolean
 language sql
@@ -12,7 +15,11 @@ as $$
     select 1
     from public.profiles
     where id = target_user_id
-      and (coalesce(is_organizer, false) or coalesce(is_admin, false))
+      and (
+        coalesce(is_organizer, false)
+        or coalesce(is_teacher, false)
+        or coalesce(is_admin, false)
+      )
   );
 $$;
 
@@ -47,7 +54,7 @@ begin
   if not public.can_user_publish_media_posts(actor_id) then
     raise exception using
       errcode = 'P0001',
-      message = 'Only organizer accounts can publish photo and video posts';
+      message = 'Only organizer, teacher, or admin accounts can publish photo and video posts';
   end if;
 
   return new;

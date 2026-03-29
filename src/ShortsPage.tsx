@@ -32,6 +32,7 @@ type OrganizerProfile = {
   language: string | null;
   bio: string | null;
   is_organizer?: boolean | null;
+  is_teacher?: boolean | null;
 };
 
 type VideoPostRow = {
@@ -611,11 +612,22 @@ export default function ShortsPage(props: ShortsPageProps) {
       return;
     }
 
-    const { data: profileRows, error: profileError } = await supabase
-      .from("profiles")
-      .select("id,full_name,avatar_url,city,country,language,bio,is_organizer")
-      .in("id", organizerIds)
-      .eq("is_organizer", true);
+      const primaryProfilesResult = await supabase
+        .from("profiles")
+        .select("id,full_name,avatar_url,city,country,language,bio,is_organizer,is_teacher")
+        .in("id", organizerIds);
+      const fallbackProfilesResult =
+        primaryProfilesResult.error &&
+        getErrorMessage(primaryProfilesResult.error).toLowerCase().includes("is_teacher")
+          ? await supabase
+              .from("profiles")
+              .select("id,full_name,avatar_url,city,country,language,bio,is_organizer")
+              .in("id", organizerIds)
+          : null;
+      const profileRows = (fallbackProfilesResult?.data ?? primaryProfilesResult.data) as
+        | OrganizerProfile[]
+        | null;
+      const profileError = fallbackProfilesResult?.error ?? primaryProfilesResult.error;
 
     if (profileError) {
       setFeedStatus({ type: "error", message: getErrorMessage(profileError) });
@@ -625,7 +637,9 @@ export default function ShortsPage(props: ShortsPageProps) {
     }
 
     const profileMap = new Map(
-      ((profileRows ?? []) as OrganizerProfile[]).map((profile) => [profile.id, profile])
+      ((profileRows ?? []) as OrganizerProfile[])
+        .filter((profile) => profile.is_organizer || profile.is_teacher)
+        .map((profile) => [profile.id, profile])
     );
     const filteredVideos = posts
       .filter((post): post is VideoPostRow & { user_id: string } =>
@@ -1270,11 +1284,14 @@ export default function ShortsPage(props: ShortsPageProps) {
         </div>
       ) : (
         <div className="shortsFeed" ref={feedRef}>
-          {videos.map((post, index) => {
-            const authorName = getAuthorName(post.author);
-            const authorInitial = getInitial(authorName);
-            const muxPlaybackId =
-              post.mux_playback_id ?? extractMuxPlaybackId(post.media_url);
+            {videos.map((post, index) => {
+              const authorName = getAuthorName(post.author);
+              const authorBadge = post.author.is_organizer
+                ? text.organizerBadge
+                : text.teacherBadge;
+              const authorInitial = getInitial(authorName);
+              const muxPlaybackId =
+                post.mux_playback_id ?? extractMuxPlaybackId(post.media_url);
             const coverUrl = getVideoCoverUrl(post);
             const locationLabel = [post.author.city, post.author.country]
               .filter(Boolean)
@@ -1348,10 +1365,10 @@ export default function ShortsPage(props: ShortsPageProps) {
                         <span className="shortsAuthorAvatar shortsAuthorAvatar--placeholder">
                           {authorInitial}
                         </span>
-                      )}
-                      <span className="shortsAuthorCopy">
-                        <span className="shortsBadge">{text.organizerBadge}</span>
-                        <span className="shortsAuthorName">{authorName}</span>
+                        )}
+                        <span className="shortsAuthorCopy">
+                          <span className="shortsBadge">{authorBadge}</span>
+                          <span className="shortsAuthorName">{authorName}</span>
                         {locationLabel || languageLabel ? (
                           <span className="shortsAuthorMeta">
                             {[locationLabel, languageLabel].filter(Boolean).join(" • ")}

@@ -369,6 +369,7 @@ type ProfileRecord = {
   instagram?: string | null;
   cover_url?: string | null;
   is_organizer?: boolean | null;
+  is_teacher?: boolean | null;
   is_admin?: boolean | null;
   pinned_short_post_id?: string | null;
 };
@@ -385,6 +386,7 @@ type SearchProfile = {
   practice_languages?: string[] | null;
   bio?: string | null;
   is_organizer?: boolean | null;
+  is_teacher?: boolean | null;
   is_admin?: boolean | null;
   pinned_short_post_id?: string | null;
 };
@@ -1397,6 +1399,10 @@ function isMissingPinnedShortColumnError(error: unknown) {
   return isMissingColumnError(error, "pinned_short_post_id");
 }
 
+function isMissingTeacherColumnError(error: unknown) {
+  return isMissingColumnError(error, "is_teacher");
+}
+
 function parsePositiveInteger(value: string): number | null {
   const normalized = value.trim();
   if (!normalized) return null;
@@ -1886,6 +1892,7 @@ export default function App() {
   const [profileTelegram, setProfileTelegram] = useState("");
   const [profileInstagram, setProfileInstagram] = useState("");
   const [profileIsOrganizer, setProfileIsOrganizer] = useState(false);
+  const [profileIsTeacher, setProfileIsTeacher] = useState(false);
   const [profileIsAdmin, setProfileIsAdmin] = useState(false);
   const [profilePinnedShortPostId, setProfilePinnedShortPostId] = useState<string | null>(
     null
@@ -2084,14 +2091,15 @@ export default function App() {
       { id: "posts" as const, label: strings.userTabPosts },
       { id: "photos" as const, label: strings.userTabPhotos },
       { id: "videos" as const, label: strings.userTabVideos },
-      ...(profileIsOrganizer || userPosts.some((post) => post.media_type === "video")
-        ? [{ id: "shorts" as const, label: strings.userTabShorts }]
-        : []),
+        ...(profileIsOrganizer || profileIsTeacher || userPosts.some((post) => post.media_type === "video")
+          ? [{ id: "shorts" as const, label: strings.userTabShorts }]
+          : []),
       { id: "tagged" as const, label: strings.userTabTagged },
     ],
     [
-      profileIsOrganizer,
-      strings.userTabAbout,
+        profileIsOrganizer,
+        profileIsTeacher,
+        strings.userTabAbout,
       strings.userTabFollowing,
       strings.userTabPhotos,
       strings.userTabPosts,
@@ -2149,16 +2157,17 @@ export default function App() {
     .map((interest) => resolveInterestLabel(interest, locale))
     .join(", ");
   const postPreviewIsVideo = Boolean(
-    postFile && postFile.type.startsWith("video/")
-  );
+      postFile && postFile.type.startsWith("video/")
+    );
   const postHasContent = Boolean(postCaption.trim() || postFile);
-  const canUploadPostMedia = profileIsOrganizer || profileIsAdmin;
+  const canUploadPostMedia = profileIsOrganizer || profileIsTeacher || profileIsAdmin;
+  const profileCanManageShorts = profileIsOrganizer || profileIsTeacher;
   const mediaPostAccessMessage =
     locale === "ru"
-      ? "Только аккаунты organizer могут добавлять фото и видео."
+      ? "Только organizer, teacher или admin могут добавлять фото и видео."
       : locale === "uk"
-        ? "Лише акаунти organizer можуть додавати фото й відео."
-        : "Only organizer accounts can upload photos and videos.";
+        ? "Лише organizer, teacher або admin можуть додавати фото й відео."
+        : "Only organizer, teacher, or admin accounts can upload photos and videos.";
   const getSupabaseErrorMessage = useCallback((error: unknown) => {
     if (error && typeof error === "object" && "message" in error) {
       const message = (error as { message?: unknown }).message;
@@ -2280,11 +2289,12 @@ export default function App() {
         } catch {
           // Ignore sign-out errors during forced session reset.
         }
-      }
-      setSessionUser(null);
-      setProfileIsOrganizer(false);
-      setProfileIsAdmin(false);
-      setProfilePinnedShortPostId(null);
+        }
+        setSessionUser(null);
+        setProfileIsOrganizer(false);
+        setProfileIsTeacher(false);
+        setProfileIsAdmin(false);
+        setProfilePinnedShortPostId(null);
       profileLoaded.current = false;
       setAuthState({
         type: "error",
@@ -2665,23 +2675,24 @@ export default function App() {
       }
       const user = sessionData.session?.user;
       if (!user) return;
-      const primaryProfileResult = await supabase
-        .from("profiles")
-        .select(
-          "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram,is_organizer,is_admin,pinned_short_post_id"
-        )
-        .eq("id", user.id)
-        .maybeSingle();
-      const fallbackProfileResult =
-        primaryProfileResult.error &&
-        isMissingPinnedShortColumnError(primaryProfileResult.error)
-          ? await supabase
-              .from("profiles")
-              .select(
-                "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram,is_organizer,is_admin"
-              )
-              .eq("id", user.id)
-              .maybeSingle()
+        const primaryProfileResult = await supabase
+          .from("profiles")
+          .select(
+            "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram,is_organizer,is_teacher,is_admin,pinned_short_post_id"
+          )
+          .eq("id", user.id)
+          .maybeSingle();
+        const fallbackProfileResult =
+          primaryProfileResult.error &&
+          (isMissingPinnedShortColumnError(primaryProfileResult.error) ||
+            isMissingTeacherColumnError(primaryProfileResult.error))
+            ? await supabase
+                .from("profiles")
+                .select(
+                  "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram,is_organizer,is_admin"
+                )
+                .eq("id", user.id)
+                .maybeSingle()
           : null;
       const data = (fallbackProfileResult?.data ?? primaryProfileResult.data) as
         | ProfileRecord
@@ -2739,11 +2750,12 @@ export default function App() {
             : []
         );
         setProfileInterestInput("");
-        setProfileTelegram(data.telegram ?? "");
-        setProfileInstagram(data.instagram ?? "");
-        setProfileIsOrganizer(Boolean(data.is_organizer));
-        setProfileIsAdmin(Boolean(data.is_admin));
-        setProfilePinnedShortPostId(data.pinned_short_post_id ?? null);
+          setProfileTelegram(data.telegram ?? "");
+          setProfileInstagram(data.instagram ?? "");
+          setProfileIsOrganizer(Boolean(data.is_organizer));
+          setProfileIsTeacher(Boolean(data.is_teacher));
+          setProfileIsAdmin(Boolean(data.is_admin));
+          setProfilePinnedShortPostId(data.pinned_short_post_id ?? null);
         setProfileCoverUrl(data.cover_url ?? null);
         setProfileCoverPreview(data.cover_url ?? null);
         setProfileCoverPhoto(null);
@@ -2757,10 +2769,11 @@ export default function App() {
         if (profilePhotoInputRef.current) {
           profilePhotoInputRef.current.value = "";
         }
-      } else {
-        setProfileIsAdmin(false);
-        setProfilePinnedShortPostId(null);
-      }
+        } else {
+          setProfileIsTeacher(false);
+          setProfileIsAdmin(false);
+          setProfilePinnedShortPostId(null);
+        }
       profileLoaded.current = true;
     })();
     return () => {
@@ -3122,10 +3135,10 @@ export default function App() {
       const [usersResult, eventsResult, postsResult, applicationsResult] =
         await Promise.all([
         supabase
-          .from("profiles")
-          .select(
-            "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,bio,is_organizer,is_admin"
-          )
+            .from("profiles")
+            .select(
+              "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,bio,is_organizer,is_teacher,is_admin"
+            )
           .order("full_name", { ascending: true }),
           supabase
             .from("events")
@@ -4220,7 +4233,7 @@ export default function App() {
 
   async function handleAdminUpdateUserRole(
     userId: string,
-    updates: Partial<Pick<SearchProfile, "is_organizer" | "is_admin">>
+    updates: Partial<Pick<SearchProfile, "is_organizer" | "is_teacher" | "is_admin">>
   ) {
     if (!profileIsAdmin) return;
     const supabase = getSupabaseClient();
@@ -4233,26 +4246,27 @@ export default function App() {
     }
     setAdminUsersStatus({ type: "loading", message: "" });
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .update(updates)
-        .eq("id", userId)
-        .select(
-          "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,bio,is_organizer,is_admin"
-        )
-        .maybeSingle();
-      if (error) throw error;
-      if (data) {
-        setAdminUsers((prev) =>
-          prev.map((profile) =>
-            profile.id === data.id ? (data as SearchProfile) : profile
+        const { data, error } = await supabase
+          .from("profiles")
+          .update(updates)
+          .eq("id", userId)
+          .select(
+            "id,full_name,avatar_url,city,country,language,language_level,learning_languages,practice_languages,bio,is_organizer,is_teacher,is_admin"
           )
-        );
-        if (sessionUser?.id === data.id) {
-          setProfileIsOrganizer(Boolean(data.is_organizer));
-          setProfileIsAdmin(Boolean(data.is_admin));
+          .maybeSingle();
+      if (error) throw error;
+        if (data) {
+          setAdminUsers((prev) =>
+            prev.map((profile) =>
+              profile.id === data.id ? (data as SearchProfile) : profile
+            )
+          );
+          if (sessionUser?.id === data.id) {
+            setProfileIsOrganizer(Boolean(data.is_organizer));
+            setProfileIsTeacher(Boolean(data.is_teacher));
+            setProfileIsAdmin(Boolean(data.is_admin));
+          }
         }
-      }
       setAdminUsersStatus({ type: "idle", message: "" });
     } catch (error) {
       setAdminUsersStatus({
@@ -5332,6 +5346,7 @@ export default function App() {
         if (!active) return;
         setSessionUser(null);
         setProfileIsOrganizer(false);
+        setProfileIsTeacher(false);
         setProfileIsAdmin(false);
         profileLoaded.current = false;
         setAuthState({
@@ -5477,11 +5492,12 @@ export default function App() {
     }
     try {
       await supabase.auth.signOut();
-    } finally {
-      setSessionUser(null);
-      setProfileIsOrganizer(false);
-      setProfileIsAdmin(false);
-      profileLoaded.current = false;
+      } finally {
+        setSessionUser(null);
+        setProfileIsOrganizer(false);
+        setProfileIsTeacher(false);
+        setProfileIsAdmin(false);
+        profileLoaded.current = false;
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(GUEST_MODE_KEY);
       }
@@ -5792,7 +5808,7 @@ export default function App() {
   }
 
   async function handlePinShortPost(postId: string | null) {
-    if (!sessionUser?.id || !profileIsOrganizer || pinShortLoadingId) return;
+    if (!sessionUser?.id || !profileCanManageShorts || pinShortLoadingId) return;
     const supabase = getSupabaseClient();
     if (!supabase) {
       setPinShortStatus({
@@ -6844,10 +6860,10 @@ export default function App() {
     photoPosts,
     videoPosts,
     shortVideoPosts,
-    profileIsOrganizer,
-    profilePinnedShortPostId,
-    pinShortLoadingId,
-    pinShortStatus,
+      profileCanManageShorts,
+      profilePinnedShortPostId,
+      pinShortLoadingId,
+      pinShortStatus,
     handlePinShortPost,
   };
   const profilePageProps = {

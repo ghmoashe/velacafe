@@ -19,6 +19,7 @@ export type ShortsText = {
   noComments: string;
   signInHint: string;
   organizerBadge: string;
+  teacherBadge: string;
   viewProfile: string;
   audioOn: string;
   audioOff: string;
@@ -55,6 +56,7 @@ const SHORTS_TEXT: ShortsText = {
   noComments: "No comments yet.",
   signInHint: "Sign in to like and comment.",
   organizerBadge: "Organizer",
+  teacherBadge: "Teacher",
   viewProfile: "View profile",
   audioOn: "Sound on",
   audioOff: "Muted",

@@ -31,6 +31,7 @@ type SearchProfile = {
   language: string | null;
   language_level: string | null;
   is_organizer?: boolean | null;
+  is_teacher?: boolean | null;
   is_admin?: boolean | null;
 };
 
@@ -85,7 +86,10 @@ type AdminPageProps = {
   adminSelectedUser: SearchProfile | null;
   adminSelectedUserId: string | null;
   setAdminSelectedUserId: (id: string) => void;
-  handleAdminUpdateUserRole: (userId: string, updates: { is_organizer?: boolean; is_admin?: boolean }) => void;
+  handleAdminUpdateUserRole: (
+    userId: string,
+    updates: { is_organizer?: boolean; is_teacher?: boolean; is_admin?: boolean }
+  ) => void;
   adminUsersBusy: boolean;
   languageLabels: LanguageLabels;
   isSupportedLocale: (value: string) => boolean;
@@ -155,6 +159,14 @@ export default function AdminPage(props: AdminPageProps) {
     handleAdminDeletePost,
     handleAdminToggleShortHidden,
   } = props;
+  const teacherRoleLabel =
+    locale === "ru" ? "Преподаватель" : locale === "uk" ? "Викладач" : "Teacher";
+  const makeTeacherLabel =
+    locale === "ru"
+      ? "Сделать преподавателем"
+      : locale === "uk"
+        ? "Зробити викладачем"
+        : "Make teacher";
 
   return (
               <div className="adminPage">
@@ -256,10 +268,28 @@ export default function AdminPage(props: AdminPageProps) {
                                   adminUsersBusy ||
                                   Boolean(adminSelectedUser?.is_organizer)
                                 }
-                              >
-                                {strings.adminMakeOrganizer}
-                              </button>
-                            </div>
+                                >
+                                  {strings.adminMakeOrganizer}
+                                </button>
+                                <button
+                                  className="btn"
+                                  type="button"
+                                  onClick={() => {
+                                    if (adminSelectedUserId) {
+                                      handleAdminUpdateUserRole(adminSelectedUserId, {
+                                        is_teacher: true,
+                                      });
+                                    }
+                                  }}
+                                  disabled={
+                                    !adminSelectedUserId ||
+                                    adminUsersBusy ||
+                                    Boolean(adminSelectedUser?.is_teacher)
+                                  }
+                                >
+                                  {makeTeacherLabel}
+                                </button>
+                              </div>
                             <div className="searchProfileGrid adminUsersGrid">
                             {adminUsers.map((profile) => {
                               const profileLanguage =
@@ -268,14 +298,15 @@ export default function AdminPage(props: AdminPageProps) {
                                   ? languageLabels[profile.language] ??
                                     profile.language
                                   : profile.language ?? "";
-                              const meta = [
-                                profile.city,
-                                profileLanguage,
-                                profile.language_level,
-                              ].filter(Boolean);
-                              const isSelf = profile.id === sessionUserId;
-                              const isOrganizer = Boolean(profile.is_organizer);
-                              const isAdmin = Boolean(profile.is_admin);
+                                const meta = [
+                                  profile.city,
+                                  profileLanguage,
+                                  profile.language_level,
+                                ].filter(Boolean);
+                                const isSelf = profile.id === sessionUserId;
+                                const isOrganizer = Boolean(profile.is_organizer);
+                                const isTeacher = Boolean(profile.is_teacher);
+                                const isAdmin = Boolean(profile.is_admin);
                               const isSelected =
                                 adminSelectedUserId === profile.id;
                                 return (
@@ -341,12 +372,24 @@ export default function AdminPage(props: AdminPageProps) {
                                         })
                                       }
                                       disabled={adminUsersBusy}
-                                    >
-                                      {strings.adminRoleOrganizer}
-                                    </button>
-                                    <button
-                                      className={`btn${isAdmin ? " btnActive" : ""}`}
-                                      type="button"
+                                      >
+                                        {strings.adminRoleOrganizer}
+                                      </button>
+                                      <button
+                                        className={`btn${isTeacher ? " btnActive" : ""}`}
+                                        type="button"
+                                        onClick={() =>
+                                          handleAdminUpdateUserRole(profile.id, {
+                                            is_teacher: !isTeacher,
+                                          })
+                                        }
+                                        disabled={adminUsersBusy}
+                                      >
+                                        {teacherRoleLabel}
+                                      </button>
+                                      <button
+                                        className={`btn${isAdmin ? " btnActive" : ""}`}
+                                        type="button"
                                       onClick={() =>
                                         handleAdminUpdateUserRole(profile.id, {
                                           is_admin: !isAdmin,

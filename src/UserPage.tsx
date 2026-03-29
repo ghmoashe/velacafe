@@ -117,7 +117,7 @@ type UserPageProps = {
   photoPosts: UserPost[];
   videoPosts: UserPost[];
   shortVideoPosts: UserPost[];
-  profileIsOrganizer: boolean;
+  profileCanManageShorts: boolean;
   profilePinnedShortPostId: string | null;
   pinShortLoadingId: string | null;
   pinShortStatus: Status;
@@ -183,7 +183,7 @@ export default function UserPage(props: UserPageProps) {
     photoPosts,
     videoPosts,
     shortVideoPosts,
-    profileIsOrganizer,
+    profileCanManageShorts,
     profilePinnedShortPostId,
     pinShortLoadingId,
     pinShortStatus,
@@ -678,7 +678,7 @@ export default function UserPage(props: UserPageProps) {
           </div>
         )
       ) : userTab === "shorts" ? (
-        !profileIsOrganizer ? (
+        !profileCanManageShorts ? (
           <div className="userPostEmpty">{strings.userPostEmpty}</div>
         ) : postsStatus.type === "loading" ? (
           <div
