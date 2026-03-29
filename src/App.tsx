@@ -14,6 +14,7 @@ import {
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import {
   buildMuxPlaybackUrl,
+  buildMuxThumbnailUrl,
   createMuxDirectUpload,
   deleteMuxAsset,
   uploadFileToMux,
@@ -266,6 +267,7 @@ type UserPost = {
   media_type: PostMediaType;
   caption: string | null;
   created_at: string;
+  cover_url?: string | null;
   mux_upload_id?: string | null;
   mux_asset_id?: string | null;
   mux_playback_id?: string | null;
@@ -522,6 +524,8 @@ type MessageKey =
   | "userPostCaptionPlaceholder"
   | "userPostPublish"
   | "userPostFileHint"
+  | "userPostCoverHint"
+  | "userPostCoverClear"
   | "userPostEmpty"
   | "userPostDelete"
   | "userPostDeleteConfirm"
@@ -1353,7 +1357,8 @@ function isMissingPostMuxColumnsError(error: unknown) {
   return (
     isMissingColumnError(error, "mux_playback_id") ||
     isMissingColumnError(error, "mux_asset_id") ||
-    isMissingColumnError(error, "mux_upload_id")
+    isMissingColumnError(error, "mux_upload_id") ||
+    isMissingColumnError(error, "cover_url")
   );
 }
 
@@ -1528,7 +1533,7 @@ const POSTS_TABLE = "posts";
 const ORGANIZER_APPLICATIONS_TABLE = "organizer_applications";
 const POST_MEDIA_FOLDER = "posts";
 const POST_SELECT_FIELDS =
-  "id,user_id,media_url,media_type,caption,created_at,mux_upload_id,mux_asset_id,mux_playback_id";
+  "id,user_id,media_url,media_type,caption,created_at,cover_url,mux_upload_id,mux_asset_id,mux_playback_id";
 const POST_SELECT_FIELDS_LEGACY =
   "id,user_id,media_url,media_type,caption,created_at";
 const EVENT_SELECT_FIELDS =
@@ -1623,7 +1628,9 @@ export default function App() {
   const [userPosts, setUserPosts] = useState<UserPost[]>([]);
   const [postCaption, setPostCaption] = useState("");
   const [postFile, setPostFile] = useState<File | null>(null);
+  const [postCoverFile, setPostCoverFile] = useState<File | null>(null);
   const [postPreviewUrl, setPostPreviewUrl] = useState<string | null>(null);
+  const [postCoverPreviewUrl, setPostCoverPreviewUrl] = useState<string | null>(null);
   const [postsStatus, setPostsStatus] = useState<{
     type: "idle" | "loading" | "error";
     message: string;
@@ -1858,6 +1865,7 @@ export default function App() {
   const profileCoverInputRef = useRef<HTMLInputElement | null>(null);
   const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
   const postFileInputRef = useRef<HTMLInputElement | null>(null);
+  const postCoverInputRef = useRef<HTMLInputElement | null>(null);
   const eventImageInputRef = useRef<HTMLInputElement | null>(null);
   const eventCropImageRef = useRef<HTMLImageElement | null>(null);
   const cropImageRef = useRef<HTMLImageElement | null>(null);
@@ -2436,6 +2444,13 @@ export default function App() {
       URL.revokeObjectURL(postPreviewUrl);
     };
   }, [postPreviewUrl]);
+
+  useEffect(() => {
+    if (!postCoverPreviewUrl?.startsWith("blob:")) return undefined;
+    return () => {
+      URL.revokeObjectURL(postCoverPreviewUrl);
+    };
+  }, [postCoverPreviewUrl]);
 
   useEffect(() => {
     if (!cropImageUrl) {
@@ -3630,11 +3645,23 @@ export default function App() {
     resetPostActionStatus();
   }
 
+  function clearPostCoverSelection() {
+    if (postCoverPreviewUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(postCoverPreviewUrl);
+    }
+    setPostCoverFile(null);
+    setPostCoverPreviewUrl(null);
+    if (postCoverInputRef.current) {
+      postCoverInputRef.current.value = "";
+    }
+  }
+
   function handlePostFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
     if (postPreviewUrl?.startsWith("blob:")) {
       URL.revokeObjectURL(postPreviewUrl);
     }
+    clearPostCoverSelection();
     setPostFile(file);
     resetPostActionStatus();
     if (!file) {
@@ -3643,6 +3670,15 @@ export default function App() {
     }
     const previewUrl = URL.createObjectURL(file);
     setPostPreviewUrl(previewUrl);
+  }
+
+  function handlePostCoverFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    clearPostCoverSelection();
+    resetPostActionStatus();
+    if (!file) return;
+    setPostCoverFile(file);
+    setPostCoverPreviewUrl(URL.createObjectURL(file));
   }
 
   function setError(message: string) {
@@ -5267,6 +5303,7 @@ export default function App() {
       return;
     }
     setPostActionStatus({ type: "loading", message: strings.loadingLabel });
+    let coverStoragePath: string | null = null;
       try {
         const { accessToken, user } = await getVerifiedSupabaseSession(supabase);
         if (!user) {
@@ -5281,6 +5318,7 @@ export default function App() {
       let muxUploadId: string | null = null;
       let muxAssetId: string | null = null;
       let muxPlaybackId: string | null = null;
+      let coverUrl: string | null = null;
       if (postFile) {
         mediaType = postFile.type.startsWith("video/") ? "video" : "image";
         if (mediaType === "video") {
@@ -5315,6 +5353,26 @@ export default function App() {
             );
           }
           mediaUrl = buildMuxPlaybackUrl(muxPlaybackId);
+          if (postCoverFile) {
+            const extension = postCoverFile.name.split(".").pop() ?? "jpg";
+            const fileName = `${Date.now()}-${Math.random()
+              .toString(36)
+              .slice(2, 8)}.${extension}`;
+            coverStoragePath = `${user.id}/${POST_MEDIA_FOLDER}/${fileName}`;
+            const { error: coverUploadError } = await supabase.storage
+              .from(POSTS_BUCKET)
+              .upload(coverStoragePath, postCoverFile, {
+                upsert: false,
+                contentType: postCoverFile.type || "image/jpeg",
+              });
+            if (coverUploadError) throw coverUploadError;
+            const { data: coverPublicData } = supabase.storage
+              .from(POSTS_BUCKET)
+              .getPublicUrl(coverStoragePath);
+            coverUrl = coverPublicData.publicUrl ?? null;
+          } else {
+            coverUrl = buildMuxThumbnailUrl(muxPlaybackId);
+          }
         } else {
           const extension = postFile.name.split(".").pop() ?? "jpg";
           const fileName = `${Date.now()}-${Math.random()
@@ -5341,6 +5399,7 @@ export default function App() {
         caption: trimmedCaption || null,
       };
       if (mediaType === "video") {
+        insertPayload.cover_url = coverUrl;
         insertPayload.mux_upload_id = muxUploadId;
         insertPayload.mux_asset_id = muxAssetId;
         insertPayload.mux_playback_id = muxPlaybackId;
@@ -5356,6 +5415,7 @@ export default function App() {
       }
       setPostCaption("");
       setPostFile(null);
+      clearPostCoverSelection();
       if (postPreviewUrl?.startsWith("blob:")) {
         URL.revokeObjectURL(postPreviewUrl);
       }
@@ -5365,6 +5425,9 @@ export default function App() {
       }
       setPostActionStatus({ type: "idle", message: "" });
     } catch (error) {
+      if (coverStoragePath) {
+        await supabase.storage.from(POSTS_BUCKET).remove([coverStoragePath]);
+      }
       if (isAuthSessionError(error)) {
         await forceSessionReset(supabase);
         return;
@@ -5372,7 +5435,7 @@ export default function App() {
       setPostActionStatus({
         type: "error",
         message: isMissingPostMuxColumnsError(error)
-          ? "Run supabase/posts_add_mux_video_fields.sql before publishing Mux videos."
+          ? "Run supabase/posts_add_mux_video_fields.sql and supabase/posts_shorts_feed_features.sql before publishing enhanced video posts."
           : getSupabaseErrorMessage(error),
       });
     }
@@ -5409,6 +5472,15 @@ export default function App() {
             .from(POSTS_BUCKET)
             .remove([path]);
           if (removeError) throw removeError;
+        }
+      }
+      if (post.cover_url) {
+        const coverPath = getStoragePathFromUrl(post.cover_url, POSTS_BUCKET);
+        if (coverPath) {
+          const { error: removeCoverError } = await supabase.storage
+            .from(POSTS_BUCKET)
+            .remove([coverPath]);
+          if (removeCoverError) throw removeCoverError;
         }
       }
         if (post.mux_asset_id) {
@@ -5474,7 +5546,7 @@ export default function App() {
       setAdminPostsStatus({
         type: "error",
         message: isMissingPostMuxColumnsError(error)
-          ? "Run supabase/posts_add_mux_video_fields.sql before editing Mux posts."
+          ? "Run supabase/posts_add_mux_video_fields.sql and supabase/posts_shorts_feed_features.sql before editing enhanced video posts."
           : getSupabaseErrorMessage(error),
       });
     }
@@ -5505,6 +5577,15 @@ export default function App() {
             .remove([path]);
           if (removeError) throw removeError;
         }
+        }
+        if (post.cover_url) {
+          const coverPath = getStoragePathFromUrl(post.cover_url, POSTS_BUCKET);
+          if (coverPath) {
+            const { error: removeCoverError } = await supabase.storage
+              .from(POSTS_BUCKET)
+              .remove([coverPath]);
+            if (removeCoverError) throw removeCoverError;
+          }
         }
         if (post.mux_asset_id) {
           await deleteMuxAsset(post.mux_asset_id, accessToken);
@@ -6414,11 +6495,15 @@ export default function App() {
     postCaption,
     updatePostCaption,
     postFileInputRef,
+    postCoverInputRef,
     handlePostFileChange,
+    handlePostCoverFileChange,
+    clearPostCoverSelection,
     handlePostPublish,
     postActionStatus,
     postHasContent,
     postPreviewUrl,
+    postCoverPreviewUrl,
     postPreviewIsVideo,
     postsStatus,
     userPosts,

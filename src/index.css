@@ -714,6 +714,16 @@ button:focus-visible {
   background: #0b0f14;
 }
 
+.shortsCover {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
 .shortsStageShade {
   position: absolute;
   inset: 0;
@@ -846,6 +856,10 @@ button:focus-visible {
 .shortsAction:disabled {
   cursor: default;
   opacity: 0.7;
+}
+
+.shortsAction--metric:disabled {
+  opacity: 0.96;
 }
 
 .shortsAction--active {
@@ -2487,7 +2501,30 @@ button:focus-visible {
   min-width: 160px;
 }
 
+.userPostCoverRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.userPostUpload--secondary {
+  border-style: solid;
+}
+
+.userPostCoverClear {
+  min-width: 140px;
+}
+
 .userPostPreview {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(234, 222, 211, 0.9);
+  background: rgba(248, 244, 238, 0.8);
+}
+
+.userPostCoverPreview {
+  width: min(220px, 100%);
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid rgba(234, 222, 211, 0.9);
@@ -2631,7 +2668,16 @@ button:focus-visible {
     align-items: stretch;
   }
 
+  .userPostCoverRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .userPostPublish {
+    width: 100%;
+  }
+
+  .userPostCoverClear {
     width: 100%;
   }
 

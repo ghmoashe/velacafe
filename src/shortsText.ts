@@ -8,6 +8,7 @@ export type ShortsText = {
   likeLabel: string;
   commentLabel: string;
   shareLabel: string;
+  viewsLabel: string;
   commentsTitle: string;
   commentPlaceholder: string;
   commentSend: string;
@@ -39,6 +40,7 @@ const SHORTS_TEXT: ShortsText = {
   likeLabel: "Like",
   commentLabel: "Comment",
   shareLabel: "Share",
+  viewsLabel: "Views",
   commentsTitle: "Comments",
   commentPlaceholder: "Write a comment...",
   commentSend: "Send",
@@ -55,7 +57,7 @@ const SHORTS_TEXT: ShortsText = {
   shareDone: "Video link shared.",
   notConfigured: "Supabase is not configured.",
   socialSetupHint:
-    "Likes and comments need the SQL in supabase/posts_social_features.sql to be enabled.",
+    "Likes, comments, views, and custom covers need the SQL in supabase/posts_social_features.sql and supabase/posts_shorts_feed_features.sql.",
   sharePrompt: "Copy this video link:",
   closeComments: "Close comments",
 };

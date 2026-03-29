@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  buildMuxThumbnailUrl,
   extractMuxPlaybackId,
   MuxPlayer,
   type MuxPlayerElement,
@@ -38,6 +39,7 @@ type VideoPostRow = {
   media_url: string | null;
   caption: string | null;
   created_at: string;
+  cover_url?: string | null;
   mux_playback_id?: string | null;
 };
 
@@ -59,6 +61,10 @@ type CommentRow = {
 };
 
 type ShareRow = {
+  post_id: string;
+};
+
+type ViewRow = {
   post_id: string;
 };
 
@@ -152,6 +158,84 @@ function buildCountMap(ids: string[]) {
   }, {});
 }
 
+function getFeedViewerKey(sessionUserId: string | null) {
+  if (sessionUserId) {
+    return `user:${sessionUserId}`;
+  }
+  if (typeof window === "undefined") {
+    return "guest:server";
+  }
+  const storageKey = "vela-shorts-viewer-key";
+  const stored = window.localStorage.getItem(storageKey);
+  if (stored?.trim()) {
+    return `guest:${stored.trim()}`;
+  }
+  const generated =
+    typeof window.crypto?.randomUUID === "function"
+      ? window.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  window.localStorage.setItem(storageKey, generated);
+  return `guest:${generated}`;
+}
+
+function getVideoRankScore(
+  post: VideoFeedItem,
+  metrics: { likes: number; comments: number; shares: number; views: number }
+) {
+  const createdAt = new Date(post.created_at).getTime();
+  const ageHours = Number.isNaN(createdAt)
+    ? 72
+    : Math.max(1, (Date.now() - createdAt) / 3_600_000);
+  const freshnessBoost = Math.max(0, 72 - ageHours) * 1.4;
+  const engagementBoost =
+    metrics.likes * 4 +
+    metrics.comments * 6 +
+    metrics.shares * 8 +
+    Math.log10(metrics.views + 1) * 18;
+  return freshnessBoost + engagementBoost;
+}
+
+function rankFeedVideos(
+  items: VideoFeedItem[],
+  likeCounts: Record<string, number>,
+  commentCounts: Record<string, number>,
+  shareCounts: Record<string, number>,
+  viewCounts: Record<string, number>,
+  requestedPostId: string | null
+) {
+  return [...items].sort((left, right) => {
+    if (requestedPostId) {
+      if (left.id === requestedPostId) return -1;
+      if (right.id === requestedPostId) return 1;
+    }
+    const scoreDiff =
+      getVideoRankScore(right, {
+        likes: likeCounts[right.id] ?? 0,
+        comments: commentCounts[right.id] ?? 0,
+        shares: shareCounts[right.id] ?? 0,
+        views: viewCounts[right.id] ?? 0,
+      }) -
+      getVideoRankScore(left, {
+        likes: likeCounts[left.id] ?? 0,
+        comments: commentCounts[left.id] ?? 0,
+        shares: shareCounts[left.id] ?? 0,
+        views: viewCounts[left.id] ?? 0,
+      });
+    if (scoreDiff !== 0) {
+      return scoreDiff;
+    }
+    return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+  });
+}
+
+function getVideoCoverUrl(post: VideoPostRow) {
+  const playbackId = post.mux_playback_id ?? extractMuxPlaybackId(post.media_url);
+  if (post.cover_url?.trim()) {
+    return post.cover_url.trim();
+  }
+  return playbackId ? buildMuxThumbnailUrl(playbackId) : null;
+}
+
 function updateRefMap<T>(
   refMap: MutableRefObject<Record<string, T | null>>,
   id: string,
@@ -169,16 +253,17 @@ function ShortsActionButton(props: {
   count: string;
   active?: boolean;
   busy?: boolean;
-  onClick: () => void;
+  onClick?: () => void;
   children: ReactNode;
 }) {
   const { label, count, active = false, busy = false, onClick, children } = props;
+  const interactive = typeof onClick === "function";
   return (
     <button
-      className={`shortsAction${active ? " shortsAction--active" : ""}`}
+      className={`shortsAction${active ? " shortsAction--active" : ""}${interactive ? "" : " shortsAction--metric"}`}
       type="button"
       onClick={onClick}
-      disabled={busy}
+      disabled={busy || !interactive}
       aria-label={label}
       title={label}
     >
@@ -214,6 +299,7 @@ export default function ShortsPage(props: ShortsPageProps) {
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [shareCounts, setShareCounts] = useState<Record<string, number>>({});
+  const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
   const [likedPostIds, setLikedPostIds] = useState<string[]>([]);
   const [openCommentsPostId, setOpenCommentsPostId] = useState<string | null>(null);
   const [commentsByPostId, setCommentsByPostId] = useState<
@@ -234,6 +320,7 @@ export default function ShortsPage(props: ShortsPageProps) {
   const feedRef = useRef<HTMLDivElement | null>(null);
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
   const videoRefs = useRef<Record<string, PlayableMediaElement | null>>({});
+  const recordedViewIdsRef = useRef<Set<string>>(new Set());
   const likedPostIdSet = useMemo(() => new Set(likedPostIds), [likedPostIds]);
 
   const setNotice = useCallback((message: string) => {
@@ -241,25 +328,30 @@ export default function ShortsPage(props: ShortsPageProps) {
   }, []);
 
   const loadInteractionSummary = useCallback(
-    async (postIds: string[]) => {
+    async (postIds: string[], items?: VideoFeedItem[]) => {
       const supabase = getSupabaseClient();
       if (!supabase || postIds.length === 0) {
         setLikeCounts(buildCountMap(postIds));
         setCommentCounts(buildCountMap(postIds));
         setShareCounts(buildCountMap(postIds));
+        setViewCounts(buildCountMap(postIds));
         setLikedPostIds([]);
         return;
       }
-      const [likesResult, commentsResult, sharesResult] = await Promise.all([
+      const [likesResult, commentsResult, sharesResult, viewsResult] = await Promise.all([
         supabase.from("post_likes").select("post_id,user_id").in("post_id", postIds),
         supabase.from("post_comments").select("post_id").in("post_id", postIds),
         supabase
           .from("post_share_events")
           .select("post_id")
           .in("post_id", postIds),
+        supabase.from("post_view_events").select("post_id").in("post_id", postIds),
       ]);
       const interactionError =
-        likesResult.error ?? commentsResult.error ?? sharesResult.error;
+        likesResult.error ??
+        commentsResult.error ??
+        sharesResult.error ??
+        viewsResult.error;
       if (interactionError) {
         setSocialReady(false);
         setSocialNotice(
@@ -270,6 +362,7 @@ export default function ShortsPage(props: ShortsPageProps) {
         setLikeCounts(buildCountMap(postIds));
         setCommentCounts(buildCountMap(postIds));
         setShareCounts(buildCountMap(postIds));
+        setViewCounts(buildCountMap(postIds));
         setLikedPostIds([]);
         return;
       }
@@ -277,6 +370,7 @@ export default function ShortsPage(props: ShortsPageProps) {
       const nextLikeCounts = buildCountMap(postIds);
       const nextCommentCounts = buildCountMap(postIds);
       const nextShareCounts = buildCountMap(postIds);
+      const nextViewCounts = buildCountMap(postIds);
       const nextLiked = new Set<string>();
 
       for (const row of (likesResult.data ?? []) as LikeRow[]) {
@@ -294,11 +388,30 @@ export default function ShortsPage(props: ShortsPageProps) {
         nextShareCounts[row.post_id] = (nextShareCounts[row.post_id] ?? 0) + 1;
       }
 
+      for (const row of (viewsResult.data ?? []) as ViewRow[]) {
+        nextViewCounts[row.post_id] = (nextViewCounts[row.post_id] ?? 0) + 1;
+      }
+
+      const requestedPostId = getRequestedPostId();
+      if (items?.length) {
+        const rankedItems = rankFeedVideos(
+          items,
+          nextLikeCounts,
+          nextCommentCounts,
+          nextShareCounts,
+          nextViewCounts,
+          requestedPostId
+        );
+        setVideos(rankedItems);
+        setActivePostId(rankedItems[0]?.id ?? null);
+      }
+
       setSocialReady(true);
       setSocialNotice("");
       setLikeCounts(nextLikeCounts);
       setCommentCounts(nextCommentCounts);
       setShareCounts(nextShareCounts);
+      setViewCounts(nextViewCounts);
       setLikedPostIds([...nextLiked]);
     },
     [sessionUserId, text.socialSetupHint]
@@ -309,13 +422,14 @@ export default function ShortsPage(props: ShortsPageProps) {
     if (!supabase) {
       setFeedStatus({ type: "error", message: text.notConfigured });
       setVideos([]);
+      setViewCounts({});
       return;
     }
 
     setFeedStatus({ type: "loading", message: "" });
     const primaryPostsResult = await supabase
       .from("posts")
-      .select("id,user_id,media_url,caption,created_at,mux_playback_id")
+      .select("id,user_id,media_url,caption,created_at,cover_url,mux_playback_id")
       .eq("media_type", "video")
       .not("media_url", "is", null)
       .order("created_at", { ascending: false })
@@ -338,6 +452,7 @@ export default function ShortsPage(props: ShortsPageProps) {
     if (postError) {
       setFeedStatus({ type: "error", message: getErrorMessage(postError) });
       setVideos([]);
+      setViewCounts({});
       return;
     }
 
@@ -356,6 +471,7 @@ export default function ShortsPage(props: ShortsPageProps) {
       setLikeCounts({});
       setCommentCounts({});
       setShareCounts({});
+      setViewCounts({});
       return;
     }
 
@@ -368,13 +484,13 @@ export default function ShortsPage(props: ShortsPageProps) {
     if (profileError) {
       setFeedStatus({ type: "error", message: getErrorMessage(profileError) });
       setVideos([]);
+      setViewCounts({});
       return;
     }
 
     const profileMap = new Map(
       ((profileRows ?? []) as OrganizerProfile[]).map((profile) => [profile.id, profile])
     );
-    const requestedPostId = getRequestedPostId();
     const filteredVideos = posts
       .filter((post): post is VideoPostRow & { user_id: string } =>
         Boolean(
@@ -388,18 +504,13 @@ export default function ShortsPage(props: ShortsPageProps) {
         author: profileMap.get(post.user_id)!,
       }));
 
-    if (requestedPostId) {
-      filteredVideos.sort((left, right) => {
-        if (left.id === requestedPostId) return -1;
-        if (right.id === requestedPostId) return 1;
-        return 0;
-      });
-    }
-
     setVideos(filteredVideos);
     setActivePostId(filteredVideos[0]?.id ?? null);
     setFeedStatus({ type: "idle", message: "" });
-    await loadInteractionSummary(filteredVideos.map((item) => item.id));
+    await loadInteractionSummary(
+      filteredVideos.map((item) => item.id),
+      filteredVideos
+    );
   }, [loadInteractionSummary, text.notConfigured]);
 
   const loadComments = useCallback(
@@ -475,6 +586,44 @@ export default function ShortsPage(props: ShortsPageProps) {
     [setNotice, socialReady, text.notConfigured, text.socialSetupHint]
   );
 
+  const recordView = useCallback(
+    async (postId: string) => {
+      if (!socialReady || recordedViewIdsRef.current.has(postId)) {
+        return;
+      }
+      const supabase = getSupabaseClient();
+      if (!supabase) return;
+
+      const viewerKey = getFeedViewerKey(sessionUserId);
+      const { error } = await supabase.from("post_view_events").insert({
+        post_id: postId,
+        user_id: sessionUserId,
+        viewer_key: viewerKey,
+      });
+
+      if (error) {
+        const message =
+          typeof error.message === "string" ? error.message.toLowerCase() : "";
+        if (error.code === "23505" || message.includes("duplicate key")) {
+          recordedViewIdsRef.current.add(postId);
+          return;
+        }
+        if (isSchemaError(error)) {
+          setSocialReady(false);
+          setSocialNotice(text.socialSetupHint);
+        }
+        return;
+      }
+
+      recordedViewIdsRef.current.add(postId);
+      setViewCounts((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] ?? 0) + 1,
+      }));
+    },
+    [sessionUserId, socialReady, text.socialSetupHint]
+  );
+
   useEffect(() => {
     const id = window.setTimeout(() => {
       void loadFeed();
@@ -536,6 +685,14 @@ export default function ShortsPage(props: ShortsPageProps) {
       }
     }
   }, [activePostId, pausedPostIds, soundOnPostId, videos]);
+
+  useEffect(() => {
+    if (!activePostId || typeof window === "undefined") return undefined;
+    const id = window.setTimeout(() => {
+      void recordView(activePostId);
+    }, 1400);
+    return () => window.clearTimeout(id);
+  }, [activePostId, recordView]);
 
   const handleToggleComments = useCallback(
     async (postId: string) => {
@@ -769,6 +926,10 @@ export default function ShortsPage(props: ShortsPageProps) {
     setSoundOnPostId((prev) => (prev === postId ? null : postId));
   }, []);
 
+  const activeVideoIndex = activePostId
+    ? videos.findIndex((item) => item.id === activePostId)
+    : -1;
+
   return (
     <div className="shortsPage">
       <div className="shortsHud">
@@ -805,11 +966,12 @@ export default function ShortsPage(props: ShortsPageProps) {
         </div>
       ) : (
         <div className="shortsFeed" ref={feedRef}>
-          {videos.map((post) => {
+          {videos.map((post, index) => {
             const authorName = getAuthorName(post.author);
             const authorInitial = getInitial(authorName);
             const muxPlaybackId =
               post.mux_playback_id ?? extractMuxPlaybackId(post.media_url);
+            const coverUrl = getVideoCoverUrl(post);
             const locationLabel = [post.author.city, post.author.country]
               .filter(Boolean)
               .join(", ");
@@ -819,6 +981,11 @@ export default function ShortsPage(props: ShortsPageProps) {
             const comments = commentsByPostId[post.id] ?? [];
             const commentsOpen = openCommentsPostId === post.id;
             const paused = Boolean(pausedPostIds[post.id]);
+            const preloadMode =
+              activeVideoIndex === -1 || Math.abs(index - activeVideoIndex) <= 1
+                ? "auto"
+                : "metadata";
+            const showCover = Boolean(coverUrl && activePostId !== post.id);
             const playbackHint = paused
               ? `${text.resumeHint} ${text.swipeHint}`
               : `${text.tapHint} ${text.swipeHint}`;
@@ -836,6 +1003,7 @@ export default function ShortsPage(props: ShortsPageProps) {
                       playerRef={(node) => updateRefMap(videoRefs, post.id, node)}
                       className="shortsVideo"
                       playbackId={muxPlaybackId}
+                      preload={preloadMode}
                       loop
                       muted
                       onClick={() => handleTogglePlayback(post.id)}
@@ -848,10 +1016,13 @@ export default function ShortsPage(props: ShortsPageProps) {
                       loop
                       muted
                       playsInline
-                      preload="metadata"
+                      preload={preloadMode}
                       onClick={() => handleTogglePlayback(post.id)}
                     />
                   )}
+                  {showCover ? (
+                    <img className="shortsCover" src={coverUrl ?? undefined} alt={authorName} />
+                  ) : null}
                   <div className="shortsStageShade" />
                   <div className="shortsStageTop">
                     <button
@@ -940,6 +1111,28 @@ export default function ShortsPage(props: ShortsPageProps) {
                           strokeWidth="1.8"
                           strokeLinecap="round"
                           strokeLinejoin="round"
+                        />
+                      </svg>
+                    </ShortsActionButton>
+                    <ShortsActionButton
+                      label={text.viewsLabel}
+                      count={numberFormatter.format(viewCounts[post.id] ?? 0)}
+                    >
+                      <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                        <path
+                          d="M2.5 12s3.7-6 9.5-6 9.5 6 9.5 6-3.7 6-9.5 6-9.5-6-9.5-6Z"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinejoin="round"
+                        />
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="3"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
                         />
                       </svg>
                     </ShortsActionButton>

@@ -40,6 +40,7 @@ type UserPost = {
   media_type: "image" | "video" | "text";
   caption: string | null;
   created_at: string;
+  cover_url?: string | null;
   mux_playback_id?: string | null;
   mux_asset_id?: string | null;
   mux_upload_id?: string | null;
@@ -88,11 +89,15 @@ type UserPageProps = {
   postCaption: string;
   updatePostCaption: (value: string) => void;
   postFileInputRef: RefObject<HTMLInputElement | null>;
+  postCoverInputRef: RefObject<HTMLInputElement | null>;
   handlePostFileChange: ChangeEventHandler<HTMLInputElement>;
+  handlePostCoverFileChange: ChangeEventHandler<HTMLInputElement>;
+  clearPostCoverSelection: () => void;
   handlePostPublish: () => Promise<void> | void;
   postActionStatus: Status;
   postHasContent: boolean;
   postPreviewUrl: string | null;
+  postCoverPreviewUrl: string | null;
   postPreviewIsVideo: boolean;
   postsStatus: Status;
   userPosts: UserPost[];
@@ -142,11 +147,15 @@ export default function UserPage(props: UserPageProps) {
     postCaption,
     updatePostCaption,
     postFileInputRef,
+    postCoverInputRef,
     handlePostFileChange,
+    handlePostCoverFileChange,
+    clearPostCoverSelection,
     handlePostPublish,
     postActionStatus,
     postHasContent,
     postPreviewUrl,
+    postCoverPreviewUrl,
     postPreviewIsVideo,
     postsStatus,
     userPosts,
@@ -430,6 +439,30 @@ export default function UserPage(props: UserPageProps) {
                   : strings.userPostPublish}
               </button>
             </div>
+            {postPreviewIsVideo ? (
+              <div className="userPostCoverRow">
+                <label className="userPostUpload userPostUpload--secondary">
+                  <input
+                    ref={postCoverInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePostCoverFileChange}
+                  />
+                  <span className="userPostUploadText">
+                    {strings.userPostCoverHint}
+                  </span>
+                </label>
+                {postCoverPreviewUrl ? (
+                  <button
+                    className="btn btnGhost userPostCoverClear"
+                    type="button"
+                    onClick={clearPostCoverSelection}
+                  >
+                    {strings.userPostCoverClear}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
             {postPreviewUrl ? (
               <div className="userPostPreview">
                 {postPreviewIsVideo ? (
@@ -445,6 +478,15 @@ export default function UserPage(props: UserPageProps) {
                     alt={strings.userTabPhotos}
                   />
                 )}
+              </div>
+            ) : null}
+            {postCoverPreviewUrl ? (
+              <div className="userPostCoverPreview">
+                <img
+                  className="userPostMedia"
+                  src={postCoverPreviewUrl}
+                  alt={strings.userPostCoverHint}
+                />
               </div>
             ) : null}
             {postActionStatus.type === "error" ? (

@@ -101,6 +101,12 @@ export function buildMuxPlaybackUrl(playbackId: string) {
   return `${MUX_PLAYBACK_BASE_URL.replace(/\/+$/, "")}/${playbackId}.m3u8`;
 }
 
+export function buildMuxThumbnailUrl(playbackId: string, time = 1) {
+  const safePlaybackId = playbackId.trim();
+  const safeTime = Number.isFinite(time) ? Math.max(0, time) : 1;
+  return `https://image.mux.com/${safePlaybackId}/thumbnail.webp?time=${safeTime}`;
+}
+
 export function extractMuxPlaybackId(value: string | null | undefined) {
   if (!value) return null;
   const trimmed = value.trim();
@@ -154,6 +160,7 @@ export function MuxPlayer(props: {
   autoPlay?: boolean;
   muted?: boolean;
   loop?: boolean;
+  preload?: "auto" | "metadata" | "none";
   onClick?: () => void;
   style?: CSSProperties;
   playerRef?: (node: MuxPlayerElement | null) => void;
@@ -165,6 +172,7 @@ export function MuxPlayer(props: {
     autoPlay,
     muted,
     loop,
+    preload,
     onClick,
     style,
     playerRef,
@@ -179,7 +187,7 @@ export function MuxPlayer(props: {
     style,
     "playback-id": playbackId,
     "stream-type": "on-demand",
-    preload: "metadata",
+    preload: preload ?? "metadata",
     controls: controls ? "" : undefined,
     muted,
     loop,

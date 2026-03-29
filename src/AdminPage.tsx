@@ -66,6 +66,7 @@ type UserPost = {
   media_type: "image" | "video" | "text";
   caption: string | null;
   created_at: string;
+  cover_url?: string | null;
   mux_playback_id?: string | null;
   mux_asset_id?: string | null;
   mux_upload_id?: string | null;
