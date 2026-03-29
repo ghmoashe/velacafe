@@ -15,6 +15,7 @@ export type ShortsText = {
   commentsTitle: string;
   commentPlaceholder: string;
   commentSend: string;
+  commentBlocked: string;
   noComments: string;
   signInHint: string;
   organizerBadge: string;
@@ -50,6 +51,7 @@ const SHORTS_TEXT: ShortsText = {
   commentsTitle: "Comments",
   commentPlaceholder: "Write a comment...",
   commentSend: "Send",
+  commentBlocked: "This comment contains blocked language and was not posted.",
   noComments: "No comments yet.",
   signInHint: "Sign in to like and comment.",
   organizerBadge: "Organizer",

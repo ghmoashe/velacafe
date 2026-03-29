@@ -14,6 +14,7 @@ import {
   MuxPlayer,
   type MuxPlayerElement,
 } from "./mux";
+import { moderateComment } from "./commentModeration";
 import { getShortsText } from "./shortsText";
 import { getSupabaseClient } from "./supabaseClient";
 
@@ -1025,15 +1026,19 @@ export default function ShortsPage(props: ShortsPageProps) {
         requireAuth();
         return;
       }
-      if (!socialReady) {
-        setNotice(text.socialSetupHint);
-        return;
-      }
-      const draft = commentDrafts[postId]?.trim() ?? "";
-      if (!draft) return;
-      const supabase = getSupabaseClient();
-      if (!supabase) {
-        setNotice(text.notConfigured);
+        if (!socialReady) {
+          setNotice(text.socialSetupHint);
+          return;
+        }
+        const draft = commentDrafts[postId]?.trim() ?? "";
+        if (!draft) return;
+        if (moderateComment(draft).blocked) {
+          setNotice(text.commentBlocked);
+          return;
+        }
+        const supabase = getSupabaseClient();
+        if (!supabase) {
+          setNotice(text.notConfigured);
         return;
       }
 
@@ -1063,12 +1068,13 @@ export default function ShortsPage(props: ShortsPageProps) {
       loadComments,
       requireAuth,
       sessionUserId,
-      setNotice,
-      socialReady,
-      text.notConfigured,
-      text.socialSetupHint,
-    ]
-  );
+        setNotice,
+        text.commentBlocked,
+        socialReady,
+        text.notConfigured,
+        text.socialSetupHint,
+      ]
+    );
 
   const handleShare = useCallback(
     async (post: VideoFeedItem) => {
