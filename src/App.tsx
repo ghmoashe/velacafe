@@ -11,6 +11,7 @@ import {
   type KeyboardEvent,
   type PointerEvent,
 } from "react";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import {
   buildMuxPlaybackUrl,
   createMuxDirectUpload,
@@ -2059,6 +2060,31 @@ export default function App() {
     }
     return "Authentication failed. Please try again.";
   }, []);
+  const getVerifiedSupabaseSession = useCallback(
+    async (supabase: SupabaseClient) => {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const session = sessionData.session;
+      const accessToken = session?.access_token;
+      if (!session?.user || !accessToken) {
+        await supabase.auth.signOut();
+        throw new Error("Your session expired. Please sign in again.");
+      }
+      const { data: userData, error: userError } = await supabase.auth.getUser(
+        accessToken
+      );
+      if (userError || !userData.user) {
+        await supabase.auth.signOut();
+        throw new Error("Your session expired. Please sign in again.");
+      }
+      return {
+        accessToken,
+        user: userData.user as User,
+      };
+    },
+    []
+  );
   const partnerCount = PARTNER_LOGOS.length;
   const partnerPair =
     partnerCount >= 2
@@ -5205,21 +5231,7 @@ export default function App() {
     }
     setPostActionStatus({ type: "loading", message: strings.loadingLabel });
       try {
-        const { data: sessionData, error: sessionError } =
-          await supabase.auth.getSession();
-        if (sessionError) throw sessionError;
-        const { data: refreshedSessionData, error: refreshError } =
-          await supabase.auth.refreshSession();
-        if (refreshError) {
-          await supabase.auth.signOut();
-          throw new Error("Your session expired. Please sign in again.");
-        }
-        const accessToken = refreshedSessionData.session?.access_token;
-        const user = refreshedSessionData.session?.user ?? sessionData.session?.user;
-        if (!accessToken) {
-          await supabase.auth.signOut();
-          throw new Error("Your session expired. Please sign in again.");
-        }
+        const { accessToken, user } = await getVerifiedSupabaseSession(supabase);
         if (!user) {
           setPostActionStatus({
             type: "error",
@@ -5341,21 +5353,7 @@ export default function App() {
     }
     setPostActionStatus({ type: "loading", message: strings.loadingLabel });
       try {
-        const { data: sessionData, error: sessionError } =
-          await supabase.auth.getSession();
-        if (sessionError) throw sessionError;
-        const { data: refreshedSessionData, error: refreshError } =
-          await supabase.auth.refreshSession();
-        if (refreshError) {
-          await supabase.auth.signOut();
-          throw new Error("Your session expired. Please sign in again.");
-        }
-        const accessToken = refreshedSessionData.session?.access_token;
-        const user = refreshedSessionData.session?.user ?? sessionData.session?.user;
-        if (!accessToken) {
-          await supabase.auth.signOut();
-          throw new Error("Your session expired. Please sign in again.");
-        }
+        const { accessToken, user } = await getVerifiedSupabaseSession(supabase);
         if (!user) {
           setPostActionStatus({
             type: "error",
@@ -5453,19 +5451,7 @@ export default function App() {
     }
       setAdminPostsStatus({ type: "loading", message: "" });
       try {
-        const { error: sessionError } = await supabase.auth.getSession();
-        if (sessionError) throw sessionError;
-        const { data: refreshedSessionData, error: refreshError } =
-          await supabase.auth.refreshSession();
-        if (refreshError) {
-          await supabase.auth.signOut();
-          throw new Error("Your session expired. Please sign in again.");
-        }
-        const accessToken = refreshedSessionData.session?.access_token;
-        if (!accessToken) {
-          await supabase.auth.signOut();
-          throw new Error("Your session expired. Please sign in again.");
-        }
+        const { accessToken } = await getVerifiedSupabaseSession(supabase);
         if (post.media_url) {
           const path = getStoragePathFromUrl(post.media_url, POSTS_BUCKET);
           if (path) {
