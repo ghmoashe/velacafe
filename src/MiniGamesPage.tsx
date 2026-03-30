@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ARTICLE_EXERCISES,
+  SENTENCE_EXERCISES,
   TRANSLATION_EXERCISES,
   type ArticleExercise,
   type ArticleOption,
+  type SentenceExercise,
   type TranslationExercise,
 } from "./miniGamesData";
 import { getMiniGamesText } from "./miniGamesText";
@@ -12,7 +14,7 @@ type MiniGamesPageProps = {
   locale: string;
 };
 
-type GameMode = "article" | "translate";
+type GameMode = "article" | "translate" | "sentence";
 
 type GameStats = {
   attempts: number;
@@ -33,6 +35,18 @@ type TranslationRound = {
   options: string[];
 };
 
+type SentenceToken = {
+  id: string;
+  word: string;
+  index: number;
+};
+
+type SentenceRound = {
+  key: string;
+  exercise: SentenceExercise;
+  tokens: SentenceToken[];
+};
+
 type AnswerState = {
   value: string | null;
   correct: boolean;
@@ -45,6 +59,7 @@ const ROUND_DURATION_SECONDS = 10;
 const INITIAL_STATS: Record<GameMode, GameStats> = {
   article: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
   translate: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
+  sentence: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
 };
 
 function randomItem<T>(items: readonly T[]): T {
@@ -83,6 +98,22 @@ function createTranslationRound(seed: number): TranslationRound {
   };
 }
 
+function createSentenceRound(seed: number): SentenceRound {
+  const exercise = randomItem(SENTENCE_EXERCISES);
+  const tokens = shuffle(
+    exercise.words.map((word, index) => ({
+      id: `${exercise.id}-${seed}-${index}`,
+      word,
+      index,
+    })),
+  );
+  return {
+    key: `${exercise.id}-${seed}`,
+    exercise,
+    tokens,
+  };
+}
+
 function formatAccuracy(stats: GameStats): string {
   if (!stats.attempts) return "0%";
   return `${Math.round((stats.correct / stats.attempts) * 100)}%`;
@@ -102,6 +133,8 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
   const [mode, setMode] = useState<GameMode>("article");
   const [articleSeed, setArticleSeed] = useState(0);
   const [translationSeed, setTranslationSeed] = useState(0);
+  const [sentenceSeed, setSentenceSeed] = useState(0);
+  const [sentenceSelection, setSentenceSelection] = useState<string[]>([]);
   const [stats, setStats] = useState(INITIAL_STATS);
   const [answerState, setAnswerState] = useState<AnswerState | null>(null);
   const [timeLeft, setTimeLeft] = useState(ROUND_DURATION_SECONDS);
@@ -114,56 +147,107 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
     () => createTranslationRound(translationSeed),
     [translationSeed],
   );
+  const sentenceRound = useMemo(
+    () => createSentenceRound(sentenceSeed),
+    [sentenceSeed],
+  );
+
   const activeStats = stats[mode];
   const isArticleMode = mode === "article";
+  const isTranslateMode = mode === "translate";
+  const isSentenceMode = mode === "sentence";
   const activeExercise = isArticleMode
     ? articleRound.exercise
-    : translationRound.exercise;
+    : isTranslateMode
+      ? translationRound.exercise
+      : sentenceRound.exercise;
+
+  const selectedSentenceTokens = useMemo(() => {
+    const tokenMap = new Map(sentenceRound.tokens.map((token) => [token.id, token]));
+    return sentenceSelection
+      .map((id) => tokenMap.get(id) ?? null)
+      .filter((token): token is SentenceToken => token !== null);
+  }, [sentenceRound.tokens, sentenceSelection]);
+
+  const availableSentenceTokens = useMemo(() => {
+    const selected = new Set(sentenceSelection);
+    return sentenceRound.tokens.filter((token) => !selected.has(token.id));
+  }, [sentenceRound.tokens, sentenceSelection]);
 
   const handleModeChange = (nextMode: GameMode) => {
     setMode(nextMode);
     setAnswerState(null);
     setTimeLeft(ROUND_DURATION_SECONDS);
+    setSentenceSelection([]);
   };
 
-  const resolveAnswer = useCallback((
-    value: string | null,
-    isCorrect: boolean,
-    timedOut: boolean,
-  ) => {
-    setAnswerState({ value, correct: isCorrect, timedOut });
-    setStats((current) => {
-      const previous = current[mode];
-      const nextStreak = isCorrect ? previous.streak + 1 : 0;
-      const nextCorrect = previous.correct + (isCorrect ? 1 : 0);
-      return {
-        ...current,
-        [mode]: {
-          attempts: previous.attempts + 1,
-          correct: nextCorrect,
-          streak: nextStreak,
-          bestStreak: Math.max(previous.bestStreak, nextStreak),
-        },
-      };
-    });
-  }, [mode]);
+  const resolveAnswer = useCallback(
+    (value: string | null, isCorrect: boolean, timedOut: boolean) => {
+      setAnswerState({ value, correct: isCorrect, timedOut });
+      setStats((current) => {
+        const previous = current[mode];
+        const nextStreak = isCorrect ? previous.streak + 1 : 0;
+        const nextCorrect = previous.correct + (isCorrect ? 1 : 0);
+        return {
+          ...current,
+          [mode]: {
+            attempts: previous.attempts + 1,
+            correct: nextCorrect,
+            streak: nextStreak,
+            bestStreak: Math.max(previous.bestStreak, nextStreak),
+          },
+        };
+      });
+    },
+    [mode],
+  );
 
   const handleNextQuestion = () => {
     setAnswerState(null);
     setTimeLeft(ROUND_DURATION_SECONDS);
+    setSentenceSelection([]);
     if (isArticleMode) {
       setArticleSeed((value) => value + 1);
       return;
     }
-    setTranslationSeed((value) => value + 1);
+    if (isTranslateMode) {
+      setTranslationSeed((value) => value + 1);
+      return;
+    }
+    setSentenceSeed((value) => value + 1);
   };
 
   const handleAnswer = (value: string) => {
-    if (answerState) return;
+    if (answerState || isSentenceMode) return;
     const isCorrect = isArticleMode
       ? value === articleRound.exercise.article
       : value === translationRound.exercise.target;
     resolveAnswer(value, isCorrect, false);
+  };
+
+  const handleSentenceTokenSelect = (tokenId: string) => {
+    if (answerState) return;
+    setSentenceSelection((current) =>
+      current.includes(tokenId) ? current : [...current, tokenId],
+    );
+  };
+
+  const handleSentenceTokenRemove = (tokenId: string) => {
+    if (answerState) return;
+    setSentenceSelection((current) => current.filter((id) => id !== tokenId));
+  };
+
+  const handleSentenceClear = () => {
+    if (answerState) return;
+    setSentenceSelection([]);
+  };
+
+  const handleSentenceCheck = () => {
+    if (answerState || !isSentenceMode) return;
+    if (selectedSentenceTokens.length !== sentenceRound.exercise.words.length) return;
+    const builtSentence = selectedSentenceTokens.map((token) => token.word).join(" ");
+    const correctSentence = sentenceRound.exercise.words.join(" ");
+    resolveAnswer(builtSentence, builtSentence === correctSentence, false);
   };
 
   useEffect(() => {
@@ -186,15 +270,21 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
         : text.incorrect
     : isArticleMode
       ? text.chooseArticle
-      : text.chooseTranslation;
+      : isTranslateMode
+        ? text.chooseTranslation
+        : text.chooseSentence;
 
   const feedbackBody = answerState
     ? isArticleMode
       ? `${articleRound.exercise.article} ${articleRound.exercise.noun} (${articleRound.exercise.hint})`
-      : `${translationRound.exercise.source} = ${translationRound.exercise.target}`
+      : isTranslateMode
+        ? `${translationRound.exercise.source} = ${translationRound.exercise.target}`
+        : `${sentenceRound.exercise.words.join(" ")} (${sentenceRound.exercise.translation})`
     : isArticleMode
       ? text.explainArticle
-      : text.explainTranslation;
+      : isTranslateMode
+        ? text.explainTranslation
+        : text.explainSentence;
 
   return (
     <div className="miniGamesPage">
@@ -210,12 +300,21 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
         </button>
         <button
           className={`miniGamesModeButton${
-            !isArticleMode ? " miniGamesModeButtonActive" : ""
+            isTranslateMode ? " miniGamesModeButtonActive" : ""
           }`}
           type="button"
           onClick={() => handleModeChange("translate")}
         >
           {text.translateMode}
+        </button>
+        <button
+          className={`miniGamesModeButton${
+            isSentenceMode ? " miniGamesModeButtonActive" : ""
+          }`}
+          type="button"
+          onClick={() => handleModeChange("sentence")}
+        >
+          {text.sentenceMode}
         </button>
       </div>
 
@@ -249,22 +348,45 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
                 <span className="miniGamesMissingArticle">___</span>
                 <span>{articleRound.exercise.noun}</span>
               </>
-            ) : (
+            ) : isTranslateMode ? (
               <span>{translationRound.exercise.source}</span>
+            ) : (
+              <span>{sentenceRound.exercise.translation}</span>
             )}
           </div>
           <p className="miniGamesInstruction">
-            {isArticleMode ? text.articleMissingLabel : text.translatePrompt}
+            {isArticleMode
+              ? text.articleMissingLabel
+              : isTranslateMode
+                ? text.translatePrompt
+                : text.sentencePrompt}
           </p>
           <p className="miniGamesHint">
-            {text.hintLabel}:{" "}
-            {isArticleMode
-              ? articleRound.exercise.hint
-              : translationRound.exercise.target}
+            {isArticleMode ? (
+              <>
+                {text.hintLabel}: {articleRound.exercise.hint}
+              </>
+            ) : isTranslateMode ? (
+              <>
+                {text.levelLabel}: {translationRound.exercise.level}
+              </>
+            ) : (
+              <>
+                {text.sentenceHintLabel}: {sentenceRound.exercise.translation}
+              </>
+            )}
           </p>
         </div>
 
-        <div className={`miniGamesOptions miniGamesOptions${isArticleMode ? "Article" : "Translate"}`}>
+        <div
+          className={`miniGamesOptions miniGamesOptions${
+            isArticleMode
+              ? "Article"
+              : isTranslateMode
+                ? "Translate"
+                : "Sentence"
+          }`}
+        >
           {isArticleMode
             ? articleRound.options.map((option) => {
                 const isCorrect = option === articleRound.exercise.article;
@@ -286,30 +408,95 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
                   </button>
                 );
               })
-            : translationRound.options.map((option) => {
-                const isCorrect = option === translationRound.exercise.target;
-                const isSelected = answerState?.value === option;
-                return (
-                  <button
-                    key={option}
-                    className={`miniGamesOption miniGamesOptionTranslate${
-                      answerState && isCorrect ? " miniGamesOptionCorrect" : ""
-                    }${
-                      answerState && isSelected && !isCorrect
-                        ? " miniGamesOptionWrong"
-                        : ""
-                    }`}
-                    type="button"
-                    onClick={() => handleAnswer(option)}
-                  >
-                    <span className="miniGamesOptionBody">{option}</span>
-                  </button>
-                );
-              })}
+            : isTranslateMode
+              ? translationRound.options.map((option) => {
+                  const isCorrect = option === translationRound.exercise.target;
+                  const isSelected = answerState?.value === option;
+                  return (
+                    <button
+                      key={option}
+                      className={`miniGamesOption miniGamesOptionTranslate${
+                        answerState && isCorrect ? " miniGamesOptionCorrect" : ""
+                      }${
+                        answerState && isSelected && !isCorrect
+                          ? " miniGamesOptionWrong"
+                          : ""
+                      }`}
+                      type="button"
+                      onClick={() => handleAnswer(option)}
+                    >
+                      <span className="miniGamesOptionBody">{option}</span>
+                    </button>
+                  );
+                })
+              : (
+                <div className="miniGamesSentenceBoard">
+                  <div className="miniGamesSentenceAnswer">
+                    {selectedSentenceTokens.length ? (
+                      selectedSentenceTokens.map((token) => (
+                        <button
+                          key={token.id}
+                          className="miniGamesSentenceToken miniGamesSentenceTokenSelected"
+                          type="button"
+                          onClick={() => handleSentenceTokenRemove(token.id)}
+                        >
+                          {token.word}
+                        </button>
+                      ))
+                    ) : (
+                      <span className="miniGamesSentencePlaceholder">
+                        {text.sentenceEmpty}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="miniGamesSentenceBank">
+                    {availableSentenceTokens.map((token) => (
+                      <button
+                        key={token.id}
+                        className="miniGamesSentenceToken"
+                        type="button"
+                        onClick={() => handleSentenceTokenSelect(token.id)}
+                      >
+                        {token.word}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="miniGamesSentenceActions">
+                    <button
+                      className="miniGamesSentenceAction"
+                      type="button"
+                      onClick={handleSentenceClear}
+                    >
+                      {text.clearSentence}
+                    </button>
+                    <button
+                      className="miniGamesSentenceAction miniGamesSentenceActionPrimary"
+                      type="button"
+                      disabled={
+                        selectedSentenceTokens.length !==
+                        sentenceRound.exercise.words.length
+                      }
+                      onClick={handleSentenceCheck}
+                    >
+                      {text.checkSentence}
+                    </button>
+                  </div>
+                </div>
+              )}
         </div>
 
         <div className="miniGamesResultPanel">
-          <div className={`miniGamesFeedbackBadge${answerState?.correct ? " miniGamesFeedbackBadgeSuccess" : answerState ? " miniGamesFeedbackBadgeError" : ""}`}>
+          <div
+            className={`miniGamesFeedbackBadge${
+              answerState?.correct
+                ? " miniGamesFeedbackBadgeSuccess"
+                : answerState
+                  ? " miniGamesFeedbackBadgeError"
+                  : ""
+            }`}
+          >
             <span aria-hidden="true">
               {answerState?.correct ? "✅" : answerState ? "⏳" : "🎯"}
             </span>

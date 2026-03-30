@@ -17,6 +17,14 @@ export type TranslationExercise = {
   level: "A1" | "A2" | "B1";
 };
 
+export type SentenceExercise = {
+  id: string;
+  translation: string;
+  words: string[];
+  emoji: string;
+  level: "A1" | "A2" | "B1";
+};
+
 type ArticleSeed = readonly [string, ArticleOption, string, string?];
 type TranslationSeed = readonly [string, string, string, "A1" | "A2"];
 
@@ -381,3 +389,146 @@ function buildTranslationExercises(): TranslationExercise[] {
 }
 
 export const TRANSLATION_EXERCISES: TranslationExercise[] = buildTranslationExercises();
+
+export const SENTENCE_EXERCISES: SentenceExercise[] = [
+  {
+    id: "satz-ich-lerne-deutsch",
+    translation: "I learn German today.",
+    words: ["Ich", "lerne", "heute", "Deutsch"],
+    emoji: "📚",
+    level: "A1",
+  },
+  {
+    id: "satz-wir-trinken-kaffee",
+    translation: "We drink coffee in the cafe.",
+    words: ["Wir", "trinken", "Kaffee", "im", "Cafe"],
+    emoji: "☕",
+    level: "A1",
+  },
+  {
+    id: "satz-er-wohnt-in-berlin",
+    translation: "He lives in Berlin.",
+    words: ["Er", "wohnt", "in", "Berlin"],
+    emoji: "🏙️",
+    level: "A1",
+  },
+  {
+    id: "satz-sie-liest-ein-buch",
+    translation: "She is reading a book.",
+    words: ["Sie", "liest", "ein", "Buch"],
+    emoji: "📖",
+    level: "A1",
+  },
+  {
+    id: "satz-der-bus-kommt-spaeter",
+    translation: "The bus comes later.",
+    words: ["Der", "Bus", "kommt", "später"],
+    emoji: "🚌",
+    level: "A1",
+  },
+  {
+    id: "satz-ich-habe-heute-unterricht",
+    translation: "I have class today.",
+    words: ["Ich", "habe", "heute", "Unterricht"],
+    emoji: "🏫",
+    level: "A1",
+  },
+  {
+    id: "satz-meine-freundin-ist-hier",
+    translation: "My friend is here.",
+    words: ["Meine", "Freundin", "ist", "hier"],
+    emoji: "👭",
+    level: "A1",
+  },
+  {
+    id: "satz-wo-ist-der-bahnhof",
+    translation: "Where is the train station?",
+    words: ["Wo", "ist", "der", "Bahnhof"],
+    emoji: "🚉",
+    level: "A1",
+  },
+  {
+    id: "satz-das-wetter-ist-schoen",
+    translation: "The weather is nice.",
+    words: ["Das", "Wetter", "ist", "schön"],
+    emoji: "☀️",
+    level: "A1",
+  },
+  {
+    id: "satz-wir-gehen-heute-spazieren",
+    translation: "We are going for a walk today.",
+    words: ["Wir", "gehen", "heute", "spazieren"],
+    emoji: "🚶",
+    level: "A1",
+  },
+  {
+    id: "satz-kannst-du-mir-helfen",
+    translation: "Can you help me?",
+    words: ["Kannst", "du", "mir", "helfen"],
+    emoji: "🤝",
+    level: "A2",
+  },
+  {
+    id: "satz-ich-moechte-ein-ticket-kaufen",
+    translation: "I would like to buy a ticket.",
+    words: ["Ich", "möchte", "ein", "Ticket", "kaufen"],
+    emoji: "🎫",
+    level: "A2",
+  },
+  {
+    id: "satz-wir-treffen-uns-um-acht",
+    translation: "We meet at eight.",
+    words: ["Wir", "treffen", "uns", "um", "acht"],
+    emoji: "🕗",
+    level: "A2",
+  },
+  {
+    id: "satz-sie-faehrt-morgen-nach-hause",
+    translation: "She goes home tomorrow.",
+    words: ["Sie", "fährt", "morgen", "nach", "Hause"],
+    emoji: "🏠",
+    level: "A2",
+  },
+  {
+    id: "satz-ich-lerne-mit-meinem-freund",
+    translation: "I study with my friend.",
+    words: ["Ich", "lerne", "mit", "meinem", "Freund"],
+    emoji: "🧑‍🤝‍🧑",
+    level: "A2",
+  },
+  {
+    id: "satz-warum-bist-du-zu-spaet",
+    translation: "Why are you late?",
+    words: ["Warum", "bist", "du", "zu", "spät"],
+    emoji: "⏰",
+    level: "A2",
+  },
+  {
+    id: "satz-heute-koche-ich-fuer-meine-familie",
+    translation: "Today I cook for my family.",
+    words: ["Heute", "koche", "ich", "für", "meine", "Familie"],
+    emoji: "🍲",
+    level: "A2",
+  },
+  {
+    id: "satz-der-film-beginnt-um-neun",
+    translation: "The movie starts at nine.",
+    words: ["Der", "Film", "beginnt", "um", "neun"],
+    emoji: "🎬",
+    level: "A2",
+  },
+  {
+    id: "satz-im-sommer-fahre-ich-ans-meer",
+    translation: "In summer I go to the sea.",
+    words: ["Im", "Sommer", "fahre", "ich", "ans", "Meer"],
+    emoji: "🌊",
+    level: "A2",
+  },
+  {
+    id: "satz-bitte-sprich-etwas-langsam",
+    translation: "Please speak a little slowly.",
+    words: ["Bitte", "sprich", "etwas", "langsam"],
+    emoji: "🗣️",
+    level: "A2",
+  },
+];
