@@ -27,6 +27,7 @@ import {
   MESSAGES,
 } from "./i18nData";
 import { openKlaroSettings, setupKlaro } from "./klaro";
+import { getMiniGamesText } from "./miniGamesText";
 import { getShortsText } from "./shortsText";
 import { getSupabaseClient } from "./supabaseClient";
 
@@ -239,6 +240,7 @@ type Route =
   | "register"
   | "forgot"
   | "search"
+  | "games"
   | "shorts"
   | "events"
   | "event"
@@ -1486,6 +1488,9 @@ function resolveRoute(slug: string): Route | null {
       return "forgot";
     case "search":
       return "search";
+    case "games":
+    case "practice":
+      return "games";
     case "shorts":
       return "shorts";
     case "events":
@@ -1546,6 +1551,7 @@ const ROUTE_PATHS: Record<Route, string> = {
   register: "/register",
   forgot: "/forgot",
   search: "/search",
+  games: "/games",
   shorts: "/shorts",
   events: "/events",
   event: "/event",
@@ -1675,6 +1681,7 @@ const LegalPage = lazy(() => import("./LegalPage"));
 const OrganizerPage = lazy(() => import("./OrganizerPage"));
 const ProfilePage = lazy(() => import("./ProfilePage"));
 const SearchPage = lazy(() => import("./SearchPage"));
+const MiniGamesPage = lazy(() => import("./MiniGamesPage"));
 const ShortsPage = lazy(() => import("./ShortsPage"));
 const UserPage = lazy(() => import("./UserPage"));
 
@@ -1975,6 +1982,7 @@ export default function App() {
     ...MESSAGES[FALLBACK_LOCALE],
     ...(MESSAGES[locale] ?? {}),
   } as Record<MessageKey, string>;
+  const miniGamesText = getMiniGamesText(locale);
   const shortsText = getShortsText(locale);
   const eventPricingText = getEventPricingText(locale);
   const eventCheckInText = getEventCheckInText(locale);
@@ -6435,6 +6443,7 @@ export default function App() {
   const isImpressumRoute = route === "impressum";
   const isTermsRoute = route === "terms";
   const isSearchRoute = route === "search";
+  const isGamesRoute = route === "games";
   const isShortsRoute = route === "shorts";
   const isEventsRoute = route === "events";
   const isEventRoute = route === "event";
@@ -6447,6 +6456,7 @@ export default function App() {
   const showConfirm = isAuthRoute && route === "register";
   const showBackButton = !isAuthRoute;
   const showSearchButton = !isAuthRoute;
+  const showGamesButton = !isAuthRoute;
   const showShortsButton = !isAuthRoute;
   const showEventsButton = !isAuthRoute;
   const showLogoutButton = !isAuthRoute && !guestMode && Boolean(sessionUser?.id);
@@ -6993,6 +7003,15 @@ export default function App() {
                     onClick={() => navigate("search")}
                   >
                     {strings.searchButton}
+                  </button>
+                ) : null}
+                {showGamesButton ? (
+                  <button
+                    className={`btn${isGamesRoute ? " btnActive" : ""}`}
+                    type="button"
+                    onClick={() => navigate("games")}
+                  >
+                    {miniGamesText.navLabel}
                   </button>
                 ) : null}
                 {showShortsButton ? (
@@ -7798,6 +7817,10 @@ export default function App() {
             ) : isSearchRoute ? (
               <Suspense fallback={<div className="searchPage" />}>
                 <SearchPage {...searchPageProps} />
+              </Suspense>
+            ) : isGamesRoute ? (
+              <Suspense fallback={<div className="miniGamesPage" />}>
+                <MiniGamesPage locale={locale} />
               </Suspense>
             ) : isShortsRoute ? (
               <Suspense fallback={<div className="shortsPage" />}>
