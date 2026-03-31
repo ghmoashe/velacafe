@@ -25,6 +25,19 @@ export type SentenceExercise = {
   level: "A1" | "A2" | "B1";
 };
 
+export type ChatExercise = {
+  id: string;
+  contact: string;
+  scenario: string;
+  incoming: string;
+  translation: string;
+  correctReply: string;
+  options: string[];
+  feedback: string;
+  emoji: string;
+  level: "A1" | "A2" | "B1";
+};
+
 type ArticleSeed = readonly [string, ArticleOption, string, string?];
 type TranslationSeed = readonly [string, string, string, "A1" | "A2"];
 
@@ -390,145 +403,856 @@ function buildTranslationExercises(): TranslationExercise[] {
 
 export const TRANSLATION_EXERCISES: TranslationExercise[] = buildTranslationExercises();
 
+type SentenceStem = {
+  words: string[];
+  translation: string;
+  emoji: string;
+};
+
+type SentenceTail = {
+  words: string[];
+  translation: string;
+};
+
+function composeSentenceExercises(
+  prefix: string,
+  level: SentenceExercise["level"],
+  stems: readonly SentenceStem[],
+  tails: readonly SentenceTail[],
+): SentenceExercise[] {
+  return stems.flatMap((stem, stemIndex) =>
+    tails.map((tail, tailIndex) => ({
+      id: `${prefix}-${stemIndex + 1}-${tailIndex + 1}`,
+      translation: `${stem.translation} ${tail.translation}`,
+      words: [...stem.words, ...tail.words],
+      emoji: stem.emoji,
+      level,
+    })),
+  );
+}
+
+const A1_LEARN_STEMS: SentenceStem[] = [
+  { words: ["Ich", "lerne"], translation: "I learn", emoji: "📚" },
+  { words: ["Wir", "lernen"], translation: "We learn", emoji: "📚" },
+  { words: ["Der", "Student", "lernt"], translation: "The student learns", emoji: "🎓" },
+  { words: ["Meine", "Freundin", "lernt"], translation: "My friend learns", emoji: "👭" },
+  { words: ["Der", "Lehrer", "lernt"], translation: "The teacher learns", emoji: "👨‍🏫" },
+];
+
+const A1_LEARN_TAILS: SentenceTail[] = [
+  { words: ["heute", "Deutsch"], translation: "German today." },
+  { words: ["am", "Abend", "neue", "Wörter"], translation: "new words in the evening." },
+  { words: ["in", "der", "Schule", "Grammatik"], translation: "grammar at school." },
+  { words: ["mit", "der", "Klasse", "Dialoge"], translation: "dialogues with the class." },
+];
+
+const A1_DRINK_STEMS: SentenceStem[] = [
+  { words: ["Ich", "trinke"], translation: "I drink", emoji: "🥤" },
+  { words: ["Wir", "trinken"], translation: "We drink", emoji: "🥤" },
+  { words: ["Mein", "Bruder", "trinkt"], translation: "My brother drinks", emoji: "🥤" },
+  { words: ["Die", "Besucherin", "trinkt"], translation: "The visitor drinks", emoji: "🥤" },
+  { words: ["Das", "Kind", "trinkt"], translation: "The child drinks", emoji: "🥤" },
+];
+
+const A1_DRINK_TAILS: SentenceTail[] = [
+  { words: ["am", "Morgen", "Kaffee"], translation: "coffee in the morning." },
+  { words: ["in", "der", "Pause", "Tee"], translation: "tea during the break." },
+  { words: ["im", "Cafe", "Wasser"], translation: "water in the cafe." },
+  { words: ["heute", "Saft"], translation: "juice today." },
+];
+
+const A1_EAT_STEMS: SentenceStem[] = [
+  { words: ["Ich", "esse"], translation: "I eat", emoji: "🍽️" },
+  { words: ["Wir", "essen"], translation: "We eat", emoji: "🍽️" },
+  { words: ["Meine", "Familie", "isst"], translation: "My family eats", emoji: "🍽️" },
+  { words: ["Der", "Tourist", "isst"], translation: "The tourist eats", emoji: "🍽️" },
+  { words: ["Die", "Studentin", "isst"], translation: "The student eats", emoji: "🍽️" },
+];
+
+const A1_EAT_TAILS: SentenceTail[] = [
+  { words: ["zum", "Frühstück", "Brot"], translation: "bread for breakfast." },
+  { words: ["am", "Mittag", "Suppe"], translation: "soup at lunch." },
+  { words: ["am", "Abend", "Pizza"], translation: "pizza in the evening." },
+  { words: ["heute", "Salat"], translation: "salad today." },
+];
+
+const A1_GO_STEMS: SentenceStem[] = [
+  { words: ["Ich", "gehe"], translation: "I go", emoji: "🚶" },
+  { words: ["Wir", "gehen"], translation: "We go", emoji: "🚶" },
+  { words: ["Meine", "Freunde", "gehen"], translation: "My friends go", emoji: "🚶" },
+  { words: ["Der", "Gast", "geht"], translation: "The guest goes", emoji: "🚶" },
+  { words: ["Die", "Familie", "geht"], translation: "The family goes", emoji: "🚶" },
+];
+
+const A1_GO_TAILS: SentenceTail[] = [
+  { words: ["heute", "zum", "Bahnhof"], translation: "to the station today." },
+  { words: ["am", "Abend", "ins", "Kino"], translation: "to the cinema in the evening." },
+  { words: ["morgen", "in", "die", "Stadt"], translation: "to the city tomorrow." },
+  { words: ["am", "Wochenende", "in", "den", "Park"], translation: "to the park on the weekend." },
+];
+
+const A1_LIVE_STEMS: SentenceStem[] = [
+  { words: ["Ich", "wohne"], translation: "I live", emoji: "🏠" },
+  { words: ["Wir", "wohnen"], translation: "We live", emoji: "🏠" },
+  { words: ["Meine", "Freundin", "wohnt"], translation: "My friend lives", emoji: "🏠" },
+  { words: ["Der", "Lehrer", "wohnt"], translation: "The teacher lives", emoji: "🏠" },
+  { words: ["Die", "Familie", "wohnt"], translation: "The family lives", emoji: "🏠" },
+];
+
+const A1_LIVE_TAILS: SentenceTail[] = [
+  { words: ["in", "Berlin"], translation: "in Berlin." },
+  { words: ["in", "einer", "kleinen", "Wohnung"], translation: "in a small apartment." },
+  { words: ["nahe", "der", "Schule"], translation: "near the school." },
+  { words: ["bei", "der", "Familie"], translation: "with the family." },
+];
+
+const A2_BUY_STEMS: SentenceStem[] = [
+  { words: ["Ich", "möchte"], translation: "I would like to", emoji: "🛒" },
+  { words: ["Wir", "möchten"], translation: "We would like to", emoji: "🛒" },
+  { words: ["Meine", "Freundin", "möchte"], translation: "My friend would like to", emoji: "🛒" },
+  { words: ["Der", "Tourist", "möchte"], translation: "The tourist would like to", emoji: "🛒" },
+  { words: ["Die", "Besucherin", "möchte"], translation: "The visitor would like to", emoji: "🛒" },
+];
+
+const A2_BUY_TAILS: SentenceTail[] = [
+  { words: ["ein", "Ticket", "kaufen"], translation: "buy a ticket." },
+  { words: ["heute", "Obst", "kaufen"], translation: "buy fruit today." },
+  { words: ["im", "Markt", "Brot", "kaufen"], translation: "buy bread at the market." },
+  { words: ["am", "Abend", "ein", "Geschenk", "kaufen"], translation: "buy a gift in the evening." },
+];
+
+const A2_MUST_STEMS: SentenceStem[] = [
+  { words: ["Ich", "muss"], translation: "I must", emoji: "📝" },
+  { words: ["Wir", "müssen"], translation: "We must", emoji: "📝" },
+  { words: ["Mein", "Bruder", "muss"], translation: "My brother must", emoji: "📝" },
+  { words: ["Die", "Studentin", "muss"], translation: "The student must", emoji: "📝" },
+  { words: ["Der", "Lehrer", "muss"], translation: "The teacher must", emoji: "📝" },
+];
+
+const A2_MUST_TAILS: SentenceTail[] = [
+  { words: ["heute", "lange", "arbeiten"], translation: "work a long time today." },
+  { words: ["morgen", "früh", "aufstehen"], translation: "get up early tomorrow." },
+  { words: ["am", "Abend", "Deutsch", "üben"], translation: "practice German in the evening." },
+  { words: ["pünktlich", "zu", "Hause", "sein"], translation: "be at home on time." },
+];
+
+const A2_CAN_STEMS: SentenceStem[] = [
+  { words: ["Ich", "kann"], translation: "I can", emoji: "💡" },
+  { words: ["Wir", "können"], translation: "We can", emoji: "💡" },
+  { words: ["Meine", "Freundin", "kann"], translation: "My friend can", emoji: "💡" },
+  { words: ["Der", "Student", "kann"], translation: "The student can", emoji: "💡" },
+  { words: ["Die", "Familie", "kann"], translation: "The family can", emoji: "💡" },
+];
+
+const A2_CAN_TAILS: SentenceTail[] = [
+  { words: ["dir", "morgen", "helfen"], translation: "help you tomorrow." },
+  { words: ["das", "Problem", "gut", "erklären"], translation: "explain the problem well." },
+  { words: ["mit", "dem", "Zug", "fahren"], translation: "travel by train." },
+  { words: ["am", "Abend", "länger", "bleiben"], translation: "stay longer in the evening." },
+];
+
+const A2_MEET_STEMS: SentenceStem[] = [
+  { words: ["Wir", "treffen", "uns"], translation: "We meet", emoji: "🤝" },
+  { words: ["Meine", "Freunde", "treffen", "sich"], translation: "My friends meet", emoji: "🤝" },
+  { words: ["Der", "Kurs", "trifft", "sich"], translation: "The course meets", emoji: "🤝" },
+  { words: ["Die", "Gruppe", "trifft", "sich"], translation: "The group meets", emoji: "🤝" },
+  { words: ["Die", "Familie", "trifft", "sich"], translation: "The family meets", emoji: "🤝" },
+];
+
+const A2_MEET_TAILS: SentenceTail[] = [
+  { words: ["um", "acht", "im", "Cafe"], translation: "at eight in the cafe." },
+  { words: ["morgen", "vor", "dem", "Kino"], translation: "tomorrow in front of the cinema." },
+  { words: ["heute", "nach", "der", "Arbeit"], translation: "today after work." },
+  { words: ["am", "Wochenende", "im", "Park"], translation: "in the park on the weekend." },
+];
+
+const A2_TRAVEL_STEMS: SentenceStem[] = [
+  { words: ["Ich", "fahre"], translation: "I travel", emoji: "✈️" },
+  { words: ["Wir", "reisen"], translation: "We travel", emoji: "✈️" },
+  { words: ["Meine", "Freundin", "fährt"], translation: "My friend travels", emoji: "✈️" },
+  { words: ["Der", "Tourist", "reist"], translation: "The tourist travels", emoji: "✈️" },
+  { words: ["Die", "Familie", "fährt"], translation: "The family travels", emoji: "✈️" },
+];
+
+const A2_TRAVEL_TAILS: SentenceTail[] = [
+  { words: ["morgen", "nach", "Hamburg"], translation: "to Hamburg tomorrow." },
+  { words: ["im", "Sommer", "ans", "Meer"], translation: "to the sea in summer." },
+  { words: ["mit", "dem", "Zug", "nach", "München"], translation: "to Munich by train." },
+  { words: ["für", "zwei", "Tage", "nach", "Wien"], translation: "to Vienna for two days." },
+];
+
+const A2_EXPLAIN_STEMS: SentenceStem[] = [
+  { words: ["Ich", "erkläre"], translation: "I explain", emoji: "🧠" },
+  { words: ["Wir", "besprechen"], translation: "We discuss", emoji: "🧠" },
+  { words: ["Meine", "Lehrerin", "erklärt"], translation: "My teacher explains", emoji: "🧠" },
+  { words: ["Der", "Trainer", "zeigt"], translation: "The trainer shows", emoji: "🧠" },
+  { words: ["Die", "Studentin", "beschreibt"], translation: "The student describes", emoji: "🧠" },
+];
+
+const A2_EXPLAIN_TAILS: SentenceTail[] = [
+  { words: ["heute", "die", "neue", "Grammatik"], translation: "the new grammar today." },
+  { words: ["im", "Kurs", "eine", "wichtige", "Regel"], translation: "an important rule in class." },
+  { words: ["am", "Abend", "den", "Plan", "für", "morgen"], translation: "the plan for tomorrow in the evening." },
+  { words: ["meiner", "Gruppe", "die", "Aufgabe"], translation: "the task to my group." },
+];
+
+const B1_OPINION_STEMS: SentenceStem[] = [
+  { words: ["Ich", "denke", "dass"], translation: "I think that", emoji: "💭" },
+  { words: ["Wir", "glauben", "dass"], translation: "We believe that", emoji: "💭" },
+  { words: ["Meine", "Lehrerin", "sagt", "dass"], translation: "My teacher says that", emoji: "💭" },
+  { words: ["Der", "Kurs", "merkt", "dass"], translation: "The course notices that", emoji: "💭" },
+  { words: ["Die", "Gruppe", "findet", "dass"], translation: "The group thinks that", emoji: "💭" },
+];
+
+const B1_OPINION_TAILS: SentenceTail[] = [
+  { words: ["wir", "mehr", "Deutsch", "sprechen", "müssen"], translation: "we must speak more German." },
+  { words: ["das", "Thema", "heute", "sehr", "wichtig", "ist"], translation: "the topic is very important today." },
+  { words: ["die", "Aufgabe", "leichter", "als", "gestern", "ist"], translation: "the task is easier than yesterday." },
+  { words: ["unsere", "Aussprache", "schon", "besser", "geworden", "ist"], translation: "our pronunciation has already improved." },
+];
+
+const B1_IF_STEMS: SentenceStem[] = [
+  { words: ["Wenn", "ich", "früh", "aufstehe"], translation: "If I get up early", emoji: "🌅" },
+  { words: ["Wenn", "wir", "zusammen", "lernen"], translation: "If we study together", emoji: "🌅" },
+  { words: ["Wenn", "meine", "Freundin", "Zeit", "hat"], translation: "If my friend has time", emoji: "🌅" },
+  { words: ["Wenn", "der", "Kurs", "pünktlich", "beginnt"], translation: "If the course starts on time", emoji: "🌅" },
+  { words: ["Wenn", "die", "Lehrerin", "langsam", "spricht"], translation: "If the teacher speaks slowly", emoji: "🌅" },
+];
+
+const B1_IF_TAILS: SentenceTail[] = [
+  { words: ["verstehe", "ich", "mehr"], translation: "I understand more." },
+  { words: ["machen", "wir", "schneller", "Fortschritte"], translation: "we make faster progress." },
+  { words: ["gehen", "wir", "später", "noch", "ins", "Cafe"], translation: "we go to the cafe later." },
+  { words: ["fühlen", "sich", "alle", "sicherer"], translation: "everyone feels more confident." },
+];
+
 export const SENTENCE_EXERCISES: SentenceExercise[] = [
+  ...composeSentenceExercises("satz-a1-lernen", "A1", A1_LEARN_STEMS, A1_LEARN_TAILS),
+  ...composeSentenceExercises("satz-a1-trinken", "A1", A1_DRINK_STEMS, A1_DRINK_TAILS),
+  ...composeSentenceExercises("satz-a1-essen", "A1", A1_EAT_STEMS, A1_EAT_TAILS),
+  ...composeSentenceExercises("satz-a1-gehen", "A1", A1_GO_STEMS, A1_GO_TAILS),
+  ...composeSentenceExercises("satz-a1-wohnen", "A1", A1_LIVE_STEMS, A1_LIVE_TAILS),
+  ...composeSentenceExercises("satz-a2-kaufen", "A2", A2_BUY_STEMS, A2_BUY_TAILS),
+  ...composeSentenceExercises("satz-a2-muessen", "A2", A2_MUST_STEMS, A2_MUST_TAILS),
+  ...composeSentenceExercises("satz-a2-koennen", "A2", A2_CAN_STEMS, A2_CAN_TAILS),
+  ...composeSentenceExercises("satz-a2-treffen", "A2", A2_MEET_STEMS, A2_MEET_TAILS),
+  ...composeSentenceExercises("satz-a2-reisen", "A2", A2_TRAVEL_STEMS, A2_TRAVEL_TAILS),
+  ...composeSentenceExercises("satz-a2-erklaeren", "A2", A2_EXPLAIN_STEMS, A2_EXPLAIN_TAILS),
+  ...composeSentenceExercises("satz-b1-meinung", "B1", B1_OPINION_STEMS, B1_OPINION_TAILS),
+  ...composeSentenceExercises("satz-b1-wenn", "B1", B1_IF_STEMS, B1_IF_TAILS),
+];
+
+export const CHAT_EXERCISES: ChatExercise[] = [
   {
-    id: "satz-ich-lerne-deutsch",
-    translation: "I learn German today.",
-    words: ["Ich", "lerne", "heute", "Deutsch"],
-    emoji: "📚",
+    id: "chat-a1-1",
+    contact: "Anna",
+    scenario: "Language cafe",
+    incoming: "Hallo! Kommst du heute ins Sprachcafe?",
+    translation: "Hi! Are you coming to the language cafe today?",
+    correctReply: "Ja, ich komme um 18 Uhr.",
+    options: [
+      "Ja, ich komme um 18 Uhr.",
+      "Nein, mein Name ist Kaffee.",
+      "Ich bin ein Tisch im Cafe.",
+      "Die Banane lernt heute Deutsch.",
+    ],
+    feedback: "Confirm the plan with a short and natural answer.",
+    emoji: "\u{1F44B}",
     level: "A1",
   },
   {
-    id: "satz-wir-trinken-kaffee",
-    translation: "We drink coffee in the cafe.",
-    words: ["Wir", "trinken", "Kaffee", "im", "Cafe"],
-    emoji: "☕",
+    id: "chat-a1-2",
+    contact: "Lukas",
+    scenario: "First meeting",
+    incoming: "Wie hei\u00dft du?",
+    translation: "What is your name?",
+    correctReply: "Ich hei\u00dfe Sara.",
+    options: [
+      "Ich hei\u00dfe Sara.",
+      "Ich komme aus dem Bahnhof.",
+      "Heute ist die Lampe blau.",
+      "Wir trinken ein Handy.",
+    ],
+    feedback: "Introduce yourself directly.",
+    emoji: "\u{1F464}",
     level: "A1",
   },
   {
-    id: "satz-er-wohnt-in-berlin",
-    translation: "He lives in Berlin.",
-    words: ["Er", "wohnt", "in", "Berlin"],
-    emoji: "🏙️",
+    id: "chat-a1-3",
+    contact: "Mia",
+    scenario: "Class time",
+    incoming: "Wann beginnt der Kurs?",
+    translation: "When does the course start?",
+    correctReply: "Der Kurs beginnt um neun Uhr.",
+    options: [
+      "Der Kurs beginnt um neun Uhr.",
+      "Der Kurs ist ein Apfel.",
+      "Ich lese den Bahnhof.",
+      "Meine Schwester ist morgen klein.",
+    ],
+    feedback: "Answer the question with a time.",
+    emoji: "\u{23F0}",
     level: "A1",
   },
   {
-    id: "satz-sie-liest-ein-buch",
-    translation: "She is reading a book.",
-    words: ["Sie", "liest", "ein", "Buch"],
-    emoji: "📖",
+    id: "chat-a1-4",
+    contact: "Noah",
+    scenario: "Vocabulary help",
+    incoming: "Kannst du mir mit diesem Wort helfen?",
+    translation: "Can you help me with this word?",
+    correctReply: "Ja, nat\u00fcrlich. Welches Wort?",
+    options: [
+      "Ja, nat\u00fcrlich. Welches Wort?",
+      "Nein, das Wort trinkt Tee.",
+      "Ich wohne in der Suppe.",
+      "Der Stuhl ist mein Bruder.",
+    ],
+    feedback: "A good chat reply accepts the request and asks for the detail.",
+    emoji: "\u{1F4DA}",
     level: "A1",
   },
   {
-    id: "satz-der-bus-kommt-spaeter",
-    translation: "The bus comes later.",
-    words: ["Der", "Bus", "kommt", "später"],
-    emoji: "🚌",
+    id: "chat-a1-5",
+    contact: "Elif",
+    scenario: "Meeting point",
+    incoming: "Wo bist du jetzt?",
+    translation: "Where are you right now?",
+    correctReply: "Ich bin vor dem Cafe.",
+    options: [
+      "Ich bin vor dem Cafe.",
+      "Ich bin um 18 Uhr.",
+      "Ich esse der Bahnhof.",
+      "Meine Wohnung hei\u00dft Milch.",
+    ],
+    feedback: "Reply with a place.",
+    emoji: "\u{1F4CD}",
     level: "A1",
   },
   {
-    id: "satz-ich-habe-heute-unterricht",
-    translation: "I have class today.",
-    words: ["Ich", "habe", "heute", "Unterricht"],
-    emoji: "🏫",
+    id: "chat-a1-6",
+    contact: "Ben",
+    scenario: "Order",
+    incoming: "M\u00f6chtest du Kaffee oder Tee?",
+    translation: "Would you like coffee or tea?",
+    correctReply: "Ich nehme Tee, bitte.",
+    options: [
+      "Ich nehme Tee, bitte.",
+      "Ich bin Tee um acht Uhr.",
+      "Das Brot f\u00e4hrt nach Berlin.",
+      "Wir lernen die Flasche.",
+    ],
+    feedback: "Choose one option politely.",
+    emoji: "\u{2615}",
     level: "A1",
   },
   {
-    id: "satz-meine-freundin-ist-hier",
-    translation: "My friend is here.",
-    words: ["Meine", "Freundin", "ist", "hier"],
-    emoji: "👭",
+    id: "chat-a1-7",
+    contact: "Sofia",
+    scenario: "Attendance",
+    incoming: "Bist du heute im Kurs?",
+    translation: "Are you in class today?",
+    correctReply: "Ja, ich bin heute im Kurs.",
+    options: [
+      "Ja, ich bin heute im Kurs.",
+      "Nein, ich hei\u00dfe im Kurs.",
+      "Das Kurszimmer trinkt Wasser.",
+      "Meine Mutter ist ein Bahnhof.",
+    ],
+    feedback: "Confirm your attendance clearly.",
+    emoji: "\u{1F4DD}",
     level: "A1",
   },
   {
-    id: "satz-wo-ist-der-bahnhof",
-    translation: "Where is the train station?",
-    words: ["Wo", "ist", "der", "Bahnhof"],
-    emoji: "🚉",
+    id: "chat-a1-8",
+    contact: "Paul",
+    scenario: "Station",
+    incoming: "Treffen wir uns am Bahnhof?",
+    translation: "Shall we meet at the station?",
+    correctReply: "Ja, wir treffen uns am Bahnhof.",
+    options: [
+      "Ja, wir treffen uns am Bahnhof.",
+      "Nein, der Bahnhof ist ein Messer.",
+      "Ich trinke den Bahnhof heute.",
+      "Die Uhr lernt im Garten.",
+    ],
+    feedback: "Mirror the meeting plan in a simple confirmation.",
+    emoji: "\u{1F686}",
     level: "A1",
   },
   {
-    id: "satz-das-wetter-ist-schoen",
-    translation: "The weather is nice.",
-    words: ["Das", "Wetter", "ist", "schön"],
-    emoji: "☀️",
+    id: "chat-a1-9",
+    contact: "Lea",
+    scenario: "Free seat",
+    incoming: "Ist dieser Platz frei?",
+    translation: "Is this seat free?",
+    correctReply: "Ja, du kannst hier sitzen.",
+    options: [
+      "Ja, du kannst hier sitzen.",
+      "Ja, ich sitze den Kaffee.",
+      "Nein, das Fenster ist hungrig.",
+      "Wir gehen den Platz um Tee.",
+    ],
+    feedback: "Offer the seat in a friendly way.",
+    emoji: "\u{1FA91}",
     level: "A1",
   },
   {
-    id: "satz-wir-gehen-heute-spazieren",
-    translation: "We are going for a walk today.",
-    words: ["Wir", "gehen", "heute", "spazieren"],
-    emoji: "🚶",
+    id: "chat-a1-10",
+    contact: "Emir",
+    scenario: "Language choice",
+    incoming: "Sprichst du Deutsch oder Englisch?",
+    translation: "Do you speak German or English?",
+    correctReply: "Ich spreche Deutsch und ein bisschen Englisch.",
+    options: [
+      "Ich spreche Deutsch und ein bisschen Englisch.",
+      "Ich spreche die Wohnung mit Brot.",
+      "Englisch ist mein Bahnhof heute.",
+      "Der Garten spricht mich um neun.",
+    ],
+    feedback: "State the languages you speak.",
+    emoji: "\u{1F5E3}",
     level: "A1",
   },
   {
-    id: "satz-kannst-du-mir-helfen",
-    translation: "Can you help me?",
-    words: ["Kannst", "du", "mir", "helfen"],
-    emoji: "🤝",
+    id: "chat-a1-11",
+    contact: "Nina",
+    scenario: "Classroom",
+    incoming: "Hast du den Klassenraum gefunden?",
+    translation: "Did you find the classroom?",
+    correctReply: "Ja, ich habe ihn gefunden.",
+    options: [
+      "Ja, ich habe ihn gefunden.",
+      "Nein, ich bin ein Klassenraum.",
+      "Das Buch geht nach Wasser.",
+      "Wir trinken die Treppe.",
+    ],
+    feedback: "A short yes-answer works well here.",
+    emoji: "\u{1F50D}",
+    level: "A1",
+  },
+  {
+    id: "chat-a1-12",
+    contact: "Tom",
+    scenario: "Address",
+    incoming: "Kannst du mir die Adresse schicken?",
+    translation: "Can you send me the address?",
+    correctReply: "Ja, ich schicke sie dir gleich.",
+    options: [
+      "Ja, ich schicke sie dir gleich.",
+      "Die Adresse trinkt gleich Kaffee.",
+      "Ich bin Adresse mit dem Sofa.",
+      "Wir kochen das Handy heute.",
+    ],
+    feedback: "A natural reply promises the action.",
+    emoji: "\u{1F4E9}",
+    level: "A1",
+  },
+  {
+    id: "chat-a2-1",
+    contact: "Clara",
+    scenario: "Late arrival",
+    incoming: "Ich bin zehn Minuten sp\u00e4ter. Ist das okay?",
+    translation: "I am ten minutes late. Is that okay?",
+    correctReply: "Ja, kein Problem. Ich warte vor dem Eingang.",
+    options: [
+      "Ja, kein Problem. Ich warte vor dem Eingang.",
+      "Nein, ich bin heute ein Eingang.",
+      "Der Kurs f\u00e4hrt zehn Minuten Kaffee.",
+      "Ich lerne mit der Lampe sp\u00e4ter.",
+    ],
+    feedback: "A supportive reply accepts the delay and shares your location.",
+    emoji: "\u{23F3}",
     level: "A2",
   },
   {
-    id: "satz-ich-moechte-ein-ticket-kaufen",
-    translation: "I would like to buy a ticket.",
-    words: ["Ich", "möchte", "ein", "Ticket", "kaufen"],
-    emoji: "🎫",
+    id: "chat-a2-2",
+    contact: "Jonas",
+    scenario: "Bring notebook",
+    incoming: "Kannst du bitte dein Notizbuch mitbringen?",
+    translation: "Can you bring your notebook, please?",
+    correctReply: "Ja, ich bringe es mit.",
+    options: [
+      "Ja, ich bringe es mit.",
+      "Ich bringe den Bahnhof mit Tee.",
+      "Nein, mein Notizbuch ist ein Bruder.",
+      "Wir wohnen im Notizbuch morgen.",
+    ],
+    feedback: "Reply by confirming the request.",
+    emoji: "\u{1F4D3}",
     level: "A2",
   },
   {
-    id: "satz-wir-treffen-uns-um-acht",
-    translation: "We meet at eight.",
-    words: ["Wir", "treffen", "uns", "um", "acht"],
-    emoji: "🕗",
+    id: "chat-a2-3",
+    contact: "Marta",
+    scenario: "After work",
+    incoming: "Hast du nach der Arbeit noch Zeit?",
+    translation: "Do you still have time after work?",
+    correctReply: "Ja, ich habe ab 19 Uhr Zeit.",
+    options: [
+      "Ja, ich habe ab 19 Uhr Zeit.",
+      "Ich arbeite die Zeit im Garten.",
+      "Mein Kaffee hat morgen Sprache.",
+      "Die Arbeit ist ein kleiner Tisch.",
+    ],
+    feedback: "A precise answer with time is best.",
+    emoji: "\u{1F4C5}",
     level: "A2",
   },
   {
-    id: "satz-sie-faehrt-morgen-nach-hause",
-    translation: "She goes home tomorrow.",
-    words: ["Sie", "fährt", "morgen", "nach", "Hause"],
-    emoji: "🏠",
+    id: "chat-a2-4",
+    contact: "David",
+    scenario: "Reservation",
+    incoming: "Kannst du zwei Pl\u00e4tze reservieren?",
+    translation: "Can you reserve two seats?",
+    correctReply: "Ja, ich reserviere zwei Pl\u00e4tze.",
+    options: [
+      "Ja, ich reserviere zwei Pl\u00e4tze.",
+      "Zwei Pl\u00e4tze trinken Wasser.",
+      "Ich reserviere den Kaffee am Bahnhof.",
+      "Meine Tasche ist reserviert Deutsch.",
+    ],
+    feedback: "Confirm the task directly.",
+    emoji: "\u{1F4CB}",
     level: "A2",
   },
   {
-    id: "satz-ich-lerne-mit-meinem-freund",
-    translation: "I study with my friend.",
-    words: ["Ich", "lerne", "mit", "meinem", "Freund"],
-    emoji: "🧑‍🤝‍🧑",
+    id: "chat-a2-5",
+    contact: "Sara",
+    scenario: "Train arrival",
+    incoming: "Wei\u00dft du, wann der Zug ankommt?",
+    translation: "Do you know when the train arrives?",
+    correctReply: "Ja, der Zug kommt um 17:20 Uhr an.",
+    options: [
+      "Ja, der Zug kommt um 17:20 Uhr an.",
+      "Ja, der Zug ist mein Bruder heute.",
+      "Wir trinken den Zug im Cafe.",
+      "Das Fenster kommt aus der Suppe.",
+    ],
+    feedback: "Give the arrival time if you know it.",
+    emoji: "\u{1F68A}",
     level: "A2",
   },
   {
-    id: "satz-warum-bist-du-zu-spaet",
-    translation: "Why are you late?",
-    words: ["Warum", "bist", "du", "zu", "spät"],
-    emoji: "⏰",
+    id: "chat-a2-6",
+    contact: "Yara",
+    scenario: "Homework",
+    incoming: "Kannst du mir die Hausaufgabe erkl\u00e4ren?",
+    translation: "Can you explain the homework to me?",
+    correctReply: "Ja, ich erkl\u00e4re sie dir nach dem Kurs.",
+    options: [
+      "Ja, ich erkl\u00e4re sie dir nach dem Kurs.",
+      "Die Hausaufgabe wohnt im Bahnhof.",
+      "Ich erkl\u00e4re den Kaffee in der Wohnung.",
+      "Wir kaufen Hausaufgabe um neun.",
+    ],
+    feedback: "Offer help and set a realistic moment.",
+    emoji: "\u{1F4DA}",
     level: "A2",
   },
   {
-    id: "satz-heute-koche-ich-fuer-meine-familie",
-    translation: "Today I cook for my family.",
-    words: ["Heute", "koche", "ich", "für", "meine", "Familie"],
-    emoji: "🍲",
+    id: "chat-a2-7",
+    contact: "Felix",
+    scenario: "New day",
+    incoming: "Wir treffen uns jetzt am Donnerstag statt am Mittwoch.",
+    translation: "We meet on Thursday instead of Wednesday now.",
+    correctReply: "Danke, Donnerstag passt f\u00fcr mich.",
+    options: [
+      "Danke, Donnerstag passt f\u00fcr mich.",
+      "Donnerstag ist eine kleine Kartoffel.",
+      "Ich passe den Tisch mit Wasser.",
+      "Mittwoch spricht mein Messer langsam.",
+    ],
+    feedback: "Acknowledge the change and confirm.",
+    emoji: "\u{1F4C6}",
     level: "A2",
   },
   {
-    id: "satz-der-film-beginnt-um-neun",
-    translation: "The movie starts at nine.",
-    words: ["Der", "Film", "beginnt", "um", "neun"],
-    emoji: "🎬",
+    id: "chat-a2-8",
+    contact: "Lina",
+    scenario: "Study group",
+    incoming: "M\u00f6chtest du in unsere Lerngruppe kommen?",
+    translation: "Would you like to join our study group?",
+    correctReply: "Ja, gern. Wann trefft ihr euch?",
+    options: [
+      "Ja, gern. Wann trefft ihr euch?",
+      "Nein, die Lerngruppe trinkt die Uhr.",
+      "Ich wohne die Gruppe im Kaffee.",
+      "Der Kurs isst meine Adresse.",
+    ],
+    feedback: "A natural reply shows interest and asks for details.",
+    emoji: "\u{1F465}",
     level: "A2",
   },
   {
-    id: "satz-im-sommer-fahre-ich-ans-meer",
-    translation: "In summer I go to the sea.",
-    words: ["Im", "Sommer", "fahre", "ich", "ans", "Meer"],
-    emoji: "🌊",
+    id: "chat-a2-9",
+    contact: "Omar",
+    scenario: "Call me",
+    incoming: "Ruf mich bitte an, wenn du da bist.",
+    translation: "Please call me when you are there.",
+    correctReply: "Okay, ich rufe dich an, wenn ich ankomme.",
+    options: [
+      "Okay, ich rufe dich an, wenn ich ankomme.",
+      "Ich komme mit dem Telefon in die Suppe.",
+      "Der Anruf ist ein Bahnhof heute.",
+      "Wir lesen die Uhr mit Brot.",
+    ],
+    feedback: "Repeat the action to confirm it.",
+    emoji: "\u{1F4DE}",
     level: "A2",
   },
   {
-    id: "satz-bitte-sprich-etwas-langsam",
-    translation: "Please speak a little slowly.",
-    words: ["Bitte", "sprich", "etwas", "langsam"],
-    emoji: "🗣️",
+    id: "chat-a2-10",
+    contact: "Emma",
+    scenario: "Tickets",
+    incoming: "Hast du die Tickets schon gekauft?",
+    translation: "Have you bought the tickets already?",
+    correctReply: "Ja, ich habe sie gestern gekauft.",
+    options: [
+      "Ja, ich habe sie gestern gekauft.",
+      "Nein, ich bin das Ticket im Garten.",
+      "Die Tickets trinken heute Kaffee.",
+      "Wir kochen die Reise im Bett.",
+    ],
+    feedback: "Use the perfect tense to report a finished action.",
+    emoji: "\u{1F3AB}",
     level: "A2",
+  },
+  {
+    id: "chat-a2-11",
+    contact: "Mila",
+    scenario: "Take a photo",
+    incoming: "Kannst du schnell ein Foto von uns machen?",
+    translation: "Can you quickly take a photo of us?",
+    correctReply: "Ja, klar. Stellt euch bitte hierhin.",
+    options: [
+      "Ja, klar. Stellt euch bitte hierhin.",
+      "Das Foto wohnt im Messer.",
+      "Ich trinke das Foto nach Hause.",
+      "Wir lernen den Garten im Bild.",
+    ],
+    feedback: "Accept the request and guide the people.",
+    emoji: "\u{1F4F8}",
+    level: "A2",
+  },
+  {
+    id: "chat-a2-12",
+    contact: "Kai",
+    scenario: "Documents",
+    incoming: "Vergiss bitte die Unterlagen nicht.",
+    translation: "Please do not forget the documents.",
+    correctReply: "Keine Sorge, ich habe sie schon in meiner Tasche.",
+    options: [
+      "Keine Sorge, ich habe sie schon in meiner Tasche.",
+      "Die Unterlagen fahren heute mit dem Sofa.",
+      "Ich vergesse die Tasche im Kaffee.",
+      "Mein Dokument ist ein kleiner Apfel.",
+    ],
+    feedback: "Reassure the person and mention where the documents are.",
+    emoji: "\u{1F4C1}",
+    level: "A2",
+  },
+  {
+    id: "chat-b1-1",
+    contact: "Laura",
+    scenario: "Event feedback",
+    incoming: "Wie fandest du den heutigen Sprachabend?",
+    translation: "How did you like today's language evening?",
+    correctReply: "Ich fand ihn sehr lebendig, besonders die Gruppengespr\u00e4che.",
+    options: [
+      "Ich fand ihn sehr lebendig, besonders die Gruppengespr\u00e4che.",
+      "Der Sprachabend trinkt heute sehr lebendig.",
+      "Ich bin der Gruppenabend im Kaffee.",
+      "Die Gespr\u00e4che wohnen unter dem Tisch.",
+    ],
+    feedback: "A strong reply gives a clear opinion plus one detail.",
+    emoji: "\u{1F389}",
+    level: "B1",
+  },
+  {
+    id: "chat-b1-2",
+    contact: "Daniel",
+    scenario: "Bad weather",
+    incoming: "Es soll morgen stark regnen. Sollen wir das Treffen verschieben?",
+    translation: "It should rain heavily tomorrow. Should we postpone the meeting?",
+    correctReply: "Ja, das ist wahrscheinlich besser. Lass uns einen neuen Termin suchen.",
+    options: [
+      "Ja, das ist wahrscheinlich besser. Lass uns einen neuen Termin suchen.",
+      "Der Regen ist mein Termin im Bahnhof.",
+      "Wir verschieben die Suppe mit dem Messer.",
+      "Ich suche morgen den Regen im Tisch.",
+    ],
+    feedback: "Accept the suggestion and move the conversation forward.",
+    emoji: "\u{1F327}",
+    level: "B1",
+  },
+  {
+    id: "chat-b1-3",
+    contact: "Hannah",
+    scenario: "Regular practice",
+    incoming: "Wie k\u00f6nnen wir unser Deutsch au\u00dferhalb des Unterrichts regelm\u00e4\u00dfig \u00fcben?",
+    translation: "How can we practise our German regularly outside class?",
+    correctReply: "Wir k\u00f6nnten zweimal pro Woche kurze Sprachnachrichten austauschen.",
+    options: [
+      "Wir k\u00f6nnten zweimal pro Woche kurze Sprachnachrichten austauschen.",
+      "Unser Deutsch wohnt au\u00dferhalb der Flasche.",
+      "Wir \u00fcben die Nachricht mit einem Apfel.",
+      "Das Unterrichtswochenende trinkt zweimal Kaffee.",
+    ],
+    feedback: "Offer a concrete and realistic idea.",
+    emoji: "\u{1F4F1}",
+    level: "B1",
+  },
+  {
+    id: "chat-b1-4",
+    contact: "Nora",
+    scenario: "Summary",
+    incoming: "Kannst du die wichtigsten Punkte kurz zusammenfassen?",
+    translation: "Can you briefly summarize the most important points?",
+    correctReply: "Ja. Wir treffen uns um 18 Uhr, bringen die Materialien mit und arbeiten in Teams.",
+    options: [
+      "Ja. Wir treffen uns um 18 Uhr, bringen die Materialien mit und arbeiten in Teams.",
+      "Die wichtigsten Punkte trinken zusammen Kaffee.",
+      "Ich fasse den Bahnhof unter dem Sofa.",
+      "Wir arbeiten die Materialien in einer Banane.",
+    ],
+    feedback: "A summary should be short and structured.",
+    emoji: "\u{1F4CC}",
+    level: "B1",
+  },
+  {
+    id: "chat-b1-5",
+    contact: "Ibrahim",
+    scenario: "Polite decline",
+    incoming: "Kannst du am Samstag beim Event mithelfen?",
+    translation: "Can you help at the event on Saturday?",
+    correctReply: "Leider nicht. Ich bin schon verplant, aber ich kann am Freitag vorbereiten helfen.",
+    options: [
+      "Leider nicht. Ich bin schon verplant, aber ich kann am Freitag vorbereiten helfen.",
+      "Samstag ist leider ein gro\u00dfer K\u00fchlschrank.",
+      "Ich helfe dem Event mit Kaffee und Fenster.",
+      "Der Freitag ist schon in meiner Suppe.",
+    ],
+    feedback: "A polite decline often includes an alternative.",
+    emoji: "\u{1F647}",
+    level: "B1",
+  },
+  {
+    id: "chat-b1-6",
+    contact: "Zeynep",
+    scenario: "Clarification",
+    incoming: "Ich bin nicht sicher, wie wir die Gruppen einteilen sollen.",
+    translation: "I am not sure how we should divide the groups.",
+    correctReply: "Wir k\u00f6nnen sie zuerst nach Niveau und dann nach Interessen aufteilen.",
+    options: [
+      "Wir k\u00f6nnen sie zuerst nach Niveau und dann nach Interessen aufteilen.",
+      "Die Gruppe teilt den Kaffee in drei Tische.",
+      "Ich bin das Niveau im Bahnhof heute.",
+      "Interessen wohnen unter der Lampe.",
+    ],
+    feedback: "A useful answer proposes a simple method.",
+    emoji: "\u{1F9E9}",
+    level: "B1",
+  },
+  {
+    id: "chat-b1-7",
+    contact: "Max",
+    scenario: "Improve the course",
+    incoming: "Was k\u00f6nnten wir im Kurs verbessern?",
+    translation: "What could we improve in the course?",
+    correctReply: "Vielleicht sollten wir mehr kurze Sprech\u00fcbungen in kleinen Gruppen machen.",
+    options: [
+      "Vielleicht sollten wir mehr kurze Sprech\u00fcbungen in kleinen Gruppen machen.",
+      "Der Kurs verbessert heute die Kartoffel im Garten.",
+      "Ich mache die \u00dcbung in einem Kissen Kaffee.",
+      "Die kleine Gruppe wohnt im Lehrbuch.",
+    ],
+    feedback: "Give one practical improvement instead of a vague opinion.",
+    emoji: "\u{1F4A1}",
+    level: "B1",
+  },
+  {
+    id: "chat-b1-8",
+    contact: "Aylin",
+    scenario: "Complaint",
+    incoming: "Das Video l\u00e4dt bei mir sehr langsam. Hast du auch das Problem?",
+    translation: "The video loads very slowly for me. Do you have the same problem?",
+    correctReply: "Bei mir auch. Wir sollten es dem Organisator melden.",
+    options: [
+      "Bei mir auch. Wir sollten es dem Organisator melden.",
+      "Das Video wohnt langsam in meiner Tasse.",
+      "Ich lade das Problem mit einem Messer.",
+      "Der Organisator trinkt das Internet heute.",
+    ],
+    feedback: "A good reply confirms the issue and suggests the next step.",
+    emoji: "\u{1F4F9}",
+    level: "B1",
+  },
+  {
+    id: "chat-b1-9",
+    contact: "Peter",
+    scenario: "Collaboration",
+    incoming: "Kannst du den ersten Teil vorbereiten, wenn ich die Moderation \u00fcbernehme?",
+    translation: "Can you prepare the first part if I take over the moderation?",
+    correctReply: "Ja, das passt gut. Ich schicke dir den Entwurf heute Abend.",
+    options: [
+      "Ja, das passt gut. Ich schicke dir den Entwurf heute Abend.",
+      "Die Moderation f\u00e4hrt heute Abend zum Tisch.",
+      "Ich \u00fcbernehme den Entwurf in der Suppe.",
+      "Der erste Teil ist mein Kaffee im Garten.",
+    ],
+    feedback: "Confirm the division of tasks and mention the deliverable.",
+    emoji: "\u{1F91D}",
+    level: "B1",
+  },
+  {
+    id: "chat-b1-10",
+    contact: "Mina",
+    scenario: "Need more time",
+    incoming: "Schaffst du den Text heute noch?",
+    translation: "Will you manage the text today?",
+    correctReply: "Wahrscheinlich nicht ganz. Ich brauche noch etwa eine Stunde.",
+    options: [
+      "Wahrscheinlich nicht ganz. Ich brauche noch etwa eine Stunde.",
+      "Der Text schafft heute meinen Bahnhof.",
+      "Ich brauche die Stunde in einer Banane.",
+      "Der Garten schreibt den Text mit Wasser.",
+    ],
+    feedback: "An honest progress update with a time estimate works best.",
+    emoji: "\u{23F1}",
+    level: "B1",
+  },
+  {
+    id: "chat-b1-11",
+    contact: "Yusuf",
+    scenario: "Appreciation",
+    incoming: "Danke noch mal f\u00fcr deine Hilfe gestern.",
+    translation: "Thanks again for your help yesterday.",
+    correctReply: "Gern. Ich freue mich, wenn ich helfen konnte.",
+    options: [
+      "Gern. Ich freue mich, wenn ich helfen konnte.",
+      "Deine Hilfe wohnt gestern im Sofa.",
+      "Ich danke den Bahnhof mit der Lampe.",
+      "Gestern war die Freude ein K\u00fchlschrank.",
+    ],
+    feedback: "A warm and modest answer is natural here.",
+    emoji: "\u{1F60A}",
+    level: "B1",
+  },
+  {
+    id: "chat-b1-12",
+    contact: "Selin",
+    scenario: "Different opinion",
+    incoming: "Ich glaube, wir brauchen noch eine weitere Probe.",
+    translation: "I think we need one more rehearsal.",
+    correctReply: "Da stimme ich dir zu. Danach f\u00fchlen sich wahrscheinlich alle sicherer.",
+    options: [
+      "Da stimme ich dir zu. Danach f\u00fchlen sich wahrscheinlich alle sicherer.",
+      "Die Probe stimmt dem Kaffee im Garten zu.",
+      "Ich brauche die Sicherheit in einer Suppe.",
+      "Alle f\u00fchlen den Bahnhof mit der Gabel.",
+    ],
+    feedback: "Show agreement and explain the benefit.",
+    emoji: "\u{1F3AD}",
+    level: "B1",
   },
 ];

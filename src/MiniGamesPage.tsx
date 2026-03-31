@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ARTICLE_EXERCISES,
+  CHAT_EXERCISES,
   SENTENCE_EXERCISES,
   TRANSLATION_EXERCISES,
   type ArticleExercise,
   type ArticleOption,
+  type ChatExercise,
   type SentenceExercise,
   type TranslationExercise,
 } from "./miniGamesData";
@@ -14,7 +16,8 @@ type MiniGamesPageProps = {
   locale: string;
 };
 
-type GameMode = "article" | "translate" | "sentence";
+type GameMode = "article" | "translate" | "sentence" | "chat";
+type ExerciseLevel = ArticleExercise["level"];
 
 type GameStats = {
   attempts: number;
@@ -47,6 +50,12 @@ type SentenceRound = {
   tokens: SentenceToken[];
 };
 
+type ChatRound = {
+  key: string;
+  exercise: ChatExercise;
+  options: string[];
+};
+
 type AnswerState = {
   value: string | null;
   correct: boolean;
@@ -54,12 +63,19 @@ type AnswerState = {
 };
 
 const ARTICLE_OPTIONS: ArticleOption[] = ["der", "die", "das"];
-const ROUND_DURATION_SECONDS = 10;
+const LEVEL_OPTIONS: ExerciseLevel[] = ["A1", "A2", "B1"];
+const ROUND_DURATIONS: Record<GameMode, number> = {
+  article: 10,
+  translate: 10,
+  sentence: 15,
+  chat: 20,
+};
 
 const INITIAL_STATS: Record<GameMode, GameStats> = {
   article: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
   translate: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
   sentence: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
+  chat: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
 };
 
 function randomItem<T>(items: readonly T[]): T {
@@ -75,8 +91,11 @@ function shuffle<T>(items: readonly T[]): T[] {
   return next;
 }
 
-function createArticleRound(seed: number): ArticleRound {
-  const exercise = randomItem(ARTICLE_EXERCISES);
+function createArticleRound(
+  exercises: readonly ArticleExercise[],
+  seed: number,
+): ArticleRound {
+  const exercise = randomItem(exercises);
   return {
     key: `${exercise.id}-${seed}`,
     exercise,
@@ -84,10 +103,14 @@ function createArticleRound(seed: number): ArticleRound {
   };
 }
 
-function createTranslationRound(seed: number): TranslationRound {
-  const exercise = randomItem(TRANSLATION_EXERCISES);
+function createTranslationRound(
+  exercises: readonly TranslationExercise[],
+  seed: number,
+): TranslationRound {
+  const exercise = randomItem(exercises);
   const distractors = shuffle(
-    TRANSLATION_EXERCISES.filter((entry) => entry.id !== exercise.id)
+    exercises
+      .filter((entry) => entry.id !== exercise.id)
       .map((entry) => entry.target)
       .filter((target, index, list) => list.indexOf(target) === index),
   ).slice(0, 3);
@@ -98,8 +121,11 @@ function createTranslationRound(seed: number): TranslationRound {
   };
 }
 
-function createSentenceRound(seed: number): SentenceRound {
-  const exercise = randomItem(SENTENCE_EXERCISES);
+function createSentenceRound(
+  exercises: readonly SentenceExercise[],
+  seed: number,
+): SentenceRound {
+  const exercise = randomItem(exercises);
   const tokens = shuffle(
     exercise.words.map((word, index) => ({
       id: `${exercise.id}-${seed}-${index}`,
@@ -111,6 +137,15 @@ function createSentenceRound(seed: number): SentenceRound {
     key: `${exercise.id}-${seed}`,
     exercise,
     tokens,
+  };
+}
+
+function createChatRound(exercises: readonly ChatExercise[], seed: number): ChatRound {
+  const exercise = randomItem(exercises);
+  return {
+    key: `${exercise.id}-${seed}`,
+    exercise,
+    options: shuffle(exercise.options),
   };
 }
 
@@ -128,39 +163,106 @@ function renderStreakStars(streak: number): string {
   return `${"★".repeat(clamped)}${"☆".repeat(5 - clamped)}`;
 }
 
+function getAvailableLevelsForMode(mode: GameMode): ExerciseLevel[] {
+  const exercises =
+    mode === "article"
+      ? ARTICLE_EXERCISES
+      : mode === "translate"
+        ? TRANSLATION_EXERCISES
+        : mode === "sentence"
+          ? SENTENCE_EXERCISES
+          : CHAT_EXERCISES;
+  return LEVEL_OPTIONS.filter((entry) =>
+    exercises.some((exercise) => exercise.level === entry),
+  );
+}
+
 export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
   const text = getMiniGamesText(locale);
   const [mode, setMode] = useState<GameMode>("article");
+  const [level, setLevel] = useState<ExerciseLevel>("A1");
   const [articleSeed, setArticleSeed] = useState(0);
   const [translationSeed, setTranslationSeed] = useState(0);
   const [sentenceSeed, setSentenceSeed] = useState(0);
+  const [chatSeed, setChatSeed] = useState(0);
   const [sentenceSelection, setSentenceSelection] = useState<string[]>([]);
   const [stats, setStats] = useState(INITIAL_STATS);
   const [answerState, setAnswerState] = useState<AnswerState | null>(null);
-  const [timeLeft, setTimeLeft] = useState(ROUND_DURATION_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(ROUND_DURATIONS.article);
+
+  const modeExercises = useMemo(() => {
+    switch (mode) {
+      case "article":
+        return ARTICLE_EXERCISES;
+      case "translate":
+        return TRANSLATION_EXERCISES;
+      case "sentence":
+        return SENTENCE_EXERCISES;
+      case "chat":
+        return CHAT_EXERCISES;
+    }
+  }, [mode]);
+
+  const availableLevels = useMemo(
+    () =>
+      LEVEL_OPTIONS.filter((entry) =>
+        modeExercises.some((exercise) => exercise.level === entry),
+      ),
+    [modeExercises],
+  );
+
+  const effectiveLevel = availableLevels.includes(level)
+    ? level
+    : availableLevels[0] ?? "A1";
+
+  const filteredArticleExercises = useMemo(
+    () => ARTICLE_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
+    [effectiveLevel],
+  );
+  const filteredTranslationExercises = useMemo(
+    () =>
+      TRANSLATION_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
+    [effectiveLevel],
+  );
+  const filteredSentenceExercises = useMemo(
+    () => SENTENCE_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
+    [effectiveLevel],
+  );
+  const filteredChatExercises = useMemo(
+    () => CHAT_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
+    [effectiveLevel],
+  );
 
   const articleRound = useMemo(
-    () => createArticleRound(articleSeed),
-    [articleSeed],
+    () => createArticleRound(filteredArticleExercises, articleSeed),
+    [articleSeed, filteredArticleExercises],
   );
   const translationRound = useMemo(
-    () => createTranslationRound(translationSeed),
-    [translationSeed],
+    () => createTranslationRound(filteredTranslationExercises, translationSeed),
+    [filteredTranslationExercises, translationSeed],
   );
   const sentenceRound = useMemo(
-    () => createSentenceRound(sentenceSeed),
-    [sentenceSeed],
+    () => createSentenceRound(filteredSentenceExercises, sentenceSeed),
+    [filteredSentenceExercises, sentenceSeed],
+  );
+  const chatRound = useMemo(
+    () => createChatRound(filteredChatExercises, chatSeed),
+    [chatSeed, filteredChatExercises],
   );
 
   const activeStats = stats[mode];
+  const currentRoundDuration = ROUND_DURATIONS[mode];
   const isArticleMode = mode === "article";
   const isTranslateMode = mode === "translate";
   const isSentenceMode = mode === "sentence";
+  const isChatMode = mode === "chat";
   const activeExercise = isArticleMode
     ? articleRound.exercise
     : isTranslateMode
       ? translationRound.exercise
-      : sentenceRound.exercise;
+      : isSentenceMode
+        ? sentenceRound.exercise
+        : chatRound.exercise;
 
   const selectedSentenceTokens = useMemo(() => {
     const tokenMap = new Map(sentenceRound.tokens.map((token) => [token.id, token]));
@@ -174,11 +276,25 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
     return sentenceRound.tokens.filter((token) => !selected.has(token.id));
   }, [sentenceRound.tokens, sentenceSelection]);
 
-  const handleModeChange = (nextMode: GameMode) => {
-    setMode(nextMode);
+  const resetRoundState = useCallback((nextDuration: number) => {
     setAnswerState(null);
-    setTimeLeft(ROUND_DURATION_SECONDS);
+    setTimeLeft(nextDuration);
     setSentenceSelection([]);
+  }, []);
+
+  const handleModeChange = (nextMode: GameMode) => {
+    const nextLevels = getAvailableLevelsForMode(nextMode);
+    setMode(nextMode);
+    if (!nextLevels.includes(level)) {
+      setLevel(nextLevels[0] ?? "A1");
+    }
+    resetRoundState(ROUND_DURATIONS[nextMode]);
+  };
+
+  const handleLevelChange = (nextLevel: ExerciseLevel) => {
+    if (!availableLevels.includes(nextLevel) || nextLevel === effectiveLevel) return;
+    setLevel(nextLevel);
+    resetRoundState(ROUND_DURATIONS[mode]);
   };
 
   const resolveAnswer = useCallback(
@@ -203,9 +319,7 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
   );
 
   const handleNextQuestion = () => {
-    setAnswerState(null);
-    setTimeLeft(ROUND_DURATION_SECONDS);
-    setSentenceSelection([]);
+    resetRoundState(currentRoundDuration);
     if (isArticleMode) {
       setArticleSeed((value) => value + 1);
       return;
@@ -214,14 +328,20 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
       setTranslationSeed((value) => value + 1);
       return;
     }
-    setSentenceSeed((value) => value + 1);
+    if (isSentenceMode) {
+      setSentenceSeed((value) => value + 1);
+      return;
+    }
+    setChatSeed((value) => value + 1);
   };
 
   const handleAnswer = (value: string) => {
     if (answerState || isSentenceMode) return;
     const isCorrect = isArticleMode
       ? value === articleRound.exercise.article
-      : value === translationRound.exercise.target;
+      : isTranslateMode
+        ? value === translationRound.exercise.target
+        : value === chatRound.exercise.correctReply;
     resolveAnswer(value, isCorrect, false);
   };
 
@@ -272,19 +392,25 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
       ? text.chooseArticle
       : isTranslateMode
         ? text.chooseTranslation
-        : text.chooseSentence;
+        : isSentenceMode
+          ? text.chooseSentence
+          : text.chooseChat;
 
   const feedbackBody = answerState
     ? isArticleMode
       ? `${articleRound.exercise.article} ${articleRound.exercise.noun} (${articleRound.exercise.hint})`
       : isTranslateMode
         ? `${translationRound.exercise.source} = ${translationRound.exercise.target}`
-        : `${sentenceRound.exercise.words.join(" ")} (${sentenceRound.exercise.translation})`
+        : isSentenceMode
+          ? `${sentenceRound.exercise.words.join(" ")} (${sentenceRound.exercise.translation})`
+          : `${chatRound.exercise.correctReply} (${chatRound.exercise.feedback})`
     : isArticleMode
       ? text.explainArticle
       : isTranslateMode
         ? text.explainTranslation
-        : text.explainSentence;
+        : isSentenceMode
+          ? text.explainSentence
+          : text.explainChat;
 
   return (
     <div className="miniGamesPage">
@@ -316,6 +442,35 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
         >
           {text.sentenceMode}
         </button>
+        <button
+          className={`miniGamesModeButton${
+            isChatMode ? " miniGamesModeButtonActive" : ""
+          }`}
+          type="button"
+          onClick={() => handleModeChange("chat")}
+        >
+          {text.chatMode}
+        </button>
+      </div>
+
+      <div className="miniGamesLevelRow" role="tablist" aria-label={text.levelFilterLabel}>
+        {LEVEL_OPTIONS.map((option) => {
+          const isAvailable = availableLevels.includes(option);
+          const isActive = effectiveLevel === option;
+          return (
+            <button
+              key={option}
+              className={`miniGamesLevelButton${
+                isActive ? " miniGamesLevelButtonActive" : ""
+              }`}
+              type="button"
+              disabled={!isAvailable}
+              onClick={() => handleLevelChange(option)}
+            >
+              {option}
+            </button>
+          );
+        })}
       </div>
 
       <section className="miniGamesStage">
@@ -342,24 +497,40 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
         </div>
 
         <div className="miniGamesQuestionBlock">
-          <div className="miniGamesWordLine">
-            {isArticleMode ? (
-              <>
-                <span className="miniGamesMissingArticle">___</span>
-                <span>{articleRound.exercise.noun}</span>
-              </>
-            ) : isTranslateMode ? (
-              <span>{translationRound.exercise.source}</span>
-            ) : (
-              <span>{sentenceRound.exercise.translation}</span>
-            )}
-          </div>
+          {isChatMode ? (
+            <div className="miniGamesChatPreview">
+              <div className="miniGamesChatMeta">
+                <span>{chatRound.exercise.contact}</span>
+                <span>
+                  {text.chatScenarioLabel}: {chatRound.exercise.scenario}
+                </span>
+              </div>
+              <div className="miniGamesChatBubble">
+                {chatRound.exercise.incoming}
+              </div>
+            </div>
+          ) : (
+            <div className="miniGamesWordLine">
+              {isArticleMode ? (
+                <>
+                  <span className="miniGamesMissingArticle">___</span>
+                  <span>{articleRound.exercise.noun}</span>
+                </>
+              ) : isTranslateMode ? (
+                <span>{translationRound.exercise.source}</span>
+              ) : (
+                <span>{sentenceRound.exercise.translation}</span>
+              )}
+            </div>
+          )}
           <p className="miniGamesInstruction">
             {isArticleMode
               ? text.articleMissingLabel
               : isTranslateMode
                 ? text.translatePrompt
-                : text.sentencePrompt}
+                : isSentenceMode
+                  ? text.sentencePrompt
+                  : text.chatPrompt}
           </p>
           <p className="miniGamesHint">
             {isArticleMode ? (
@@ -368,11 +539,15 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
               </>
             ) : isTranslateMode ? (
               <>
-                {text.levelLabel}: {translationRound.exercise.level}
+                {text.levelLabel}: {effectiveLevel}
+              </>
+            ) : isSentenceMode ? (
+              <>
+                {text.sentenceHintLabel}: {sentenceRound.exercise.translation} ({effectiveLevel})
               </>
             ) : (
               <>
-                {text.sentenceHintLabel}: {sentenceRound.exercise.translation}
+                {text.chatHintLabel}: {chatRound.exercise.translation} ({effectiveLevel})
               </>
             )}
           </p>
@@ -384,7 +559,9 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
               ? "Article"
               : isTranslateMode
                 ? "Translate"
-                : "Sentence"
+                : isSentenceMode
+                  ? "Sentence"
+                  : "Chat"
           }`}
         >
           {isArticleMode
@@ -429,7 +606,7 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
                     </button>
                   );
                 })
-              : (
+              : isSentenceMode ? (
                 <div className="miniGamesSentenceBoard">
                   <div className="miniGamesSentenceAnswer">
                     {selectedSentenceTokens.length ? (
@@ -484,6 +661,27 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
                     </button>
                   </div>
                 </div>
+              ) : (
+                chatRound.options.map((option) => {
+                  const isCorrect = option === chatRound.exercise.correctReply;
+                  const isSelected = answerState?.value === option;
+                  return (
+                    <button
+                      key={option}
+                      className={`miniGamesOption miniGamesOptionTranslate miniGamesOptionChat${
+                        answerState && isCorrect ? " miniGamesOptionCorrect" : ""
+                      }${
+                        answerState && isSelected && !isCorrect
+                          ? " miniGamesOptionWrong"
+                          : ""
+                      }`}
+                      type="button"
+                      onClick={() => handleAnswer(option)}
+                    >
+                      <span className="miniGamesOptionBody">{option}</span>
+                    </button>
+                  );
+                })
               )}
         </div>
 
