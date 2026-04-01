@@ -42,6 +42,22 @@ export type MiniGamesText = {
   chatHintLabel: string;
   chatScenarioLabel: string;
   levelFilterLabel: string;
+  livesBadge?: string;
+  livesInfinite?: string;
+  livesEmptyTitle?: string;
+  livesEmptyCopy?: string;
+  premiumLivesCopy?: string;
+  signInSyncHint?: string;
+  dailyChallengeLabel?: string;
+  dailyChallengeCopy?: string;
+  dailyChallengePlay?: string;
+  dailyChallengeDone?: string;
+  dailyChallengeComplete?: string;
+  dailyChallengeBack?: string;
+  leaderboardLabel?: string;
+  leaderboardDaily?: string;
+  leaderboardAllTime?: string;
+  leaderboardEmpty?: string;
 };
 
 type MiniGamesLocale =
@@ -104,6 +120,25 @@ const ENGLISH_TEXT: MiniGamesText = {
   chatHintLabel: "Meaning",
   chatScenarioLabel: "Scenario",
   levelFilterLabel: "Level filter",
+  livesBadge: "Lives",
+  livesInfinite: "Premium",
+  livesEmptyTitle: "No lives left",
+  livesEmptyCopy:
+    "You lose one life for a wrong answer or timeout. One life comes back every 2 hours.",
+  premiumLivesCopy: "Premium keeps your lives unlimited.",
+  signInSyncHint:
+    "Sign in to save progress, daily challenge, and leaderboard results.",
+  dailyChallengeLabel: "Daily challenge",
+  dailyChallengeCopy:
+    "One fixed challenge every day. Finish it once to enter the daily leaderboard.",
+  dailyChallengePlay: "Play daily challenge",
+  dailyChallengeDone: "Completed for today.",
+  dailyChallengeComplete: "Completed",
+  dailyChallengeBack: "Back to practice",
+  leaderboardLabel: "Leaderboard",
+  leaderboardDaily: "Today",
+  leaderboardAllTime: "All time",
+  leaderboardEmpty: "No results yet.",
 };
 
 const MINI_GAMES_TEXT: Record<MiniGamesLocale, MiniGamesText> = {

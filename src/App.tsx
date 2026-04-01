@@ -373,6 +373,7 @@ type ProfileRecord = {
   is_organizer?: boolean | null;
   is_teacher?: boolean | null;
   is_admin?: boolean | null;
+  is_premium?: boolean | null;
   pinned_short_post_id?: string | null;
 };
 
@@ -1405,6 +1406,10 @@ function isMissingTeacherColumnError(error: unknown) {
   return isMissingColumnError(error, "is_teacher");
 }
 
+function isMissingPremiumColumnError(error: unknown) {
+  return isMissingColumnError(error, "is_premium");
+}
+
 function parsePositiveInteger(value: string): number | null {
   const normalized = value.trim();
   if (!normalized) return null;
@@ -1901,6 +1906,7 @@ export default function App() {
   const [profileIsOrganizer, setProfileIsOrganizer] = useState(false);
   const [profileIsTeacher, setProfileIsTeacher] = useState(false);
   const [profileIsAdmin, setProfileIsAdmin] = useState(false);
+  const [profileIsPremium, setProfileIsPremium] = useState(false);
   const [profilePinnedShortPostId, setProfilePinnedShortPostId] = useState<string | null>(
     null
   );
@@ -2302,6 +2308,7 @@ export default function App() {
         setProfileIsOrganizer(false);
         setProfileIsTeacher(false);
         setProfileIsAdmin(false);
+        setProfileIsPremium(false);
         setProfilePinnedShortPostId(null);
       profileLoaded.current = false;
       setAuthState({
@@ -2686,14 +2693,15 @@ export default function App() {
         const primaryProfileResult = await supabase
           .from("profiles")
           .select(
-            "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram,is_organizer,is_teacher,is_admin,pinned_short_post_id"
+            "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram,is_organizer,is_teacher,is_admin,is_premium,pinned_short_post_id"
           )
           .eq("id", user.id)
           .maybeSingle();
         const fallbackProfileResult =
           primaryProfileResult.error &&
           (isMissingPinnedShortColumnError(primaryProfileResult.error) ||
-            isMissingTeacherColumnError(primaryProfileResult.error))
+            isMissingTeacherColumnError(primaryProfileResult.error) ||
+            isMissingPremiumColumnError(primaryProfileResult.error))
             ? await supabase
                 .from("profiles")
                 .select(
@@ -2763,6 +2771,7 @@ export default function App() {
           setProfileIsOrganizer(Boolean(data.is_organizer));
           setProfileIsTeacher(Boolean(data.is_teacher));
           setProfileIsAdmin(Boolean(data.is_admin));
+          setProfileIsPremium(Boolean(data.is_premium));
           setProfilePinnedShortPostId(data.pinned_short_post_id ?? null);
         setProfileCoverUrl(data.cover_url ?? null);
         setProfileCoverPreview(data.cover_url ?? null);
@@ -2778,6 +2787,7 @@ export default function App() {
           profilePhotoInputRef.current.value = "";
         }
         } else {
+          setProfileIsPremium(false);
           setProfileIsTeacher(false);
           setProfileIsAdmin(false);
           setProfilePinnedShortPostId(null);
@@ -5356,6 +5366,7 @@ export default function App() {
         setProfileIsOrganizer(false);
         setProfileIsTeacher(false);
         setProfileIsAdmin(false);
+        setProfileIsPremium(false);
         profileLoaded.current = false;
         setAuthState({
           type: "error",
@@ -5505,6 +5516,7 @@ export default function App() {
         setProfileIsOrganizer(false);
         setProfileIsTeacher(false);
         setProfileIsAdmin(false);
+        setProfileIsPremium(false);
         profileLoaded.current = false;
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(GUEST_MODE_KEY);
@@ -7820,7 +7832,11 @@ export default function App() {
               </Suspense>
             ) : isGamesRoute ? (
               <Suspense fallback={<div className="miniGamesPage" />}>
-                <MiniGamesPage locale={locale} />
+                <MiniGamesPage
+                  locale={locale}
+                  sessionUserId={sessionUser?.id ?? null}
+                  isPremium={profileIsPremium}
+                />
               </Suspense>
             ) : isShortsRoute ? (
               <Suspense fallback={<div className="shortsPage" />}>

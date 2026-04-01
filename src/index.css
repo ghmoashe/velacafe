@@ -4792,6 +4792,76 @@ button:focus-visible {
   cursor: not-allowed;
 }
 
+.miniGamesSyncStatus {
+  padding: 12px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(214, 195, 166, 0.42);
+  background: rgba(255, 255, 255, 0.84);
+  color: #4a4174;
+  font-weight: 700;
+  box-shadow: 0 12px 20px rgba(34, 39, 46, 0.05);
+}
+
+.miniGamesSyncStatusError {
+  border-color: rgba(203, 92, 92, 0.28);
+  color: #a23838;
+}
+
+.miniGamesChallengeCard,
+.miniGamesLeaderboard {
+  display: grid;
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: 26px;
+  border: 1px solid rgba(214, 195, 166, 0.42);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 12px 20px rgba(34, 39, 46, 0.05);
+}
+
+.miniGamesChallengeCard {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.miniGamesChallengeEyebrow {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.miniGamesChallengeTitle {
+  font-size: 22px;
+  font-weight: 900;
+  color: #2b3156;
+}
+
+.miniGamesChallengeCopy {
+  margin: 0;
+  color: #5a5f7e;
+  font-weight: 600;
+}
+
+.miniGamesChallengeButton,
+.miniGamesLeaderboardTab {
+  min-height: 46px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #7a52ed, #6136d3);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.miniGamesChallengeButton:disabled,
+.miniGamesLeaderboardTab:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
 .miniGamesStage {
   display: grid;
   gap: 18px;
@@ -4806,6 +4876,14 @@ button:focus-visible {
   color: #ffffff;
   overflow: hidden;
   position: relative;
+}
+
+.miniGamesStageCorrect {
+  animation: miniGamesStagePulse 0.6s ease;
+}
+
+.miniGamesStageWrong {
+  animation: miniGamesStageShake 0.45s ease;
 }
 
 .miniGamesStage::before {
@@ -5168,6 +5246,14 @@ button:focus-visible {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
+.miniGamesResultPanelCorrect {
+  animation: miniGamesResultLift 0.45s ease;
+}
+
+.miniGamesResultPanelWrong {
+  animation: miniGamesResultShake 0.4s ease;
+}
+
 .miniGamesFeedbackBadge {
   display: flex;
   align-items: center;
@@ -5226,9 +5312,28 @@ button:focus-visible {
     0 16px 30px rgba(68, 42, 154, 0.25);
 }
 
+.miniGamesLivesEmptyCard {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 22px;
+  background: rgba(18, 12, 58, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.miniGamesLivesEmptyCard strong {
+  font-size: 20px;
+}
+
+.miniGamesLivesEmptyCard span {
+  color: rgba(245, 248, 255, 0.86);
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 .miniGamesStats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -5252,6 +5357,110 @@ button:focus-visible {
   line-height: 1;
 }
 
+.miniGamesLeaderboardHeader,
+.miniGamesLeaderboardRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.miniGamesLeaderboardTabs {
+  display: flex;
+  gap: 10px;
+}
+
+.miniGamesLeaderboardTab {
+  min-height: 40px;
+  padding: 0 14px;
+  background: rgba(70, 82, 137, 0.1);
+  color: #2b3156;
+}
+
+.miniGamesLeaderboardTabActive {
+  background: linear-gradient(180deg, #7a52ed, #6136d3);
+  color: #ffffff;
+}
+
+.miniGamesLeaderboardList {
+  display: grid;
+  gap: 10px;
+}
+
+.miniGamesLeaderboardRow {
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(96, 78, 177, 0.06);
+}
+
+.miniGamesLeaderboardRank,
+.miniGamesLeaderboardScore {
+  font-size: 18px;
+  font-weight: 900;
+  color: #2b3156;
+}
+
+.miniGamesLeaderboardAvatar {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(122, 82, 237, 0.14);
+  color: #2b3156;
+  font-weight: 900;
+  overflow: hidden;
+}
+
+.miniGamesLeaderboardAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.miniGamesLeaderboardMeta {
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+
+.miniGamesLeaderboardMeta strong {
+  color: #2b3156;
+}
+
+.miniGamesLeaderboardMeta span,
+.miniGamesLeaderboardEmpty {
+  color: #6d7088;
+  font-weight: 600;
+}
+
+@keyframes miniGamesStagePulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.01); }
+  100% { transform: scale(1); }
+}
+
+@keyframes miniGamesStageShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(3px); }
+}
+
+@keyframes miniGamesResultLift {
+  0% { transform: translateY(0); }
+  45% { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes miniGamesResultShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  50% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+}
+
 @media (max-width: 720px) {
   .miniGamesPage {
     width: min(100%, 420px);
@@ -5260,6 +5469,15 @@ button:focus-visible {
   .miniGamesModeRow,
   .miniGamesLevelRow {
     flex-wrap: wrap;
+  }
+
+  .miniGamesChallengeCard,
+  .miniGamesLeaderboardHeader,
+  .miniGamesLeaderboardRow,
+  .miniGamesLeaderboardTabs {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .miniGamesOptionsArticle,
