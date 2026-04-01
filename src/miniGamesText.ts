@@ -13,6 +13,8 @@ export type MiniGamesText = {
   statsBest: string;
   articlePrompt: string;
   translatePrompt: string;
+  translateInputPlaceholder?: string;
+  submitTranslation?: string;
   sentencePrompt: string;
   chatPrompt: string;
   chooseArticle: string;
@@ -73,6 +75,8 @@ const ENGLISH_TEXT: MiniGamesText = {
   statsBest: "Best streak",
   articlePrompt: "Choose the correct German article.",
   translatePrompt: "Choose the correct translation.",
+  translateInputPlaceholder: "Type the translation",
+  submitTranslation: "Check answer",
   sentencePrompt: "Put the words in the correct order.",
   chatPrompt: "Choose the best reply in the chat.",
   chooseArticle: "Pick der, die, or das.",
@@ -635,5 +639,8 @@ const MINI_GAMES_TEXT: Record<MiniGamesLocale, MiniGamesText> = {
 };
 
 export function getMiniGamesText(locale: string): MiniGamesText {
-  return MINI_GAMES_TEXT[locale as MiniGamesLocale] ?? MINI_GAMES_TEXT.en;
+  return {
+    ...ENGLISH_TEXT,
+    ...(MINI_GAMES_TEXT[locale as MiniGamesLocale] ?? MINI_GAMES_TEXT.en),
+  };
 }

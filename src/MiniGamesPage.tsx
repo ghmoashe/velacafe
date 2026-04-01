@@ -35,7 +35,6 @@ type ArticleRound = {
 type TranslationRound = {
   key: string;
   exercise: TranslationExercise;
-  options: string[];
 };
 
 type SentenceToken = {
@@ -66,7 +65,7 @@ const ARTICLE_OPTIONS: ArticleOption[] = ["der", "die", "das"];
 const LEVEL_OPTIONS: ExerciseLevel[] = ["A1", "A2", "B1"];
 const ROUND_DURATIONS: Record<GameMode, number> = {
   article: 10,
-  translate: 10,
+  translate: 30,
   sentence: 15,
   chat: 20,
 };
@@ -108,16 +107,9 @@ function createTranslationRound(
   seed: number,
 ): TranslationRound {
   const exercise = randomItem(exercises);
-  const distractors = shuffle(
-    exercises
-      .filter((entry) => entry.id !== exercise.id)
-      .map((entry) => entry.target)
-      .filter((target, index, list) => list.indexOf(target) === index),
-  ).slice(0, 3);
   return {
     key: `${exercise.id}-${seed}`,
     exercise,
-    options: shuffle([exercise.target, ...distractors]),
   };
 }
 
@@ -163,6 +155,16 @@ function renderStreakStars(streak: number): string {
   return `${"★".repeat(clamped)}${"☆".repeat(5 - clamped)}`;
 }
 
+function normalizeTranslationAnswer(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[’']/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase();
+}
+
 export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
   const text = getMiniGamesText(locale);
   const articleExercises = useMemo(() => getArticleExercises(locale), [locale]);
@@ -177,6 +179,7 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
   const [sentenceSeed, setSentenceSeed] = useState(0);
   const [chatSeed, setChatSeed] = useState(0);
   const [sentenceSelection, setSentenceSelection] = useState<string[]>([]);
+  const [translationInput, setTranslationInput] = useState("");
   const [stats, setStats] = useState(INITIAL_STATS);
   const [answerState, setAnswerState] = useState<AnswerState | null>(null);
   const [timeLeft, setTimeLeft] = useState(ROUND_DURATIONS.article);
@@ -271,6 +274,7 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
     setAnswerState(null);
     setTimeLeft(nextDuration);
     setSentenceSelection([]);
+    setTranslationInput("");
   }, []);
 
   const handleModeChange = (nextMode: GameMode) => {
@@ -341,9 +345,17 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
     const isCorrect = isArticleMode
       ? value === articleRound.exercise.article
       : isTranslateMode
-        ? value === translationRound.exercise.target
+        ? normalizeTranslationAnswer(value) ===
+          normalizeTranslationAnswer(translationRound.exercise.target)
         : value === chatRound.exercise.correctReply;
     resolveAnswer(value, isCorrect, false);
+  };
+
+  const handleTranslationSubmit = () => {
+    if (!isTranslateMode || answerState) return;
+    const nextValue = translationInput.trim();
+    if (!nextValue) return;
+    handleAnswer(nextValue);
   };
 
   const handleSentenceTokenSelect = (tokenId: string) => {
@@ -587,26 +599,37 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
                 );
               })
             : isTranslateMode
-              ? translationRound.options.map((option) => {
-                  const isCorrect = option === translationRound.exercise.target;
-                  const isSelected = answerState?.value === option;
-                  return (
-                    <button
-                      key={option}
-                      className={`miniGamesOption miniGamesOptionTranslate${
-                        answerState && isCorrect ? " miniGamesOptionCorrect" : ""
-                      }${
-                        answerState && isSelected && !isCorrect
-                          ? " miniGamesOptionWrong"
+              ? (
+                <form
+                  className="miniGamesTranslateComposer"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    handleTranslationSubmit();
+                  }}
+                >
+                  <input
+                    className={`miniGamesTranslateInput${
+                      answerState?.correct
+                        ? " miniGamesTranslateInputCorrect"
+                        : answerState
+                          ? " miniGamesTranslateInputWrong"
                           : ""
-                      }`}
-                      type="button"
-                      onClick={() => handleAnswer(option)}
-                    >
-                      <span className="miniGamesOptionBody">{option}</span>
-                    </button>
-                  );
-                })
+                    }`}
+                    type="text"
+                    value={translationInput}
+                    disabled={Boolean(answerState)}
+                    placeholder={text.translateInputPlaceholder ?? "Type the translation"}
+                    onChange={(event) => setTranslationInput(event.target.value)}
+                  />
+                  <button
+                    className="miniGamesTranslateSubmit"
+                    type="submit"
+                    disabled={!translationInput.trim() || Boolean(answerState)}
+                  >
+                    {text.submitTranslation ?? "Check answer"}
+                  </button>
+                </form>
+              )
               : isSentenceMode ? (
                 <div className="miniGamesSentenceBoard">
                   <div className="miniGamesSentenceAnswer">

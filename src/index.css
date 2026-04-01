@@ -4923,7 +4923,7 @@ button:focus-visible {
 }
 
 .miniGamesOptionsTranslate {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
 }
 
 .miniGamesOptionsSentence {
@@ -4975,6 +4975,65 @@ button:focus-visible {
 .miniGamesOptionChat {
   min-height: 74px;
   text-align: left;
+}
+
+.miniGamesTranslateComposer {
+  display: grid;
+  gap: 12px;
+}
+
+.miniGamesTranslateInput {
+  min-height: 72px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #2b3156;
+  font: inherit;
+  font-size: 24px;
+  font-weight: 800;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 10px 20px rgba(27, 24, 89, 0.16);
+}
+
+.miniGamesTranslateInput::placeholder {
+  color: rgba(43, 49, 86, 0.52);
+}
+
+.miniGamesTranslateInputCorrect {
+  box-shadow:
+    0 0 0 4px rgba(255, 255, 255, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 14px 24px rgba(43, 146, 83, 0.28);
+}
+
+.miniGamesTranslateInputWrong {
+  box-shadow:
+    0 0 0 4px rgba(255, 255, 255, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 14px 24px rgba(177, 47, 91, 0.24);
+}
+
+.miniGamesTranslateSubmit {
+  min-height: 62px;
+  border: 0;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffcf66, #ff9f43);
+  color: #4e2605;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.15),
+    0 12px 22px rgba(27, 24, 89, 0.18);
+}
+
+.miniGamesTranslateSubmit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .miniGamesChatPreview {
