@@ -160,7 +160,7 @@ const ROUND_SCORE_BONUS: Record<GameMode, number> = {
   sentence: 18,
   chat: 20,
 };
-const MAX_LIVES = 3;
+const MAX_LIVES = 10;
 const LIFE_REFILL_MS = 2 * 60 * 60 * 1000;
 
 const INITIAL_STATS: Record<GameMode, GameStats> = {

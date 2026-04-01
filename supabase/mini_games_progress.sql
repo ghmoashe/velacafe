@@ -13,7 +13,7 @@ create table if not exists public.mini_game_user_state (
   total_correct integer not null default 0,
   current_streak integer not null default 0,
   best_streak integer not null default 0,
-  lives integer not null default 3,
+  lives integer not null default 10,
   last_life_refill_at timestamptz not null default timezone('utc', now()),
   daily_challenge_date date,
   daily_challenge_score integer not null default 0,
@@ -21,7 +21,7 @@ create table if not exists public.mini_game_user_state (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
   constraint mini_game_user_state_lives_check
-    check (lives between 0 and 3),
+    check (lives between 0 and 10),
   constraint mini_game_user_state_attempts_check
     check (
       total_attempts >= 0
