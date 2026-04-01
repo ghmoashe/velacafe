@@ -6,6 +6,7 @@ export type MiniGamesText = {
   translateMode: string;
   sentenceMode: string;
   chatMode: string;
+  storyMode?: string;
   scoreBadge: string;
   timerBadge: string;
   statsAccuracy: string;
@@ -17,10 +18,12 @@ export type MiniGamesText = {
   submitTranslation?: string;
   sentencePrompt: string;
   chatPrompt: string;
+  storyPrompt?: string;
   chooseArticle: string;
   chooseTranslation: string;
   chooseSentence: string;
   chooseChat: string;
+  chooseStory?: string;
   correct: string;
   incorrect: string;
   nextQuestion: string;
@@ -32,6 +35,7 @@ export type MiniGamesText = {
   explainTranslation: string;
   explainSentence: string;
   explainChat: string;
+  explainStory?: string;
   timeout: string;
   articleMissingLabel: string;
   starsLabel: string;
@@ -41,6 +45,8 @@ export type MiniGamesText = {
   sentenceEmpty: string;
   chatHintLabel: string;
   chatScenarioLabel: string;
+  storyHintLabel?: string;
+  storyQuestionLabel?: string;
   levelFilterLabel: string;
   livesBadge?: string;
   livesInfinite?: string;
@@ -84,6 +90,7 @@ const ENGLISH_TEXT: MiniGamesText = {
   translateMode: "Translate words",
   sentenceMode: "Build sentence",
   chatMode: "Chat simulator",
+  storyMode: "Story mode",
   scoreBadge: "Score",
   timerBadge: "Time",
   statsAccuracy: "Accuracy",
@@ -95,10 +102,12 @@ const ENGLISH_TEXT: MiniGamesText = {
   submitTranslation: "Check answer",
   sentencePrompt: "Put the words in the correct order.",
   chatPrompt: "Choose the best reply in the chat.",
+  storyPrompt: "Read the scene and choose the best continuation.",
   chooseArticle: "Pick der, die, or das.",
   chooseTranslation: "Pick the right meaning.",
   chooseSentence: "Tap the words to build the sentence.",
   chooseChat: "Pick the most natural reply.",
+  chooseStory: "Pick the answer that fits the story best.",
   correct: "Correct",
   incorrect: "Not quite",
   nextQuestion: "Next question",
@@ -110,6 +119,7 @@ const ENGLISH_TEXT: MiniGamesText = {
   explainTranslation: "Repeat the pair aloud to lock it in faster.",
   explainSentence: "Build the sentence from left to right and listen for the rhythm.",
   explainChat: "Focus on the goal of the message: confirm, ask, help, or respond politely.",
+  explainStory: "Look for the response that solves the situation clearly and naturally.",
   timeout: "Time is up",
   articleMissingLabel: "Choose article:",
   starsLabel: "Streak",
@@ -119,6 +129,8 @@ const ENGLISH_TEXT: MiniGamesText = {
   sentenceEmpty: "Tap a word below to start the sentence.",
   chatHintLabel: "Meaning",
   chatScenarioLabel: "Scenario",
+  storyHintLabel: "Story",
+  storyQuestionLabel: "Question",
   levelFilterLabel: "Level filter",
   livesBadge: "Lives",
   livesInfinite: "Premium",

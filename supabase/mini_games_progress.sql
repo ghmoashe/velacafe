@@ -73,6 +73,27 @@ create table if not exists public.mini_game_daily_results (
     check (score >= 0)
 );
 
+alter table if exists public.mini_game_user_state
+  drop constraint if exists mini_game_user_state_lives_check;
+
+alter table if exists public.mini_game_user_state
+  add constraint mini_game_user_state_lives_check
+  check (lives between 0 and 10);
+
+alter table if exists public.mini_game_mode_progress
+  drop constraint if exists mini_game_mode_progress_mode_check;
+
+alter table if exists public.mini_game_mode_progress
+  add constraint mini_game_mode_progress_mode_check
+  check (mode in ('article', 'translate', 'sentence', 'chat', 'story'));
+
+alter table if exists public.mini_game_daily_results
+  drop constraint if exists mini_game_daily_results_mode_check;
+
+alter table if exists public.mini_game_daily_results
+  add constraint mini_game_daily_results_mode_check
+  check (mode in ('article', 'translate', 'sentence', 'chat', 'story'));
+
 create index if not exists mini_game_user_state_score_idx
   on public.mini_game_user_state(total_score desc, updated_at desc);
 

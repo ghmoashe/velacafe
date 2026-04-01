@@ -5012,6 +5012,10 @@ button:focus-visible {
   grid-template-columns: 1fr;
 }
 
+.miniGamesOptionsStory {
+  grid-template-columns: 1fr;
+}
+
 .miniGamesOption {
   min-height: 84px;
   border: 0;
@@ -5146,6 +5150,60 @@ button:focus-visible {
   font-size: 22px;
   font-weight: 800;
   line-height: 1.35;
+}
+
+.miniGamesStoryPreview {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 560px);
+  margin: 0 auto;
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  text-align: left;
+}
+
+.miniGamesStoryTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.miniGamesStoryTitle small {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(24, 48, 138, 0.42);
+  color: rgba(244, 248, 255, 0.88);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.miniGamesStorySetup,
+.miniGamesStoryQuestion {
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: rgba(8, 18, 69, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 12px 24px rgba(20, 17, 75, 0.12);
+  font-size: 20px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.miniGamesStoryQuestion strong {
+  color: rgba(255, 233, 165, 0.96);
+}
+
+.miniGamesOptionStory {
+  min-height: 82px;
 }
 
 .miniGamesSentenceBoard {

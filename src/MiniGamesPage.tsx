@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CHAT_EXERCISES,
   SENTENCE_EXERCISES,
+  STORY_EXERCISES,
   getArticleExercises,
   getTranslationExercises,
   type ArticleExercise,
   type ArticleOption,
   type ChatExercise,
   type SentenceExercise,
+  type StoryExercise,
   type TranslationExercise,
 } from "./miniGamesData";
 import { getMiniGamesText } from "./miniGamesText";
@@ -19,7 +21,7 @@ type MiniGamesPageProps = {
   isPremium?: boolean;
 };
 
-type GameMode = "article" | "translate" | "sentence" | "chat";
+type GameMode = "article" | "translate" | "sentence" | "chat" | "story";
 type ExerciseLevel = ArticleExercise["level"];
 
 type GameStats = {
@@ -55,6 +57,12 @@ type SentenceRound = {
 type ChatRound = {
   key: string;
   exercise: ChatExercise;
+  options: string[];
+};
+
+type StoryRound = {
+  key: string;
+  exercise: StoryExercise;
   options: string[];
 };
 
@@ -143,31 +151,35 @@ type DailyChallengeRound =
       translationRound: TranslationRound;
     }
   | { mode: "sentence"; level: ExerciseLevel; key: string; sentenceRound: SentenceRound }
-  | { mode: "chat"; level: ExerciseLevel; key: string; chatRound: ChatRound };
+  | { mode: "chat"; level: ExerciseLevel; key: string; chatRound: ChatRound }
+  | { mode: "story"; level: ExerciseLevel; key: string; storyRound: StoryRound };
 
 const ARTICLE_OPTIONS: ArticleOption[] = ["der", "die", "das"];
 const LEVEL_OPTIONS: ExerciseLevel[] = ["A1", "A2", "B1"];
-const GAME_MODE_ORDER: GameMode[] = ["article", "translate", "sentence", "chat"];
+const GAME_MODE_ORDER: GameMode[] = ["article", "translate", "sentence", "chat", "story"];
 const ROUND_DURATIONS: Record<GameMode, number> = {
   article: 10,
   translate: 30,
   sentence: 15,
   chat: 20,
+  story: 25,
 };
 const ROUND_SCORE_BONUS: Record<GameMode, number> = {
   article: 10,
   translate: 14,
   sentence: 18,
   chat: 20,
+  story: 22,
 };
 const MAX_LIVES = 10;
-const LIFE_REFILL_MS = 0.2 * 60 * 60 * 1000;
+const LIFE_REFILL_MS = 2 * 60 * 60 * 1000;
 
 const INITIAL_STATS: Record<GameMode, GameStats> = {
   article: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
   translate: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
   sentence: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
   chat: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
+  story: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
 };
 
 const INITIAL_OVERALL_PROGRESS: OverallProgress = {
@@ -254,6 +266,17 @@ function createChatRoundFromExercise(
   exercise: ChatExercise,
   seed: string | number,
 ): ChatRound {
+  return {
+    key: `${exercise.id}-${seed}`,
+    exercise,
+    options: shuffleWithSeed(exercise.options, `${exercise.id}-${seed}`),
+  };
+}
+
+function createStoryRoundFromExercise(
+  exercise: StoryExercise,
+  seed: string | number,
+): StoryRound {
   return {
     key: `${exercise.id}-${seed}`,
     exercise,
@@ -380,6 +403,8 @@ function getModeLabel(text: ReturnType<typeof getMiniGamesText>, mode: GameMode)
       return text.sentenceMode;
     case "chat":
       return text.chatMode;
+    case "story":
+      return text.storyMode ?? "Story mode";
   }
 }
 
@@ -434,6 +459,15 @@ function createChatRound(exercises: readonly ChatExercise[], seed: number): Chat
   };
 }
 
+function createStoryRound(exercises: readonly StoryExercise[], seed: number): StoryRound {
+  const exercise = randomItem(exercises);
+  return {
+    key: `${exercise.id}-${seed}`,
+    exercise,
+    options: shuffle(exercise.options),
+  };
+}
+
 function formatAccuracy(stats: GameStats): string {
   if (!stats.attempts) return "0%";
   return `${Math.round((stats.correct / stats.attempts) * 100)}%`;
@@ -464,13 +498,27 @@ function buildDailyChallengeRound(params: {
   translationExercises: readonly TranslationExercise[];
   sentenceExercises: readonly SentenceExercise[];
   chatExercises: readonly ChatExercise[];
+  storyExercises: readonly StoryExercise[];
 }): DailyChallengeRound {
-  const { challengeKey, articleExercises, translationExercises, sentenceExercises, chatExercises } =
-    params;
+  const {
+    challengeKey,
+    articleExercises,
+    translationExercises,
+    sentenceExercises,
+    chatExercises,
+    storyExercises,
+  } = params;
   const mode = GAME_MODE_ORDER[hashString(`${challengeKey}-mode`) % GAME_MODE_ORDER.length];
   const levelPools: Record<
     GameMode,
-    Record<ExerciseLevel, readonly ArticleExercise[] | readonly TranslationExercise[] | readonly SentenceExercise[] | readonly ChatExercise[]>
+    Record<
+      ExerciseLevel,
+      | readonly ArticleExercise[]
+      | readonly TranslationExercise[]
+      | readonly SentenceExercise[]
+      | readonly ChatExercise[]
+      | readonly StoryExercise[]
+    >
   > = {
     article: {
       A1: articleExercises.filter((exercise) => exercise.level === "A1"),
@@ -491,6 +539,11 @@ function buildDailyChallengeRound(params: {
       A1: chatExercises.filter((exercise) => exercise.level === "A1"),
       A2: chatExercises.filter((exercise) => exercise.level === "A2"),
       B1: chatExercises.filter((exercise) => exercise.level === "B1"),
+    },
+    story: {
+      A1: storyExercises.filter((exercise) => exercise.level === "A1"),
+      A2: storyExercises.filter((exercise) => exercise.level === "A2"),
+      B1: storyExercises.filter((exercise) => exercise.level === "B1"),
     },
   };
   const availableLevels = LEVEL_OPTIONS.filter(
@@ -534,6 +587,14 @@ function buildDailyChallengeRound(params: {
       ),
     };
   }
+  if (mode === "story") {
+    return {
+      key: challengeKey,
+      mode,
+      level,
+      storyRound: createStoryRoundFromExercise(exercise as StoryExercise, challengeKey),
+    };
+  }
   return {
     key: challengeKey,
     mode,
@@ -561,6 +622,7 @@ export default function MiniGamesPage({
   const [translationSeed, setTranslationSeed] = useState(0);
   const [sentenceSeed, setSentenceSeed] = useState(0);
   const [chatSeed, setChatSeed] = useState(0);
+  const [storySeed, setStorySeed] = useState(0);
   const [sentenceSelection, setSentenceSelection] = useState<string[]>([]);
   const [translationInput, setTranslationInput] = useState("");
   const [stats, setStats] = useState(INITIAL_STATS);
@@ -596,6 +658,8 @@ export default function MiniGamesPage({
         return SENTENCE_EXERCISES;
       case "chat":
         return CHAT_EXERCISES;
+      case "story":
+        return STORY_EXERCISES;
     }
   }, [articleExercises, mode, translationExercises]);
 
@@ -628,6 +692,10 @@ export default function MiniGamesPage({
     () => CHAT_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
     [effectiveLevel],
   );
+  const filteredStoryExercises = useMemo(
+    () => STORY_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
+    [effectiveLevel],
+  );
 
   const dailyChallengeRound = useMemo(
     () =>
@@ -637,6 +705,7 @@ export default function MiniGamesPage({
         translationExercises,
         sentenceExercises: SENTENCE_EXERCISES,
         chatExercises: CHAT_EXERCISES,
+        storyExercises: STORY_EXERCISES,
       }),
     [articleExercises, todayChallengeKey, translationExercises],
   );
@@ -670,6 +739,12 @@ export default function MiniGamesPage({
     }
     return createChatRound(filteredChatExercises, chatSeed);
   }, [chatSeed, dailyChallengeActive, dailyChallengeRound, filteredChatExercises]);
+  const storyRound = useMemo(() => {
+    if (dailyChallengeActive && dailyChallengeRound.mode === "story") {
+      return dailyChallengeRound.storyRound;
+    }
+    return createStoryRound(filteredStoryExercises, storySeed);
+  }, [dailyChallengeActive, dailyChallengeRound, filteredStoryExercises, storySeed]);
 
   const activeStats = stats[mode];
   const currentRoundDuration = ROUND_DURATIONS[mode];
@@ -677,6 +752,7 @@ export default function MiniGamesPage({
   const isTranslateMode = mode === "translate";
   const isSentenceMode = mode === "sentence";
   const isChatMode = mode === "chat";
+  const isStoryMode = mode === "story";
   const recoveredLivesState = recoverLivesState(livesState);
   const hasAvailableLives = recoveredLivesState.infinite || recoveredLivesState.lives > 0;
   const nextLifeCountdown = recoveredLivesState.infinite
@@ -688,7 +764,9 @@ export default function MiniGamesPage({
       ? translationRound.exercise
       : isSentenceMode
         ? sentenceRound.exercise
-        : chatRound.exercise;
+        : isChatMode
+          ? chatRound.exercise
+          : storyRound.exercise;
 
   const selectedSentenceTokens = useMemo(() => {
     const tokenMap = new Map(sentenceRound.tokens.map((token) => [token.id, token]));
@@ -884,7 +962,9 @@ export default function MiniGamesPage({
           ? translationExercises
           : nextMode === "sentence"
             ? SENTENCE_EXERCISES
-            : CHAT_EXERCISES;
+            : nextMode === "chat"
+              ? CHAT_EXERCISES
+              : STORY_EXERCISES;
     const nextLevels = LEVEL_OPTIONS.filter((entry) =>
       nextModeExercises.some((exercise) => exercise.level === entry),
     );
@@ -1045,7 +1125,11 @@ export default function MiniGamesPage({
       setSentenceSeed((value) => value + (wasDailyChallenge ? 2 : 1));
       return;
     }
-    setChatSeed((value) => value + (wasDailyChallenge ? 2 : 1));
+    if (isChatMode) {
+      setChatSeed((value) => value + (wasDailyChallenge ? 2 : 1));
+      return;
+    }
+    setStorySeed((value) => value + (wasDailyChallenge ? 2 : 1));
   };
 
   const handlePlayDailyChallenge = () => {
@@ -1063,7 +1147,9 @@ export default function MiniGamesPage({
       : isTranslateMode
         ? normalizeTranslationAnswer(value) ===
           normalizeTranslationAnswer(translationRound.exercise.target)
-        : value === chatRound.exercise.correctReply;
+        : isChatMode
+          ? value === chatRound.exercise.correctReply
+          : value === storyRound.exercise.correctAnswer;
     resolveAnswer(value, isCorrect, false);
   };
 
@@ -1269,7 +1355,9 @@ export default function MiniGamesPage({
         ? text.chooseTranslation
         : isSentenceMode
           ? text.chooseSentence
-          : text.chooseChat;
+          : isChatMode
+            ? text.chooseChat
+            : text.chooseStory ?? "Pick the answer that fits the story best.";
 
   const feedbackBody = answerState
     ? isArticleMode
@@ -1278,14 +1366,18 @@ export default function MiniGamesPage({
         ? `${translationRound.exercise.source} = ${translationRound.exercise.target}`
         : isSentenceMode
           ? `${sentenceRound.exercise.words.join(" ")} (${sentenceRound.exercise.translation})`
-          : `${chatRound.exercise.correctReply} (${chatRound.exercise.feedback})`
+          : isChatMode
+            ? `${chatRound.exercise.correctReply} (${chatRound.exercise.feedback})`
+            : `${storyRound.exercise.correctAnswer} (${storyRound.exercise.explanation})`
     : isArticleMode
       ? text.explainArticle
       : isTranslateMode
         ? text.explainTranslation
         : isSentenceMode
           ? text.explainSentence
-          : text.explainChat;
+          : isChatMode
+            ? text.explainChat
+            : text.explainStory ?? "Look for the response that solves the situation clearly and naturally.";
 
   return (
     <div className="miniGamesPage">
@@ -1325,6 +1417,15 @@ export default function MiniGamesPage({
           onClick={() => handleModeChange("chat")}
         >
           {text.chatMode}
+        </button>
+        <button
+          className={`miniGamesModeButton${
+            isStoryMode ? " miniGamesModeButtonActive" : ""
+          }`}
+          type="button"
+          onClick={() => handleModeChange("story")}
+        >
+          {text.storyMode ?? "Story mode"}
         </button>
       </div>
 
@@ -1444,6 +1545,18 @@ export default function MiniGamesPage({
                 {chatRound.exercise.incoming}
               </div>
             </div>
+          ) : isStoryMode ? (
+            <div className="miniGamesStoryPreview">
+              <div className="miniGamesStoryTitle">
+                <span>{storyRound.exercise.title}</span>
+                <small>{effectiveLevel}</small>
+              </div>
+              <div className="miniGamesStorySetup">{storyRound.exercise.setup}</div>
+              <div className="miniGamesStoryQuestion">
+                <strong>{text.storyQuestionLabel ?? "Question"}:</strong>{" "}
+                {storyRound.exercise.question}
+              </div>
+            </div>
           ) : (
             <div className="miniGamesWordLine">
               {isArticleMode ? (
@@ -1465,7 +1578,9 @@ export default function MiniGamesPage({
                 ? text.translatePrompt
                 : isSentenceMode
                   ? text.sentencePrompt
-                  : text.chatPrompt}
+                  : isChatMode
+                    ? text.chatPrompt
+                    : text.storyPrompt ?? "Read the scene and choose the best continuation."}
           </p>
           <p className="miniGamesHint">
             {isArticleMode ? (
@@ -1480,9 +1595,13 @@ export default function MiniGamesPage({
               <>
                 {text.sentenceHintLabel}: {sentenceRound.exercise.translation} ({effectiveLevel})
               </>
-            ) : (
+            ) : isChatMode ? (
               <>
                 {text.chatHintLabel}: {chatRound.exercise.translation} ({effectiveLevel})
+              </>
+            ) : (
+              <>
+                {text.storyHintLabel ?? "Story"}: {storyRound.exercise.translation} ({effectiveLevel})
               </>
             )}
           </p>
@@ -1496,7 +1615,9 @@ export default function MiniGamesPage({
                 ? "Translate"
                 : isSentenceMode
                   ? "Sentence"
-                  : "Chat"
+                  : isChatMode
+                    ? "Chat"
+                    : "Story"
           }`}
         >
           {isArticleMode
@@ -1613,7 +1734,7 @@ export default function MiniGamesPage({
                     </button>
                   </div>
                 </div>
-              ) : (
+              ) : isChatMode ? (
                 chatRound.options.map((option) => {
                   const isCorrect = option === chatRound.exercise.correctReply;
                   const isSelected = answerState?.value === option;
@@ -1621,6 +1742,28 @@ export default function MiniGamesPage({
                     <button
                       key={option}
                       className={`miniGamesOption miniGamesOptionTranslate miniGamesOptionChat${
+                        answerState && isCorrect ? " miniGamesOptionCorrect" : ""
+                      }${
+                        answerState && isSelected && !isCorrect
+                          ? " miniGamesOptionWrong"
+                          : ""
+                      }`}
+                      type="button"
+                      disabled={Boolean(answerState) || !hasAvailableLives}
+                      onClick={() => handleAnswer(option)}
+                    >
+                      <span className="miniGamesOptionBody">{option}</span>
+                    </button>
+                  );
+                })
+              ) : (
+                storyRound.options.map((option) => {
+                  const isCorrect = option === storyRound.exercise.correctAnswer;
+                  const isSelected = answerState?.value === option;
+                  return (
+                    <button
+                      key={option}
+                      className={`miniGamesOption miniGamesOptionTranslate miniGamesOptionStory${
                         answerState && isCorrect ? " miniGamesOptionCorrect" : ""
                       }${
                         answerState && isSelected && !isCorrect
