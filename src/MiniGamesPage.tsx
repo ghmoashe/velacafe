@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ARTICLE_EXERCISES,
   CHAT_EXERCISES,
   SENTENCE_EXERCISES,
-  TRANSLATION_EXERCISES,
+  getArticleExercises,
+  getTranslationExercises,
   type ArticleExercise,
   type ArticleOption,
   type ChatExercise,
@@ -163,22 +163,13 @@ function renderStreakStars(streak: number): string {
   return `${"★".repeat(clamped)}${"☆".repeat(5 - clamped)}`;
 }
 
-function getAvailableLevelsForMode(mode: GameMode): ExerciseLevel[] {
-  const exercises =
-    mode === "article"
-      ? ARTICLE_EXERCISES
-      : mode === "translate"
-        ? TRANSLATION_EXERCISES
-        : mode === "sentence"
-          ? SENTENCE_EXERCISES
-          : CHAT_EXERCISES;
-  return LEVEL_OPTIONS.filter((entry) =>
-    exercises.some((exercise) => exercise.level === entry),
-  );
-}
-
 export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
   const text = getMiniGamesText(locale);
+  const articleExercises = useMemo(() => getArticleExercises(locale), [locale]);
+  const translationExercises = useMemo(
+    () => getTranslationExercises(locale),
+    [locale],
+  );
   const [mode, setMode] = useState<GameMode>("article");
   const [level, setLevel] = useState<ExerciseLevel>("A1");
   const [articleSeed, setArticleSeed] = useState(0);
@@ -193,15 +184,15 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
   const modeExercises = useMemo(() => {
     switch (mode) {
       case "article":
-        return ARTICLE_EXERCISES;
+        return articleExercises;
       case "translate":
-        return TRANSLATION_EXERCISES;
+        return translationExercises;
       case "sentence":
         return SENTENCE_EXERCISES;
       case "chat":
         return CHAT_EXERCISES;
     }
-  }, [mode]);
+  }, [articleExercises, mode, translationExercises]);
 
   const availableLevels = useMemo(
     () =>
@@ -216,13 +207,13 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
     : availableLevels[0] ?? "A1";
 
   const filteredArticleExercises = useMemo(
-    () => ARTICLE_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
-    [effectiveLevel],
+    () => articleExercises.filter((exercise) => exercise.level === effectiveLevel),
+    [articleExercises, effectiveLevel],
   );
   const filteredTranslationExercises = useMemo(
     () =>
-      TRANSLATION_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
-    [effectiveLevel],
+      translationExercises.filter((exercise) => exercise.level === effectiveLevel),
+    [effectiveLevel, translationExercises],
   );
   const filteredSentenceExercises = useMemo(
     () => SENTENCE_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
@@ -283,7 +274,17 @@ export default function MiniGamesPage({ locale }: MiniGamesPageProps) {
   }, []);
 
   const handleModeChange = (nextMode: GameMode) => {
-    const nextLevels = getAvailableLevelsForMode(nextMode);
+    const nextModeExercises =
+      nextMode === "article"
+        ? articleExercises
+        : nextMode === "translate"
+          ? translationExercises
+          : nextMode === "sentence"
+            ? SENTENCE_EXERCISES
+            : CHAT_EXERCISES;
+    const nextLevels = LEVEL_OPTIONS.filter((entry) =>
+      nextModeExercises.some((exercise) => exercise.level === entry),
+    );
     setMode(nextMode);
     if (!nextLevels.includes(level)) {
       setLevel(nextLevels[0] ?? "A1");

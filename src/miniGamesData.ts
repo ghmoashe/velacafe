@@ -1,3 +1,5 @@
+import { getMiniGamesGloss, hasMiniGamesGloss } from "./miniGamesGlossary";
+
 export type ArticleOption = "der" | "die" | "das";
 
 export type ArticleExercise = {
@@ -208,23 +210,38 @@ function slugifyWord(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-function buildArticleExercises(): ArticleExercise[] {
+function buildArticleExercises(locale: string): ArticleExercise[] {
+  const localizedBase = ARTICLE_A1_BASE.filter(([, , hint]) =>
+    hasMiniGamesGloss(hint, locale),
+  );
+  const base = localizedBase.length ? localizedBase : ARTICLE_A1_BASE;
   return Array.from({ length: ARTICLE_EXERCISE_TARGET }, (_, index) => {
-    const seed = ARTICLE_A1_BASE[index % ARTICLE_A1_BASE.length];
+    const seed = base[index % base.length];
     const [noun, article, hint, emoji] = seed;
-    const variant = Math.floor(index / ARTICLE_A1_BASE.length) + 1;
+    const variant = Math.floor(index / base.length) + 1;
     return {
       id: `artikel-${slugifyWord(noun)}-${variant}`,
       noun,
       article,
-      hint,
+      hint: getMiniGamesGloss(hint, locale),
       emoji,
       level: "A1",
     };
   });
 }
 
-export const ARTICLE_EXERCISES: ArticleExercise[] = buildArticleExercises();
+const ARTICLE_EXERCISE_CACHE = new Map<string, ArticleExercise[]>();
+
+export function getArticleExercises(locale: string): ArticleExercise[] {
+  const cacheKey = locale || "en";
+  const cached = ARTICLE_EXERCISE_CACHE.get(cacheKey);
+  if (cached) return cached;
+  const built = buildArticleExercises(cacheKey);
+  ARTICLE_EXERCISE_CACHE.set(cacheKey, built);
+  return built;
+}
+
+export const ARTICLE_EXERCISES: ArticleExercise[] = getArticleExercises("en");
 
 const TRANSLATION_GENERAL_BASE: ReadonlyArray<TranslationSeed> = [
   ["gehen", "go", "🚶", "A1"],
@@ -376,15 +393,38 @@ const TRANSLATION_GENERAL_BASE: ReadonlyArray<TranslationSeed> = [
   ["bald", "soon", "🕐", "A2"],
 ];
 
-function buildTranslationExercises(): TranslationExercise[] {
+function buildTranslationExercises(locale: string): TranslationExercise[] {
+  const localizedArticleBase = ARTICLE_A1_BASE.filter(([, , hint]) =>
+    hasMiniGamesGloss(hint, locale),
+  ).map(([noun, , hint, emoji]) => [
+    noun,
+    getMiniGamesGloss(hint, locale),
+    emoji ?? "рџ“ќ",
+    "A1",
+  ] as const);
+  const localizedTranslationBase = TRANSLATION_GENERAL_BASE.filter(([, target]) =>
+    hasMiniGamesGloss(target, locale),
+  ).map(([source, target, emoji, level]) => [
+    source,
+    getMiniGamesGloss(target, locale),
+    emoji,
+    level,
+  ] as const);
+  void localizedArticleBase;
+  void localizedTranslationBase;
   const base: TranslationSeed[] = [
     ...ARTICLE_A1_BASE.map(([noun, , hint, emoji]) => [
       noun,
-      hint,
+      getMiniGamesGloss(hint, locale),
       emoji ?? "📝",
       "A1",
     ] as const),
-    ...TRANSLATION_GENERAL_BASE,
+    ...TRANSLATION_GENERAL_BASE.map(([source, target, emoji, level]) => [
+      source,
+      getMiniGamesGloss(target, locale),
+      emoji,
+      level,
+    ] as const),
   ];
 
   return Array.from({ length: TRANSLATION_EXERCISE_TARGET }, (_, index) => {
@@ -401,7 +441,71 @@ function buildTranslationExercises(): TranslationExercise[] {
   });
 }
 
-export const TRANSLATION_EXERCISES: TranslationExercise[] = buildTranslationExercises();
+function buildTranslationExercisesLocalized(locale: string): TranslationExercise[] {
+  const localizedArticleBase = ARTICLE_A1_BASE.filter(([, , hint]) =>
+    hasMiniGamesGloss(hint, locale),
+  ).map(([noun, , hint, emoji]) => [
+    noun,
+    getMiniGamesGloss(hint, locale),
+    emoji ?? "📝",
+    "A1",
+  ] as const);
+
+  const localizedTranslationBase = TRANSLATION_GENERAL_BASE.filter(([, target]) =>
+    hasMiniGamesGloss(target, locale),
+  ).map(([source, target, emoji, level]) => [
+    source,
+    getMiniGamesGloss(target, locale),
+    emoji,
+    level,
+  ] as const);
+
+  const base: TranslationSeed[] = [
+    ...(localizedArticleBase.length
+      ? localizedArticleBase
+      : ARTICLE_A1_BASE.map(([noun, , hint, emoji]) => [
+          noun,
+          getMiniGamesGloss(hint, locale),
+          emoji ?? "📝",
+          "A1",
+        ] as const)),
+    ...(localizedTranslationBase.length
+      ? localizedTranslationBase
+      : TRANSLATION_GENERAL_BASE.map(([source, target, emoji, level]) => [
+          source,
+          getMiniGamesGloss(target, locale),
+          emoji,
+          level,
+        ] as const)),
+  ];
+
+  return Array.from({ length: TRANSLATION_EXERCISE_TARGET }, (_, index) => {
+    const seed = base[index % base.length];
+    const [source, target, emoji, level] = seed;
+    const variant = Math.floor(index / base.length) + 1;
+    return {
+      id: `wort-${slugifyWord(source)}-${variant}`,
+      source,
+      target,
+      emoji,
+      level,
+    };
+  });
+}
+
+const TRANSLATION_EXERCISE_CACHE = new Map<string, TranslationExercise[]>();
+
+export function getTranslationExercises(locale: string): TranslationExercise[] {
+  const cacheKey = locale || "en";
+  const cached = TRANSLATION_EXERCISE_CACHE.get(cacheKey);
+  if (cached) return cached;
+  const localized = buildTranslationExercisesLocalized(cacheKey);
+  const built = localized.length ? localized : buildTranslationExercises(cacheKey);
+  TRANSLATION_EXERCISE_CACHE.set(cacheKey, built);
+  return built;
+}
+
+export const TRANSLATION_EXERCISES: TranslationExercise[] = getTranslationExercises("en");
 
 type SentenceStem = {
   words: string[];
