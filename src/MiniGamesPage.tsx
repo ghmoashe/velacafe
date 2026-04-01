@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CHAT_EXERCISES,
   SENTENCE_EXERCISES,
-  STORY_EXERCISES,
+  STORY_EPISODES,
   getArticleExercises,
   getTranslationExercises,
   type ArticleExercise,
   type ArticleOption,
   type ChatExercise,
   type SentenceExercise,
-  type StoryExercise,
+  type StoryEpisode,
   type TranslationExercise,
 } from "./miniGamesData";
 import { getMiniGamesText } from "./miniGamesText";
@@ -62,8 +62,13 @@ type ChatRound = {
 
 type StoryRound = {
   key: string;
-  exercise: StoryExercise;
-  options: string[];
+  episode: StoryEpisode;
+};
+
+type ResolveAnswerOptions = {
+  completeDaily?: boolean;
+  dailyScore?: number;
+  dailyCorrect?: boolean;
 };
 
 type AnswerState = {
@@ -273,14 +278,13 @@ function createChatRoundFromExercise(
   };
 }
 
-function createStoryRoundFromExercise(
-  exercise: StoryExercise,
+function createStoryRoundFromEpisode(
+  episode: StoryEpisode,
   seed: string | number,
 ): StoryRound {
   return {
-    key: `${exercise.id}-${seed}`,
-    exercise,
-    options: shuffleWithSeed(exercise.options, `${exercise.id}-${seed}`),
+    key: `${episode.id}-${seed}`,
+    episode,
   };
 }
 
@@ -459,12 +463,11 @@ function createChatRound(exercises: readonly ChatExercise[], seed: number): Chat
   };
 }
 
-function createStoryRound(exercises: readonly StoryExercise[], seed: number): StoryRound {
-  const exercise = randomItem(exercises);
+function createStoryRound(episodes: readonly StoryEpisode[], seed: number): StoryRound {
+  const episode = randomItem(episodes);
   return {
-    key: `${exercise.id}-${seed}`,
-    exercise,
-    options: shuffle(exercise.options),
+    key: `${episode.id}-${seed}`,
+    episode,
   };
 }
 
@@ -498,7 +501,7 @@ function buildDailyChallengeRound(params: {
   translationExercises: readonly TranslationExercise[];
   sentenceExercises: readonly SentenceExercise[];
   chatExercises: readonly ChatExercise[];
-  storyExercises: readonly StoryExercise[];
+  storyEpisodes: readonly StoryEpisode[];
 }): DailyChallengeRound {
   const {
     challengeKey,
@@ -506,7 +509,7 @@ function buildDailyChallengeRound(params: {
     translationExercises,
     sentenceExercises,
     chatExercises,
-    storyExercises,
+    storyEpisodes,
   } = params;
   const mode = GAME_MODE_ORDER[hashString(`${challengeKey}-mode`) % GAME_MODE_ORDER.length];
   const levelPools: Record<
@@ -517,7 +520,7 @@ function buildDailyChallengeRound(params: {
       | readonly TranslationExercise[]
       | readonly SentenceExercise[]
       | readonly ChatExercise[]
-      | readonly StoryExercise[]
+      | readonly StoryEpisode[]
     >
   > = {
     article: {
@@ -541,9 +544,9 @@ function buildDailyChallengeRound(params: {
       B1: chatExercises.filter((exercise) => exercise.level === "B1"),
     },
     story: {
-      A1: storyExercises.filter((exercise) => exercise.level === "A1"),
-      A2: storyExercises.filter((exercise) => exercise.level === "A2"),
-      B1: storyExercises.filter((exercise) => exercise.level === "B1"),
+      A1: storyEpisodes.filter((episode) => episode.level === "A1"),
+      A2: storyEpisodes.filter((episode) => episode.level === "A2"),
+      B1: storyEpisodes.filter((episode) => episode.level === "B1"),
     },
   };
   const availableLevels = LEVEL_OPTIONS.filter(
@@ -592,7 +595,7 @@ function buildDailyChallengeRound(params: {
       key: challengeKey,
       mode,
       level,
-      storyRound: createStoryRoundFromExercise(exercise as StoryExercise, challengeKey),
+      storyRound: createStoryRoundFromEpisode(exercise as StoryEpisode, challengeKey),
     };
   }
   return {
@@ -623,6 +626,9 @@ export default function MiniGamesPage({
   const [sentenceSeed, setSentenceSeed] = useState(0);
   const [chatSeed, setChatSeed] = useState(0);
   const [storySeed, setStorySeed] = useState(0);
+  const [storyDecisionIndex, setStoryDecisionIndex] = useState(0);
+  const [storyEpisodeScore, setStoryEpisodeScore] = useState(0);
+  const [storyEpisodeCorrectCount, setStoryEpisodeCorrectCount] = useState(0);
   const [sentenceSelection, setSentenceSelection] = useState<string[]>([]);
   const [translationInput, setTranslationInput] = useState("");
   const [stats, setStats] = useState(INITIAL_STATS);
@@ -659,7 +665,7 @@ export default function MiniGamesPage({
       case "chat":
         return CHAT_EXERCISES;
       case "story":
-        return STORY_EXERCISES;
+        return STORY_EPISODES;
     }
   }, [articleExercises, mode, translationExercises]);
 
@@ -692,8 +698,8 @@ export default function MiniGamesPage({
     () => CHAT_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
     [effectiveLevel],
   );
-  const filteredStoryExercises = useMemo(
-    () => STORY_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
+  const filteredStoryEpisodes = useMemo(
+    () => STORY_EPISODES.filter((episode) => episode.level === effectiveLevel),
     [effectiveLevel],
   );
 
@@ -705,7 +711,7 @@ export default function MiniGamesPage({
         translationExercises,
         sentenceExercises: SENTENCE_EXERCISES,
         chatExercises: CHAT_EXERCISES,
-        storyExercises: STORY_EXERCISES,
+        storyEpisodes: STORY_EPISODES,
       }),
     [articleExercises, todayChallengeKey, translationExercises],
   );
@@ -743,8 +749,8 @@ export default function MiniGamesPage({
     if (dailyChallengeActive && dailyChallengeRound.mode === "story") {
       return dailyChallengeRound.storyRound;
     }
-    return createStoryRound(filteredStoryExercises, storySeed);
-  }, [dailyChallengeActive, dailyChallengeRound, filteredStoryExercises, storySeed]);
+    return createStoryRound(filteredStoryEpisodes, storySeed);
+  }, [dailyChallengeActive, dailyChallengeRound, filteredStoryEpisodes, storySeed]);
 
   const activeStats = stats[mode];
   const currentRoundDuration = ROUND_DURATIONS[mode];
@@ -753,6 +759,18 @@ export default function MiniGamesPage({
   const isSentenceMode = mode === "sentence";
   const isChatMode = mode === "chat";
   const isStoryMode = mode === "story";
+  const currentStoryEpisode = storyRound.episode;
+  const currentStoryStep = currentStoryEpisode.steps[storyDecisionIndex] ?? currentStoryEpisode.steps[0];
+  const currentStoryStepOptions = useMemo(
+    () =>
+      shuffleWithSeed(
+        currentStoryStep.options,
+        `${storyRound.key}-${currentStoryStep.id}-${storyDecisionIndex}`,
+      ),
+    [currentStoryStep.id, currentStoryStep.options, storyDecisionIndex, storyRound.key],
+  );
+  const isFinalStoryDecision =
+    storyDecisionIndex === Math.max(0, currentStoryEpisode.steps.length - 1);
   const recoveredLivesState = recoverLivesState(livesState);
   const hasAvailableLives = recoveredLivesState.infinite || recoveredLivesState.lives > 0;
   const nextLifeCountdown = recoveredLivesState.infinite
@@ -766,7 +784,7 @@ export default function MiniGamesPage({
         ? sentenceRound.exercise
         : isChatMode
           ? chatRound.exercise
-          : storyRound.exercise;
+          : currentStoryEpisode;
 
   const selectedSentenceTokens = useMemo(() => {
     const tokenMap = new Map(sentenceRound.tokens.map((token) => [token.id, token]));
@@ -954,6 +972,12 @@ export default function MiniGamesPage({
     setTranslationInput("");
   }, []);
 
+  const resetStoryEpisodeState = useCallback(() => {
+    setStoryDecisionIndex(0);
+    setStoryEpisodeScore(0);
+    setStoryEpisodeCorrectCount(0);
+  }, []);
+
   const handleModeChange = (nextMode: GameMode) => {
     const nextModeExercises =
       nextMode === "article"
@@ -964,12 +988,13 @@ export default function MiniGamesPage({
             ? SENTENCE_EXERCISES
             : nextMode === "chat"
               ? CHAT_EXERCISES
-              : STORY_EXERCISES;
+              : STORY_EPISODES;
     const nextLevels = LEVEL_OPTIONS.filter((entry) =>
       nextModeExercises.some((exercise) => exercise.level === entry),
     );
     setDailyChallengeActive(false);
     setMode(nextMode);
+    resetStoryEpisodeState();
     if (!nextLevels.includes(level)) {
       setLevel(nextLevels[0] ?? "A1");
     }
@@ -980,11 +1005,21 @@ export default function MiniGamesPage({
     if (!availableLevels.includes(nextLevel) || nextLevel === effectiveLevel) return;
     setDailyChallengeActive(false);
     setLevel(nextLevel);
+    resetStoryEpisodeState();
     resetRoundState(ROUND_DURATIONS[mode]);
   };
 
+  useEffect(() => {
+    resetStoryEpisodeState();
+  }, [resetStoryEpisodeState, storyRound.key]);
+
   const resolveAnswer = useCallback(
-    (value: string | null, isCorrect: boolean, timedOut: boolean) => {
+    (
+      value: string | null,
+      isCorrect: boolean,
+      timedOut: boolean,
+      options?: ResolveAnswerOptions,
+    ) => {
       const nowIso = new Date().toISOString();
       const scoreDelta = isCorrect ? ROUND_SCORE_BONUS[mode] + timeLeft : 0;
       const nextModeStats: GameStats = {
@@ -1010,15 +1045,19 @@ export default function MiniGamesPage({
         ? recoverLivesState(recoveredLivesState, Date.parse(nowIso))
         : consumeLife(recoveredLivesState, nowIso);
       const shouldCompleteDaily =
-        dailyChallengeActive &&
-        dailyChallengeState.date === todayChallengeKey &&
-        !dailyChallengeState.completed;
+        typeof options?.completeDaily === "boolean"
+          ? options.completeDaily
+          : dailyChallengeActive &&
+            dailyChallengeState.date === todayChallengeKey &&
+            !dailyChallengeState.completed;
+      const dailyScore = options?.dailyScore ?? scoreDelta;
+      const dailyCorrect = options?.dailyCorrect ?? isCorrect;
       const nextDailyState: DailyChallengeState = shouldCompleteDaily
         ? {
             date: todayChallengeKey,
             completed: true,
-            score: scoreDelta,
-            correct: isCorrect,
+            score: dailyScore,
+            correct: dailyCorrect,
             mode,
             level: effectiveLevel,
           }
@@ -1073,8 +1112,8 @@ export default function MiniGamesPage({
                   user_id: sessionUserId,
                   mode,
                   level: effectiveLevel,
-                  score: scoreDelta,
-                  correct: isCorrect,
+                  score: dailyScore,
+                  correct: dailyCorrect,
                   completed_at: nowIso,
                 },
                 { onConflict: "challenge_date,user_id" },
@@ -1110,6 +1149,19 @@ export default function MiniGamesPage({
   );
 
   const handleNextQuestion = () => {
+    if (isStoryMode) {
+      if (!isFinalStoryDecision) {
+        setStoryDecisionIndex((value) => value + 1);
+        resetRoundState(currentRoundDuration);
+        return;
+      }
+      const wasDailyChallenge = dailyChallengeActive;
+      setDailyChallengeActive(false);
+      resetStoryEpisodeState();
+      resetRoundState(currentRoundDuration);
+      setStorySeed((value) => value + (wasDailyChallenge ? 2 : 1));
+      return;
+    }
     const wasDailyChallenge = dailyChallengeActive;
     setDailyChallengeActive(false);
     resetRoundState(currentRoundDuration);
@@ -1137,19 +1189,39 @@ export default function MiniGamesPage({
     setDailyChallengeActive(true);
     setMode(dailyChallengeRound.mode);
     setLevel(dailyChallengeRound.level);
+    resetStoryEpisodeState();
     resetRoundState(ROUND_DURATIONS[dailyChallengeRound.mode]);
   };
 
   const handleAnswer = (value: string) => {
     if (answerState || isSentenceMode || !hasAvailableLives) return;
+    if (isStoryMode) {
+      const isCorrect = value === currentStoryStep.correctAnswer;
+      const scoreDelta = isCorrect ? ROUND_SCORE_BONUS.story + timeLeft : 0;
+      const nextEpisodeScore = storyEpisodeScore + scoreDelta;
+      const nextEpisodeCorrectCount = storyEpisodeCorrectCount + (isCorrect ? 1 : 0);
+      const shouldCompleteDailyChallenge =
+        dailyChallengeActive &&
+        dailyChallengeState.date === todayChallengeKey &&
+        !dailyChallengeState.completed &&
+        isFinalStoryDecision;
+
+      setStoryEpisodeScore(nextEpisodeScore);
+      setStoryEpisodeCorrectCount(nextEpisodeCorrectCount);
+      resolveAnswer(value, isCorrect, false, {
+        completeDaily: shouldCompleteDailyChallenge,
+        dailyScore: nextEpisodeScore,
+        dailyCorrect: nextEpisodeCorrectCount === currentStoryEpisode.steps.length,
+      });
+      return;
+    }
+
     const isCorrect = isArticleMode
       ? value === articleRound.exercise.article
       : isTranslateMode
         ? normalizeTranslationAnswer(value) ===
           normalizeTranslationAnswer(translationRound.exercise.target)
-        : isChatMode
-          ? value === chatRound.exercise.correctReply
-          : value === storyRound.exercise.correctAnswer;
+        : value === chatRound.exercise.correctReply;
     resolveAnswer(value, isCorrect, false);
   };
 
@@ -1329,13 +1401,38 @@ export default function MiniGamesPage({
     if (answerState || !hasAvailableLives) return;
     const timeoutId = window.setTimeout(() => {
       if (timeLeft <= 1) {
-        resolveAnswer(null, false, true);
+        if (isStoryMode) {
+          const nextEpisodeScore = storyEpisodeScore;
+          const shouldCompleteDailyChallenge =
+            dailyChallengeActive &&
+            dailyChallengeState.date === todayChallengeKey &&
+            !dailyChallengeState.completed &&
+            isFinalStoryDecision;
+          resolveAnswer(null, false, true, {
+            completeDaily: shouldCompleteDailyChallenge,
+            dailyScore: nextEpisodeScore,
+            dailyCorrect: false,
+          });
+        } else {
+          resolveAnswer(null, false, true);
+        }
         return;
       }
       setTimeLeft((current) => current - 1);
     }, 1000);
     return () => window.clearTimeout(timeoutId);
-  }, [answerState, hasAvailableLives, resolveAnswer, timeLeft]);
+  }, [
+    answerState,
+    dailyChallengeActive,
+    dailyChallengeState,
+    hasAvailableLives,
+    isFinalStoryDecision,
+    isStoryMode,
+    resolveAnswer,
+    storyEpisodeScore,
+    timeLeft,
+    todayChallengeKey,
+  ]);
 
   useEffect(() => {
     if (!answerState) return;
@@ -1368,7 +1465,7 @@ export default function MiniGamesPage({
           ? `${sentenceRound.exercise.words.join(" ")} (${sentenceRound.exercise.translation})`
           : isChatMode
             ? `${chatRound.exercise.correctReply} (${chatRound.exercise.feedback})`
-            : `${storyRound.exercise.correctAnswer} (${storyRound.exercise.explanation})`
+            : `${currentStoryStep.correctAnswer} (${currentStoryStep.explanation})`
     : isArticleMode
       ? text.explainArticle
       : isTranslateMode
@@ -1378,6 +1475,25 @@ export default function MiniGamesPage({
           : isChatMode
             ? text.explainChat
             : text.explainStory ?? "Look for the response that solves the situation clearly and naturally.";
+  const storyDecisionLabel = `${
+    text.storyDecisionLabel ?? "Decision"
+  } ${Math.min(storyDecisionIndex + 1, currentStoryEpisode.steps.length)}/${currentStoryEpisode.steps.length}`;
+  const storyEpisodeScoreLabel = `${
+    text.storyEpisodeScoreLabel ?? "Episode score"
+  }: ${storyEpisodeScore}`;
+  const storyEpisodeResultLabel = `${
+    text.storyEpisodeResultLabel ?? "Episode result"
+  }: ${storyEpisodeCorrectCount}/${currentStoryEpisode.steps.length}`;
+  const storyHistory = currentStoryEpisode.steps.slice(0, storyDecisionIndex);
+  const nextButtonLabel = isStoryMode
+    ? isFinalStoryDecision
+      ? dailyChallengeActive
+        ? text.dailyChallengeBack ?? "Back to practice"
+        : text.nextEpisodeLabel ?? "Next episode"
+      : text.nextDecisionLabel ?? "Next decision"
+    : dailyChallengeActive
+      ? text.dailyChallengeBack ?? "Back to practice"
+      : text.nextQuestion;
 
   return (
     <div className="miniGamesPage">
@@ -1548,13 +1664,38 @@ export default function MiniGamesPage({
           ) : isStoryMode ? (
             <div className="miniGamesStoryPreview">
               <div className="miniGamesStoryTitle">
-                <span>{storyRound.exercise.title}</span>
+                <span>{currentStoryEpisode.title}</span>
                 <small>{effectiveLevel}</small>
               </div>
-              <div className="miniGamesStorySetup">{storyRound.exercise.setup}</div>
+              <div className="miniGamesStoryMetaRow">
+                <span className="miniGamesStoryMetaChip">
+                  {text.storySettingLabel ?? "Place"}: {currentStoryEpisode.setting}
+                </span>
+                <span className="miniGamesStoryMetaChip">{storyDecisionLabel}</span>
+                <span className="miniGamesStoryMetaChip">{storyEpisodeScoreLabel}</span>
+                {(currentStoryEpisode.characters ?? []).map((character) => (
+                  <span className="miniGamesStoryMetaChip" key={character}>
+                    {character}
+                  </span>
+                ))}
+              </div>
+              <div className="miniGamesStorySetup">{currentStoryEpisode.setup}</div>
+              {storyHistory.length ? (
+                <div className="miniGamesStoryBeats">
+                  {storyHistory.map((step, index) => (
+                    <div className="miniGamesStoryBeat" key={`${currentStoryEpisode.id}-beat-${step.id}`}>
+                      <span className="miniGamesStoryBeatIndex">{index + 1}</span>
+                      <span>{step.scene}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <div className="miniGamesStoryQuestion">
+                <strong>{text.storySceneLabel ?? "Scene"}:</strong> {currentStoryStep.scene}
+              </div>
               <div className="miniGamesStoryQuestion">
                 <strong>{text.storyQuestionLabel ?? "Question"}:</strong>{" "}
-                {storyRound.exercise.question}
+                {currentStoryStep.question}
               </div>
             </div>
           ) : (
@@ -1601,7 +1742,7 @@ export default function MiniGamesPage({
               </>
             ) : (
               <>
-                {text.storyHintLabel ?? "Story"}: {storyRound.exercise.translation} ({effectiveLevel})
+                {text.storyHintLabel ?? "Story"}: {currentStoryStep.translation} ({effectiveLevel})
               </>
             )}
           </p>
@@ -1757,12 +1898,12 @@ export default function MiniGamesPage({
                   );
                 })
               ) : (
-                storyRound.options.map((option) => {
-                  const isCorrect = option === storyRound.exercise.correctAnswer;
+                currentStoryStepOptions.map((option) => {
+                  const isCorrect = option === currentStoryStep.correctAnswer;
                   const isSelected = answerState?.value === option;
                   return (
                     <button
-                      key={option}
+                      key={`${currentStoryStep.id}-${option}`}
                       className={`miniGamesOption miniGamesOptionTranslate miniGamesOptionStory${
                         answerState && isCorrect ? " miniGamesOptionCorrect" : ""
                       }${
@@ -1831,14 +1972,20 @@ export default function MiniGamesPage({
             </span>
           </div>
 
+          {isStoryMode && (answerState || storyDecisionIndex > 0 || storyEpisodeScore > 0) ? (
+            <div className="miniGamesStoryEpisodeSummary">
+              <span>{storyEpisodeResultLabel}</span>
+              <strong>{storyEpisodeScoreLabel}</strong>
+            </div>
+          ) : null}
+
           <button
             className="miniGamesNextButton"
             type="button"
+            disabled={!answerState}
             onClick={handleNextQuestion}
           >
-            {dailyChallengeActive
-              ? text.dailyChallengeBack ?? "Back to practice"
-              : text.nextQuestion}{" "}
+            {nextButtonLabel}{" "}
             →
           </button>
         </div>

@@ -5185,6 +5185,24 @@ button:focus-visible {
   font-weight: 800;
 }
 
+.miniGamesStoryMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.miniGamesStoryMetaChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(24, 48, 138, 0.35);
+  color: rgba(244, 248, 255, 0.9);
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .miniGamesStorySetup,
 .miniGamesStoryQuestion {
   padding: 16px 18px;
@@ -5200,6 +5218,37 @@ button:focus-visible {
 
 .miniGamesStoryQuestion strong {
   color: rgba(255, 233, 165, 0.96);
+}
+
+.miniGamesStoryBeats {
+  display: grid;
+  gap: 10px;
+}
+
+.miniGamesStoryBeat {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  font-size: 18px;
+  font-weight: 720;
+  line-height: 1.4;
+}
+
+.miniGamesStoryBeatIndex {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffd86c, #ffb84d);
+  color: #5b2c0d;
+  font-size: 15px;
+  font-weight: 900;
 }
 
 .miniGamesOptionStory {
@@ -5354,6 +5403,22 @@ button:focus-visible {
   text-shadow: 0 4px 14px rgba(255, 203, 76, 0.32);
 }
 
+.miniGamesStoryEpisodeSummary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: rgba(12, 23, 81, 0.34);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 15px;
+}
+
+.miniGamesStoryEpisodeSummary strong {
+  color: #ffe998;
+}
+
 .miniGamesNextButton {
   min-height: 62px;
   border: 0;
@@ -5368,6 +5433,12 @@ button:focus-visible {
     inset 0 2px 0 rgba(255, 255, 255, 0.2),
     inset 0 -4px 0 rgba(61, 26, 128, 0.3),
     0 16px 30px rgba(68, 42, 154, 0.25);
+}
+
+.miniGamesNextButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .miniGamesLivesEmptyCard {

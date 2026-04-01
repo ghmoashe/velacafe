@@ -47,6 +47,14 @@ export type MiniGamesText = {
   chatScenarioLabel: string;
   storyHintLabel?: string;
   storyQuestionLabel?: string;
+  storySettingLabel?: string;
+  storyCharactersLabel?: string;
+  storySceneLabel?: string;
+  storyDecisionLabel?: string;
+  storyEpisodeScoreLabel?: string;
+  storyEpisodeResultLabel?: string;
+  nextDecisionLabel?: string;
+  nextEpisodeLabel?: string;
   levelFilterLabel: string;
   livesBadge?: string;
   livesInfinite?: string;
@@ -131,6 +139,14 @@ const ENGLISH_TEXT: MiniGamesText = {
   chatScenarioLabel: "Scenario",
   storyHintLabel: "Story",
   storyQuestionLabel: "Question",
+  storySettingLabel: "Place",
+  storyCharactersLabel: "Characters",
+  storySceneLabel: "Scene",
+  storyDecisionLabel: "Decision",
+  storyEpisodeScoreLabel: "Episode score",
+  storyEpisodeResultLabel: "Episode result",
+  nextDecisionLabel: "Next decision",
+  nextEpisodeLabel: "Next episode",
   levelFilterLabel: "Level filter",
   livesBadge: "Lives",
   livesInfinite: "Premium",
