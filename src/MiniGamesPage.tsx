@@ -527,6 +527,24 @@ function createStoryRoundFromEpisode(
   };
 }
 
+function fillExerciseGap(template: string, answer: string, revealAnswer: boolean): string {
+  return revealAnswer ? template.replace("___", answer) : template;
+}
+
+function renderExerciseGap(template: string, answer: string, revealAnswer: boolean) {
+  if (!revealAnswer || !template.includes("___")) {
+    return template;
+  }
+  const [before, after] = template.split("___", 2);
+  return (
+    <>
+      {before}
+      <span className="miniGamesRevealedArticle">{answer}</span>
+      {after}
+    </>
+  );
+}
+
 function getTodayChallengeKey() {
   const now = new Date();
   const year = now.getFullYear();
@@ -1319,8 +1337,20 @@ export default function MiniGamesPage({
         ? `${articleRound.exercise.article} ${articleRound.exercise.noun}`
         : articleRound.exercise.noun;
     }
-    if (isGrammarMode) return grammarRound.exercise.sentence;
-    if (isWQuestionMode) return wQuestionRound.exercise.answer;
+    if (isGrammarMode) {
+      return fillExerciseGap(
+        grammarRound.exercise.sentence,
+        grammarRound.exercise.correctAnswer,
+        Boolean(answerState),
+      );
+    }
+    if (isWQuestionMode) {
+      return fillExerciseGap(
+        wQuestionRound.exercise.questionTemplate,
+        wQuestionRound.exercise.correctAnswer,
+        Boolean(answerState),
+      );
+    }
     if (isTranslateMode) return translationRound.exercise.source;
     if (isSentenceMode) {
       return selectedSentenceTokens.length
@@ -1334,6 +1364,7 @@ export default function MiniGamesPage({
     answerState,
     articleRound.exercise.article,
     articleRound.exercise.noun,
+    grammarRound.exercise.correctAnswer,
     chatRound.exercise.incoming,
     currentStoryStep.scene,
     grammarRound.exercise.sentence,
@@ -1346,12 +1377,23 @@ export default function MiniGamesPage({
     isWQuestionMode,
     selectedSentenceTokens,
     translationRound.exercise.source,
-    wQuestionRound.exercise.answer,
+    wQuestionRound.exercise.correctAnswer,
+    wQuestionRound.exercise.questionTemplate,
   ]);
   const correctPronunciationText = useMemo(() => {
     if (isArticleMode) return `${articleRound.exercise.article} ${articleRound.exercise.noun}`;
-    if (isGrammarMode) return grammarRound.exercise.sentence;
-    if (isWQuestionMode) return wQuestionRound.exercise.answer;
+    if (isGrammarMode) {
+      return grammarRound.exercise.sentence.replace(
+        "___",
+        grammarRound.exercise.correctAnswer,
+      );
+    }
+    if (isWQuestionMode) {
+      return wQuestionRound.exercise.questionTemplate.replace(
+        "___",
+        wQuestionRound.exercise.correctAnswer,
+      );
+    }
     if (isTranslateMode) return translationRound.exercise.source;
     if (isSentenceMode) return sentenceRound.exercise.words.join(" ");
     if (isChatMode) return chatRound.exercise.correctReply;
@@ -1362,6 +1404,7 @@ export default function MiniGamesPage({
     articleRound.exercise.noun,
     chatRound.exercise.correctReply,
     currentStoryStep.correctAnswer,
+    grammarRound.exercise.correctAnswer,
     grammarRound.exercise.sentence,
     isArticleMode,
     isChatMode,
@@ -1372,7 +1415,8 @@ export default function MiniGamesPage({
     isWQuestionMode,
     sentenceRound.exercise.words,
     translationRound.exercise.source,
-    wQuestionRound.exercise.answer,
+    wQuestionRound.exercise.correctAnswer,
+    wQuestionRound.exercise.questionTemplate,
   ]);
   const canUseSpeechSynthesis =
     typeof window !== "undefined" &&
@@ -2617,7 +2661,13 @@ export default function MiniGamesPage({
                 className={`miniGamesWordLine${germanExerciseClassName}`}
                 {...germanExerciseTextProps}
               >
-                <span>{wQuestionRound.exercise.questionTemplate}</span>
+                <span>
+                  {renderExerciseGap(
+                    wQuestionRound.exercise.questionTemplate,
+                    wQuestionRound.exercise.correctAnswer,
+                    Boolean(answerState),
+                  )}
+                </span>
               </div>
             </>
           ) : (
@@ -2629,11 +2679,23 @@ export default function MiniGamesPage({
             >
               {isArticleMode ? (
                 <>
-                  <span className="miniGamesMissingArticle">___</span>
+                  <span
+                    className={
+                      answerState ? "miniGamesRevealedArticle" : "miniGamesMissingArticle"
+                    }
+                  >
+                    {answerState ? articleRound.exercise.article : "___"}
+                  </span>
                   <span>{articleRound.exercise.noun}</span>
                 </>
               ) : isGrammarMode ? (
-                <span>{grammarRound.exercise.sentence}</span>
+                <span>
+                  {renderExerciseGap(
+                    grammarRound.exercise.sentence,
+                    grammarRound.exercise.correctAnswer,
+                    Boolean(answerState),
+                  )}
+                </span>
               ) : isTranslateMode ? (
                 <span>{translationRound.exercise.source}</span>
               ) : (

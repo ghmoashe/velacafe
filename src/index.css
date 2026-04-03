@@ -5079,6 +5079,12 @@ button:focus-visible {
   opacity: 0.88;
 }
 
+.miniGamesRevealedArticle {
+  text-decoration: underline;
+  text-decoration-thickness: 0.11em;
+  text-underline-offset: 0.12em;
+}
+
 .miniGamesInstruction {
   margin: 0;
   font-size: 24px;
