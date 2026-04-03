@@ -1670,7 +1670,13 @@ export default function MiniGamesPage({
         setTtsMessage("");
         const voiceId = activeElevenLabsVoiceId;
         if (!voiceId) {
-          throw new Error("No ElevenLabs voice is available.");
+          setTtsMessage(
+            elevenLabsLoadingVoices
+              ? text.voiceLoadingLabel ?? "Loading voices..."
+              : ttsMessage.trim() ||
+                  "No ElevenLabs voice is available. Check your API key and voice setup.",
+          );
+          return;
         }
         const rate = rateOverride ?? speechRate;
         const cacheKey = `${voiceId}|${rate}|${trimmedValue}`;
@@ -1700,7 +1706,14 @@ export default function MiniGamesPage({
         );
       }
     },
-    [activeElevenLabsVoiceId, canUseElevenLabs, speechRate],
+    [
+      activeElevenLabsVoiceId,
+      canUseElevenLabs,
+      elevenLabsLoadingVoices,
+      speechRate,
+      text.voiceLoadingLabel,
+      ttsMessage,
+    ],
   );
 
   const resetRoundState = useCallback((nextDuration: number) => {
@@ -2302,7 +2315,11 @@ export default function MiniGamesPage({
         if (!active) return;
         setElevenLabsVoices(payload.voices);
         setElevenLabsDefaultVoiceId(payload.defaultVoiceId);
-        setTtsMessage("");
+        setTtsMessage(
+          payload.voices.length || payload.defaultVoiceId
+            ? ""
+            : "No ElevenLabs voices were returned. Check your API key and voice access.",
+        );
       })
       .catch((error) => {
         if (!active) return;
