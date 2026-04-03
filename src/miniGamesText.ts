@@ -3,6 +3,7 @@ export type MiniGamesText = {
   title: string;
   subtitle: string;
   articleMode: string;
+  grammarMode?: string;
   translateMode: string;
   sentenceMode: string;
   chatMode: string;
@@ -20,6 +21,7 @@ export type MiniGamesText = {
   chatPrompt: string;
   storyPrompt?: string;
   chooseArticle: string;
+  chooseGrammar?: string;
   chooseTranslation: string;
   chooseSentence: string;
   chooseChat: string;
@@ -32,6 +34,7 @@ export type MiniGamesText = {
   levelLabel: string;
   scoreLabel: string;
   explainArticle: string;
+  explainGrammar?: string;
   explainTranslation: string;
   explainSentence: string;
   explainChat: string;
@@ -55,6 +58,12 @@ export type MiniGamesText = {
   storyEpisodeResultLabel?: string;
   nextDecisionLabel?: string;
   nextEpisodeLabel?: string;
+  grammarTopicsLabel?: string;
+  grammarRuleLabel?: string;
+  grammarFlowLabel?: string;
+  grammarFocusLabel?: string;
+  grammarContrastLabel?: string;
+  grammarMixedLabel?: string;
   levelFilterLabel: string;
   livesBadge?: string;
   livesInfinite?: string;
@@ -95,6 +104,7 @@ const ENGLISH_TEXT: MiniGamesText = {
   subtitle:
     "Train vocabulary with quick rounds: guess the article, translate words, build sentences, and pick natural chat replies.",
   articleMode: "Guess article",
+  grammarMode: "Grammar cases",
   translateMode: "Translate words",
   sentenceMode: "Build sentence",
   chatMode: "Chat simulator",
@@ -112,6 +122,7 @@ const ENGLISH_TEXT: MiniGamesText = {
   chatPrompt: "Choose the best reply in the chat.",
   storyPrompt: "Read the scene and choose the best continuation.",
   chooseArticle: "Pick der, die, or das.",
+  chooseGrammar: "Choose the correct case form.",
   chooseTranslation: "Pick the right meaning.",
   chooseSentence: "Tap the words to build the sentence.",
   chooseChat: "Pick the most natural reply.",
@@ -124,6 +135,8 @@ const ENGLISH_TEXT: MiniGamesText = {
   levelLabel: "Level",
   scoreLabel: "Score",
   explainArticle: "Remember the noun together with its article.",
+  explainGrammar:
+    "Watch the signal word: verb, preposition, and movement vs. location decide the case.",
   explainTranslation: "Repeat the pair aloud to lock it in faster.",
   explainSentence: "Build the sentence from left to right and listen for the rhythm.",
   explainChat: "Focus on the goal of the message: confirm, ask, help, or respond politely.",
@@ -147,6 +160,12 @@ const ENGLISH_TEXT: MiniGamesText = {
   storyEpisodeResultLabel: "Episode result",
   nextDecisionLabel: "Next decision",
   nextEpisodeLabel: "Next episode",
+  grammarTopicsLabel: "Grammar topics",
+  grammarRuleLabel: "Rule",
+  grammarFlowLabel: "Training flow",
+  grammarFocusLabel: "Focus",
+  grammarContrastLabel: "Contrast",
+  grammarMixedLabel: "Mixed traps",
   levelFilterLabel: "Level filter",
   livesBadge: "Lives",
   livesInfinite: "Premium",
@@ -177,6 +196,7 @@ const MINI_GAMES_TEXT: Record<MiniGamesLocale, MiniGamesText> = {
     subtitle:
       "Trainiere deinen Wortschatz in schnellen Runden: Artikel raten, Wörter übersetzen, Sätze bauen und natürliche Chat-Antworten wählen.",
     articleMode: "Artikel raten",
+    grammarMode: "Fälle trainieren",
     translateMode: "Wörter übersetzen",
     sentenceMode: "Satz bauen",
     chatMode: "Chat-Simulator",
@@ -190,6 +210,7 @@ const MINI_GAMES_TEXT: Record<MiniGamesLocale, MiniGamesText> = {
     sentencePrompt: "Bringe die Wörter in die richtige Reihenfolge.",
     chatPrompt: "Wähle die beste Antwort im Chat.",
     chooseArticle: "Wähle der, die oder das.",
+    chooseGrammar: "Wähle die richtige Kasusform.",
     chooseTranslation: "Wähle die richtige Bedeutung.",
     chooseSentence: "Tippe auf die Wörter, um den Satz zu bauen.",
     chooseChat: "Wähle die natürlichste Antwort.",
@@ -201,6 +222,8 @@ const MINI_GAMES_TEXT: Record<MiniGamesLocale, MiniGamesText> = {
     levelLabel: "Niveau",
     scoreLabel: "Punkte",
     explainArticle: "Lerne das Nomen immer zusammen mit seinem Artikel.",
+    explainGrammar:
+      "Achte auf Signalwörter: Verb, Präposition und Bewegung oder Ort entscheiden den Fall.",
     explainTranslation: "Sprich das Wortpaar laut aus, damit es besser hängen bleibt.",
     explainSentence: "Baue den Satz von links nach rechts und achte auf den Rhythmus.",
     explainChat: "Achte auf das Ziel der Nachricht: bestätigen, fragen, helfen oder höflich reagieren.",
@@ -213,6 +236,12 @@ const MINI_GAMES_TEXT: Record<MiniGamesLocale, MiniGamesText> = {
     sentenceEmpty: "Tippe unten auf ein Wort, um den Satz zu starten.",
     chatHintLabel: "Bedeutung",
     chatScenarioLabel: "Situation",
+    grammarTopicsLabel: "Grammatikthemen",
+    grammarRuleLabel: "Regel",
+    grammarFlowLabel: "Trainingsfluss",
+    grammarFocusLabel: "Fokus",
+    grammarContrastLabel: "Kontrast",
+    grammarMixedLabel: "Mischfallen",
     levelFilterLabel: "Niveaufilter",
   },
   vi: {
@@ -265,6 +294,7 @@ const MINI_GAMES_TEXT: Record<MiniGamesLocale, MiniGamesText> = {
     subtitle:
       "Тренируй словарный запас в быстрых раундах: угадывай артикль, переводи слова, собирай предложения и выбирай естественные ответы в чате.",
     articleMode: "Угадай артикль",
+    grammarMode: "Падежи",
     translateMode: "Перевод слов",
     sentenceMode: "Собери предложение",
     chatMode: "Симулятор чата",
@@ -278,6 +308,7 @@ const MINI_GAMES_TEXT: Record<MiniGamesLocale, MiniGamesText> = {
     sentencePrompt: "Поставь слова в правильном порядке.",
     chatPrompt: "Выбери лучший ответ в чате.",
     chooseArticle: "Выбери der, die или das.",
+    chooseGrammar: "Выбери правильную падежную форму.",
     chooseTranslation: "Выбери правильное значение.",
     chooseSentence: "Нажимай на слова, чтобы собрать предложение.",
     chooseChat: "Выбери самый естественный ответ.",
@@ -289,6 +320,8 @@ const MINI_GAMES_TEXT: Record<MiniGamesLocale, MiniGamesText> = {
     levelLabel: "Уровень",
     scoreLabel: "Счёт",
     explainArticle: "Запоминай существительное сразу вместе с артиклем.",
+    explainGrammar:
+      "Смотри на сигнал в предложении: глагол, предлог и направление движения или место определяют падеж.",
     explainTranslation: "Повторяй пару слов вслух, чтобы быстрее запомнить.",
     explainSentence: "Собирай предложение слева направо и слушай его ритм.",
     explainChat: "Смотри на цель сообщения: подтвердить, спросить, помочь или ответить вежливо.",
@@ -301,6 +334,12 @@ const MINI_GAMES_TEXT: Record<MiniGamesLocale, MiniGamesText> = {
     sentenceEmpty: "Нажми на слово ниже, чтобы начать предложение.",
     chatHintLabel: "Значение",
     chatScenarioLabel: "Ситуация",
+    grammarTopicsLabel: "Темы грамматики",
+    grammarRuleLabel: "Правило",
+    grammarFlowLabel: "Тренировочный поток",
+    grammarFocusLabel: "Фокус",
+    grammarContrastLabel: "Контраст",
+    grammarMixedLabel: "Смешанные ловушки",
     levelFilterLabel: "Фильтр уровня",
   },
   uk: {

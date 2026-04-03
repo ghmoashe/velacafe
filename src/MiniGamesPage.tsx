@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CHAT_EXERCISES,
+  GRAMMAR_EXERCISES,
   SENTENCE_EXERCISES,
   STORY_EPISODES,
   getArticleExercises,
@@ -8,6 +9,8 @@ import {
   type ArticleExercise,
   type ArticleOption,
   type ChatExercise,
+  type GrammarExercise,
+  type GrammarTopic,
   type SentenceExercise,
   type StoryEpisode,
   type TranslationExercise,
@@ -21,7 +24,7 @@ type MiniGamesPageProps = {
   isPremium?: boolean;
 };
 
-type GameMode = "article" | "translate" | "sentence" | "chat" | "story";
+type GameMode = "article" | "grammar" | "translate" | "sentence" | "chat" | "story";
 type ExerciseLevel = ArticleExercise["level"];
 
 type GameStats = {
@@ -59,6 +62,19 @@ type ChatRound = {
   exercise: ChatExercise;
   options: string[];
 };
+
+type GrammarRound = {
+  key: string;
+  exercise: GrammarPracticeExercise;
+  options: string[];
+};
+
+type GrammarPracticeExercise = GrammarExercise & {
+  topic: GrammarTopic;
+  rule: string;
+};
+
+type GrammarLayer = "focus" | "contrast" | "mixed";
 
 type StoryRound = {
   key: string;
@@ -149,6 +165,7 @@ type DailyChallengeState = {
 
 type DailyChallengeRound =
   | { mode: "article"; level: ExerciseLevel; key: string; articleRound: ArticleRound }
+  | { mode: "grammar"; level: ExerciseLevel; key: string; grammarRound: GrammarRound }
   | {
       mode: "translate";
       level: ExerciseLevel;
@@ -161,9 +178,141 @@ type DailyChallengeRound =
 
 const ARTICLE_OPTIONS: ArticleOption[] = ["der", "die", "das"];
 const LEVEL_OPTIONS: ExerciseLevel[] = ["A1", "A2", "B1"];
-const GAME_MODE_ORDER: GameMode[] = ["article", "translate", "sentence", "chat", "story"];
+const GRAMMAR_TOPIC_ORDER: GrammarTopic[] = [
+  "akkusativ",
+  "dativ",
+  "wechselpraepositionen",
+  "genitiv",
+];
+const GRAMMAR_TOPIC_LABELS: Record<GrammarTopic, string> = {
+  akkusativ: "Akkusativ",
+  dativ: "Dativ",
+  wechselpraepositionen: "Wechselpraepositionen",
+  genitiv: "Genitiv",
+};
+const GRAMMAR_LAYER_THRESHOLDS = {
+  contrast: 3,
+  mixed: 6,
+} as const;
+const GRAMMAR_MASTERY_MAX = GRAMMAR_LAYER_THRESHOLDS.mixed;
+const GRAMMAR_TOPIC_CONFUSIONS: Record<GrammarTopic, GrammarTopic[]> = {
+  akkusativ: ["dativ", "wechselpraepositionen", "genitiv"],
+  dativ: ["akkusativ", "wechselpraepositionen", "genitiv"],
+  wechselpraepositionen: ["akkusativ", "dativ", "genitiv"],
+  genitiv: ["dativ", "akkusativ", "wechselpraepositionen"],
+};
+const GRAMMAR_EXERCISE_META: Record<
+  string,
+  { topic: GrammarTopic; rule: string }
+> = {
+  "grammar-a1-1": {
+    topic: "akkusativ",
+    rule: "The direct object takes Akkusativ.",
+  },
+  "grammar-a1-2": {
+    topic: "akkusativ",
+    rule: "The direct object takes Akkusativ.",
+  },
+  "grammar-a1-3": {
+    topic: "akkusativ",
+    rule: "`fuer` always takes Akkusativ.",
+  },
+  "grammar-a1-4": {
+    topic: "dativ",
+    rule: "`mit` always takes Dativ.",
+  },
+  "grammar-a1-5": {
+    topic: "dativ",
+    rule: "`helfen` takes Dativ.",
+  },
+  "grammar-a1-6": {
+    topic: "dativ",
+    rule: "`zu` always takes Dativ.",
+  },
+  "grammar-a1-7": {
+    topic: "akkusativ",
+    rule: "The direct object takes Akkusativ.",
+  },
+  "grammar-a2-1": {
+    topic: "wechselpraepositionen",
+    rule: "Movement with a Wechselpraeposition takes Akkusativ.",
+  },
+  "grammar-a2-2": {
+    topic: "wechselpraepositionen",
+    rule: "Location with a Wechselpraeposition takes Dativ.",
+  },
+  "grammar-a2-3": {
+    topic: "wechselpraepositionen",
+    rule: "Movement with a Wechselpraeposition takes Akkusativ.",
+  },
+  "grammar-a2-4": {
+    topic: "wechselpraepositionen",
+    rule: "Location with a Wechselpraeposition takes Dativ.",
+  },
+  "grammar-a2-5": {
+    topic: "wechselpraepositionen",
+    rule: "Movement with a Wechselpraeposition takes Akkusativ.",
+  },
+  "grammar-a2-6": {
+    topic: "wechselpraepositionen",
+    rule: "Location with a Wechselpraeposition takes Dativ.",
+  },
+  "grammar-a2-7": {
+    topic: "dativ",
+    rule: "The receiver of something is often in Dativ.",
+  },
+  "grammar-a2-8": {
+    topic: "akkusativ",
+    rule: "`warten auf` takes Akkusativ.",
+  },
+  "grammar-a2-9": {
+    topic: "dativ",
+    rule: "`mit` always takes Dativ.",
+  },
+  "grammar-a2-10": {
+    topic: "dativ",
+    rule: "The receiver of something is often in Dativ.",
+  },
+  "grammar-b1-1": {
+    topic: "genitiv",
+    rule: "`wegen` is normally used with Genitiv.",
+  },
+  "grammar-b1-2": {
+    topic: "genitiv",
+    rule: "`trotz` is normally used with Genitiv.",
+  },
+  "grammar-b1-3": {
+    topic: "genitiv",
+    rule: "Possession with a noun phrase uses Genitiv.",
+  },
+  "grammar-b1-4": {
+    topic: "akkusativ",
+    rule: "`sich erinnern an` takes Akkusativ.",
+  },
+  "grammar-b1-5": {
+    topic: "dativ",
+    rule: "`bei` always takes Dativ.",
+  },
+  "grammar-b1-6": {
+    topic: "genitiv",
+    rule: "`waehrend` is normally used with Genitiv.",
+  },
+  "grammar-b1-7": {
+    topic: "genitiv",
+    rule: "`statt` is normally used with Genitiv.",
+  },
+};
+const GAME_MODE_ORDER: GameMode[] = [
+  "article",
+  "grammar",
+  "translate",
+  "sentence",
+  "chat",
+  "story",
+];
 const ROUND_DURATIONS: Record<GameMode, number> = {
   article: 10,
+  grammar: 20,
   translate: 30,
   sentence: 15,
   chat: 20,
@@ -171,6 +320,7 @@ const ROUND_DURATIONS: Record<GameMode, number> = {
 };
 const ROUND_SCORE_BONUS: Record<GameMode, number> = {
   article: 10,
+  grammar: 18,
   translate: 14,
   sentence: 18,
   chat: 20,
@@ -181,6 +331,7 @@ const LIFE_REFILL_MS = 2 * 60 * 60 * 1000;
 
 const INITIAL_STATS: Record<GameMode, GameStats> = {
   article: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
+  grammar: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
   translate: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
   sentence: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
   chat: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
@@ -271,6 +422,26 @@ function createChatRoundFromExercise(
   exercise: ChatExercise,
   seed: string | number,
 ): ChatRound {
+  return {
+    key: `${exercise.id}-${seed}`,
+    exercise,
+    options: shuffleWithSeed(exercise.options, `${exercise.id}-${seed}`),
+  };
+}
+
+function enrichGrammarExercise(exercise: GrammarExercise): GrammarPracticeExercise {
+  const meta = GRAMMAR_EXERCISE_META[exercise.id];
+  return {
+    ...exercise,
+    topic: meta?.topic ?? "akkusativ",
+    rule: meta?.rule ?? "Choose the correct case form.",
+  };
+}
+
+function createGrammarRoundFromExercise(
+  exercise: GrammarPracticeExercise,
+  seed: string | number,
+): GrammarRound {
   return {
     key: `${exercise.id}-${seed}`,
     exercise,
@@ -401,6 +572,8 @@ function getModeLabel(text: ReturnType<typeof getMiniGamesText>, mode: GameMode)
   switch (mode) {
     case "article":
       return text.articleMode;
+    case "grammar":
+      return text.grammarMode ?? "Grammar cases";
     case "translate":
       return text.translateMode;
     case "sentence":
@@ -463,6 +636,44 @@ function createChatRound(exercises: readonly ChatExercise[], seed: number): Chat
   };
 }
 
+function createGrammarRound(
+  exercises: readonly GrammarPracticeExercise[],
+  seed: number,
+): GrammarRound {
+  const exercise = randomItem(exercises);
+  return {
+    key: `${exercise.id}-${seed}`,
+    exercise,
+    options: shuffle(exercise.options),
+  };
+}
+
+function createInitialGrammarMastery(): Record<GrammarTopic, number> {
+  return {
+    akkusativ: 0,
+    dativ: 0,
+    wechselpraepositionen: 0,
+    genitiv: 0,
+  };
+}
+
+function getGrammarLayer(mastery: number): GrammarLayer {
+  if (mastery >= GRAMMAR_LAYER_THRESHOLDS.mixed) {
+    return "mixed";
+  }
+  if (mastery >= GRAMMAR_LAYER_THRESHOLDS.contrast) {
+    return "contrast";
+  }
+  return "focus";
+}
+
+function getGrammarContrastTopics(
+  topic: GrammarTopic,
+  availableTopics: readonly GrammarTopic[],
+): GrammarTopic[] {
+  return GRAMMAR_TOPIC_CONFUSIONS[topic].filter((entry) => availableTopics.includes(entry));
+}
+
 function createStoryRound(episodes: readonly StoryEpisode[], seed: number): StoryRound {
   const episode = randomItem(episodes);
   return {
@@ -498,6 +709,7 @@ function normalizeTranslationAnswer(value: string): string {
 function buildDailyChallengeRound(params: {
   challengeKey: string;
   articleExercises: readonly ArticleExercise[];
+  grammarExercises: readonly GrammarPracticeExercise[];
   translationExercises: readonly TranslationExercise[];
   sentenceExercises: readonly SentenceExercise[];
   chatExercises: readonly ChatExercise[];
@@ -506,6 +718,7 @@ function buildDailyChallengeRound(params: {
   const {
     challengeKey,
     articleExercises,
+    grammarExercises,
     translationExercises,
     sentenceExercises,
     chatExercises,
@@ -517,6 +730,7 @@ function buildDailyChallengeRound(params: {
     Record<
       ExerciseLevel,
       | readonly ArticleExercise[]
+      | readonly GrammarPracticeExercise[]
       | readonly TranslationExercise[]
       | readonly SentenceExercise[]
       | readonly ChatExercise[]
@@ -527,6 +741,11 @@ function buildDailyChallengeRound(params: {
       A1: articleExercises.filter((exercise) => exercise.level === "A1"),
       A2: articleExercises.filter((exercise) => exercise.level === "A2"),
       B1: articleExercises.filter((exercise) => exercise.level === "B1"),
+    },
+    grammar: {
+      A1: grammarExercises.filter((exercise) => exercise.level === "A1"),
+      A2: grammarExercises.filter((exercise) => exercise.level === "A2"),
+      B1: grammarExercises.filter((exercise) => exercise.level === "B1"),
     },
     translate: {
       A1: translationExercises.filter((exercise) => exercise.level === "A1"),
@@ -564,6 +783,17 @@ function buildDailyChallengeRound(params: {
       level,
       articleRound: createArticleRoundFromExercise(
         exercise as ArticleExercise,
+        challengeKey,
+      ),
+    };
+  }
+  if (mode === "grammar") {
+    return {
+      key: challengeKey,
+      mode,
+      level,
+      grammarRound: createGrammarRoundFromExercise(
+        exercise as GrammarPracticeExercise,
         challengeKey,
       ),
     };
@@ -613,6 +843,10 @@ export default function MiniGamesPage({
 }: MiniGamesPageProps) {
   const text = getMiniGamesText(locale);
   const articleExercises = useMemo(() => getArticleExercises(locale), [locale]);
+  const grammarExercises = useMemo(
+    () => GRAMMAR_EXERCISES.map(enrichGrammarExercise),
+    [],
+  );
   const translationExercises = useMemo(
     () => getTranslationExercises(locale),
     [locale],
@@ -625,6 +859,11 @@ export default function MiniGamesPage({
   const [mode, setMode] = useState<GameMode>("article");
   const [level, setLevel] = useState<ExerciseLevel>("A1");
   const [articleSeed, setArticleSeed] = useState(0);
+  const [grammarSeed, setGrammarSeed] = useState(0);
+  const [grammarTopic, setGrammarTopic] = useState<GrammarTopic>("akkusativ");
+  const [grammarMastery, setGrammarMastery] = useState<Record<GrammarTopic, number>>(
+    () => createInitialGrammarMastery(),
+  );
   const [translationSeed, setTranslationSeed] = useState(0);
   const [sentenceSeed, setSentenceSeed] = useState(0);
   const [chatSeed, setChatSeed] = useState(0);
@@ -661,6 +900,8 @@ export default function MiniGamesPage({
     switch (mode) {
       case "article":
         return articleExercises;
+      case "grammar":
+        return grammarExercises;
       case "translate":
         return translationExercises;
       case "sentence":
@@ -670,7 +911,7 @@ export default function MiniGamesPage({
       case "story":
         return STORY_EPISODES;
     }
-  }, [articleExercises, mode, translationExercises]);
+  }, [articleExercises, grammarExercises, mode, translationExercises]);
 
   const availableLevels = useMemo(
     () =>
@@ -687,6 +928,17 @@ export default function MiniGamesPage({
   const filteredArticleExercises = useMemo(
     () => articleExercises.filter((exercise) => exercise.level === effectiveLevel),
     [articleExercises, effectiveLevel],
+  );
+  const filteredGrammarExercises = useMemo(
+    () => grammarExercises.filter((exercise) => exercise.level === effectiveLevel),
+    [effectiveLevel, grammarExercises],
+  );
+  const availableGrammarTopics = useMemo(
+    () =>
+      GRAMMAR_TOPIC_ORDER.filter((topic) =>
+        filteredGrammarExercises.some((exercise) => exercise.topic === topic),
+      ),
+    [filteredGrammarExercises],
   );
   const filteredTranslationExercises = useMemo(
     () =>
@@ -711,13 +963,96 @@ export default function MiniGamesPage({
       buildDailyChallengeRound({
         challengeKey: todayChallengeKey,
         articleExercises,
+        grammarExercises,
         translationExercises,
         sentenceExercises: SENTENCE_EXERCISES,
         chatExercises: CHAT_EXERCISES,
         storyEpisodes: STORY_EPISODES,
       }),
-    [articleExercises, todayChallengeKey, translationExercises],
+    [articleExercises, grammarExercises, todayChallengeKey, translationExercises],
   );
+  const currentGrammarTopic =
+    dailyChallengeActive && dailyChallengeRound.mode === "grammar"
+      ? dailyChallengeRound.grammarRound.exercise.topic
+      : availableGrammarTopics.includes(grammarTopic)
+        ? grammarTopic
+        : availableGrammarTopics[0] ?? "akkusativ";
+  const currentGrammarMastery = grammarMastery[currentGrammarTopic] ?? 0;
+  const currentGrammarLayer =
+    dailyChallengeActive && dailyChallengeRound.mode === "grammar"
+      ? "focus"
+      : getGrammarLayer(currentGrammarMastery);
+  const currentGrammarTopicLabel = GRAMMAR_TOPIC_LABELS[currentGrammarTopic];
+  const grammarContrastTopics = useMemo(
+    () => getGrammarContrastTopics(currentGrammarTopic, availableGrammarTopics),
+    [availableGrammarTopics, currentGrammarTopic],
+  );
+  const filteredGrammarTopicExercises = useMemo(
+    () =>
+      filteredGrammarExercises.filter(
+        (exercise) => exercise.topic === currentGrammarTopic,
+      ),
+    [currentGrammarTopic, filteredGrammarExercises],
+  );
+  const filteredGrammarContrastExercises = useMemo(
+    () =>
+      filteredGrammarExercises.filter((exercise) =>
+        grammarContrastTopics.includes(exercise.topic),
+      ),
+    [filteredGrammarExercises, grammarContrastTopics],
+  );
+  const grammarPracticeExercises = useMemo(() => {
+    if (currentGrammarLayer === "focus" || !filteredGrammarContrastExercises.length) {
+      return filteredGrammarTopicExercises;
+    }
+    if (currentGrammarLayer === "contrast") {
+      return [
+        ...filteredGrammarTopicExercises,
+        ...filteredGrammarTopicExercises,
+        ...filteredGrammarContrastExercises,
+      ];
+    }
+    return [
+      ...filteredGrammarTopicExercises,
+      ...filteredGrammarTopicExercises,
+      ...filteredGrammarTopicExercises,
+      ...filteredGrammarContrastExercises,
+    ];
+  }, [
+    currentGrammarLayer,
+    filteredGrammarContrastExercises,
+    filteredGrammarTopicExercises,
+  ]);
+  const currentGrammarLayerLabel =
+    currentGrammarLayer === "focus"
+      ? text.grammarFocusLabel ?? "Focus"
+      : currentGrammarLayer === "contrast"
+        ? text.grammarContrastLabel ?? "Contrast"
+        : text.grammarMixedLabel ?? "Mixed traps";
+  const currentGrammarContrastLabels = grammarContrastTopics.map(
+    (topic) => GRAMMAR_TOPIC_LABELS[topic],
+  );
+  const grammarPracticeTopicLabels = [
+    currentGrammarTopicLabel,
+    ...currentGrammarContrastLabels,
+  ];
+  const currentGrammarFlowProgress =
+    currentGrammarLayer === "focus"
+      ? `${currentGrammarMastery}/${GRAMMAR_LAYER_THRESHOLDS.contrast}`
+      : currentGrammarLayer === "contrast"
+        ? `${Math.max(
+            0,
+            currentGrammarMastery - GRAMMAR_LAYER_THRESHOLDS.contrast,
+          )}/${GRAMMAR_LAYER_THRESHOLDS.mixed - GRAMMAR_LAYER_THRESHOLDS.contrast}`
+        : `${GRAMMAR_MASTERY_MAX}/${GRAMMAR_MASTERY_MAX}`;
+  const currentGrammarFlowCopy =
+    currentGrammarLayer === "focus"
+      ? currentGrammarTopicLabel
+      : currentGrammarLayer === "contrast"
+        ? [currentGrammarTopicLabel, currentGrammarContrastLabels[0]]
+            .filter(Boolean)
+            .join(" + ")
+        : grammarPracticeTopicLabels.join(" + ");
 
   const articleRound = useMemo(() => {
     if (dailyChallengeActive && dailyChallengeRound.mode === "article") {
@@ -725,6 +1060,17 @@ export default function MiniGamesPage({
     }
     return createArticleRound(filteredArticleExercises, articleSeed);
   }, [articleSeed, dailyChallengeActive, dailyChallengeRound, filteredArticleExercises]);
+  const grammarRound = useMemo(() => {
+    if (dailyChallengeActive && dailyChallengeRound.mode === "grammar") {
+      return dailyChallengeRound.grammarRound;
+    }
+    return createGrammarRound(grammarPracticeExercises, grammarSeed);
+  }, [
+    dailyChallengeActive,
+    dailyChallengeRound,
+    grammarPracticeExercises,
+    grammarSeed,
+  ]);
   const translationRound = useMemo(() => {
     if (dailyChallengeActive && dailyChallengeRound.mode === "translate") {
       return dailyChallengeRound.translationRound;
@@ -758,6 +1104,7 @@ export default function MiniGamesPage({
   const activeStats = stats[mode];
   const currentRoundDuration = ROUND_DURATIONS[mode];
   const isArticleMode = mode === "article";
+  const isGrammarMode = mode === "grammar";
   const isTranslateMode = mode === "translate";
   const isSentenceMode = mode === "sentence";
   const isChatMode = mode === "chat";
@@ -781,6 +1128,8 @@ export default function MiniGamesPage({
     : formatCountdown(recoveredLivesState.nextRefillAt);
   const activeExercise = isArticleMode
     ? articleRound.exercise
+    : isGrammarMode
+      ? grammarRound.exercise
     : isTranslateMode
       ? translationRound.exercise
       : isSentenceMode
@@ -985,6 +1334,8 @@ export default function MiniGamesPage({
     const nextModeExercises =
       nextMode === "article"
         ? articleExercises
+        : nextMode === "grammar"
+          ? grammarExercises
         : nextMode === "translate"
           ? translationExercises
           : nextMode === "sentence"
@@ -1010,6 +1361,16 @@ export default function MiniGamesPage({
     setLevel(nextLevel);
     resetStoryEpisodeState();
     resetRoundState(ROUND_DURATIONS[mode]);
+  };
+
+  const handleGrammarTopicChange = (nextTopic: GrammarTopic) => {
+    if (!availableGrammarTopics.includes(nextTopic) || nextTopic === currentGrammarTopic) {
+      return;
+    }
+    setDailyChallengeActive(false);
+    setGrammarTopic(nextTopic);
+    resetStoryEpisodeState();
+    resetRoundState(ROUND_DURATIONS.grammar);
   };
 
   useEffect(() => {
@@ -1100,6 +1461,19 @@ export default function MiniGamesPage({
       setStats((current) => ({ ...current, [mode]: nextModeStats }));
       setOverallProgress(nextOverallProgress);
       setLivesState(nextLives);
+      if (mode === "grammar" && !dailyChallengeActive) {
+        setGrammarMastery((current) => {
+          const currentValue = current[currentGrammarTopic] ?? 0;
+          const nextValue = Math.max(
+            0,
+            Math.min(GRAMMAR_MASTERY_MAX, currentValue + (isCorrect ? 1 : -1)),
+          );
+          if (nextValue === currentValue) {
+            return current;
+          }
+          return { ...current, [currentGrammarTopic]: nextValue };
+        });
+      }
       if (shouldCompleteDaily) {
         setDailyChallengeState(nextDailyState);
       }
@@ -1168,6 +1542,7 @@ export default function MiniGamesPage({
       dailyChallengeState,
       effectiveLevel,
       getErrorMessage,
+      currentGrammarTopic,
       mode,
       overallProgress,
       persistUserStatePatch,
@@ -1199,6 +1574,10 @@ export default function MiniGamesPage({
     resetRoundState(currentRoundDuration);
     if (isArticleMode) {
       setArticleSeed((value) => value + (wasDailyChallenge ? 2 : 1));
+      return;
+    }
+    if (isGrammarMode) {
+      setGrammarSeed((value) => value + (wasDailyChallenge ? 2 : 1));
       return;
     }
     if (isTranslateMode) {
@@ -1250,6 +1629,8 @@ export default function MiniGamesPage({
 
     const isCorrect = isArticleMode
       ? value === articleRound.exercise.article
+      : isGrammarMode
+        ? value === grammarRound.exercise.correctAnswer
       : isTranslateMode
         ? normalizeTranslationAnswer(value) ===
           normalizeTranslationAnswer(translationRound.exercise.target)
@@ -1480,6 +1861,8 @@ export default function MiniGamesPage({
         : text.incorrect
     : isArticleMode
       ? text.chooseArticle
+      : isGrammarMode
+        ? text.chooseGrammar ?? "Choose the correct case form."
       : isTranslateMode
         ? text.chooseTranslation
         : isSentenceMode
@@ -1491,6 +1874,8 @@ export default function MiniGamesPage({
   const feedbackBody = answerState
     ? isArticleMode
       ? `${articleRound.exercise.article} ${articleRound.exercise.noun} (${articleRound.exercise.hint})`
+      : isGrammarMode
+        ? `${grammarRound.exercise.correctAnswer} (${grammarRound.exercise.explanation})`
       : isTranslateMode
         ? `${translationRound.exercise.source} = ${translationRound.exercise.target}`
         : isSentenceMode
@@ -1500,9 +1885,12 @@ export default function MiniGamesPage({
             : `${currentStoryStep.correctAnswer} (${currentStoryStep.explanation})`
     : isArticleMode
       ? text.explainArticle
+      : isGrammarMode
+        ? text.explainGrammar ??
+          "Watch the signal word: verb, preposition, and movement vs. location decide the case."
       : isTranslateMode
         ? text.explainTranslation
-        : isSentenceMode
+      : isSentenceMode
           ? text.explainSentence
           : isChatMode
             ? text.explainChat
@@ -1538,6 +1926,15 @@ export default function MiniGamesPage({
           onClick={() => handleModeChange("article")}
         >
           {text.articleMode}
+        </button>
+        <button
+          className={`miniGamesModeButton${
+            isGrammarMode ? " miniGamesModeButtonActive" : ""
+          }`}
+          type="button"
+          onClick={() => handleModeChange("grammar")}
+        >
+          {text.grammarMode ?? "Grammar cases"}
         </button>
         <button
           className={`miniGamesModeButton${
@@ -1596,6 +1993,32 @@ export default function MiniGamesPage({
           );
         })}
       </div>
+
+      {isGrammarMode ? (
+        <div
+          className="miniGamesLevelRow miniGamesGrammarTopicRow"
+          role="tablist"
+          aria-label={text.grammarTopicsLabel ?? "Grammar topics"}
+        >
+          {GRAMMAR_TOPIC_ORDER.map((topic) => {
+            const isAvailable = availableGrammarTopics.includes(topic);
+            const isActive = currentGrammarTopic === topic;
+            return (
+              <button
+                key={topic}
+                className={`miniGamesLevelButton miniGamesGrammarTopicButton${
+                  isActive ? " miniGamesLevelButtonActive" : ""
+                }`}
+                type="button"
+                disabled={!isAvailable}
+                onClick={() => handleGrammarTopicChange(topic)}
+              >
+                {GRAMMAR_TOPIC_LABELS[topic]}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {persistenceStatus.type === "error" ? (
         <div className="miniGamesSyncStatus miniGamesSyncStatusError" role="status">
@@ -1681,6 +2104,25 @@ export default function MiniGamesPage({
         </div>
 
         <div className="miniGamesQuestionBlock">
+          {isGrammarMode && !dailyChallengeActive ? (
+            <div className="miniGamesGrammarFlow">
+              <span className="miniGamesGrammarFlowLabel">
+                {text.grammarFlowLabel ?? "Training flow"}
+              </span>
+              <span className="miniGamesGrammarFlowChip">{currentGrammarLayerLabel}</span>
+              <span className="miniGamesGrammarFlowProgress">{currentGrammarFlowProgress}</span>
+              <span className="miniGamesGrammarFlowText">{currentGrammarFlowCopy}</span>
+            </div>
+          ) : null}
+          {isGrammarMode ? (
+            <div className="miniGamesGrammarRule">
+              <span className="miniGamesGrammarRuleLabel">
+                {text.grammarRuleLabel ?? "Rule"}
+              </span>
+              <span className="miniGamesGrammarRuleTopic">{currentGrammarTopicLabel}</span>
+              <span className="miniGamesGrammarRuleText">{grammarRound.exercise.rule}</span>
+            </div>
+          ) : null}
           {isChatMode ? (
             <div className="miniGamesChatPreview">
               <div className="miniGamesChatMeta">
@@ -1737,6 +2179,8 @@ export default function MiniGamesPage({
                   <span className="miniGamesMissingArticle">___</span>
                   <span>{articleRound.exercise.noun}</span>
                 </>
+              ) : isGrammarMode ? (
+                <span>{grammarRound.exercise.sentence}</span>
               ) : isTranslateMode ? (
                 <span>{translationRound.exercise.source}</span>
               ) : (
@@ -1747,6 +2191,8 @@ export default function MiniGamesPage({
           <p className="miniGamesInstruction">
             {isArticleMode
               ? text.articleMissingLabel
+              : isGrammarMode
+                ? grammarRound.exercise.question
               : isTranslateMode
                 ? text.translatePrompt
                 : isSentenceMode
@@ -1759,6 +2205,11 @@ export default function MiniGamesPage({
             {isArticleMode ? (
               <>
                 {text.hintLabel}: {articleRound.exercise.hint}
+              </>
+            ) : isGrammarMode ? (
+              <>
+                {text.hintLabel}: {grammarRound.exercise.translation} (
+                {effectiveLevel} / {currentGrammarTopicLabel})
               </>
             ) : isTranslateMode ? (
               <>
@@ -1784,6 +2235,8 @@ export default function MiniGamesPage({
           className={`miniGamesOptions miniGamesOptions${
             isArticleMode
               ? "Article"
+              : isGrammarMode
+                ? "Grammar"
               : isTranslateMode
                 ? "Translate"
                 : isSentenceMode
@@ -1815,6 +2268,28 @@ export default function MiniGamesPage({
                   </button>
                 );
               })
+            : isGrammarMode
+              ? grammarRound.options.map((option) => {
+                  const isCorrect = option === grammarRound.exercise.correctAnswer;
+                  const isSelected = answerState?.value === option;
+                  return (
+                    <button
+                      key={`${grammarRound.exercise.id}-${option}`}
+                      className={`miniGamesOption miniGamesOptionTranslate miniGamesOptionGrammar${
+                        answerState && isCorrect ? " miniGamesOptionCorrect" : ""
+                      }${
+                        answerState && isSelected && !isCorrect
+                          ? " miniGamesOptionWrong"
+                          : ""
+                      }`}
+                      type="button"
+                      disabled={Boolean(answerState) || !hasAvailableLives}
+                      onClick={() => handleAnswer(option)}
+                    >
+                      <span className="miniGamesOptionBody">{option}</span>
+                    </button>
+                  );
+                })
             : isTranslateMode
               ? (
                 <form

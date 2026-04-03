@@ -40,6 +40,26 @@ export type ChatExercise = {
   level: "A1" | "A2" | "B1";
 };
 
+export type GrammarTopic =
+  | "akkusativ"
+  | "dativ"
+  | "wechselpraepositionen"
+  | "genitiv";
+
+export type GrammarExercise = {
+  id: string;
+  sentence: string;
+  translation: string;
+  question: string;
+  topic?: GrammarTopic;
+  rule?: string;
+  correctAnswer: string;
+  options: string[];
+  explanation: string;
+  emoji: string;
+  level: "A1" | "A2" | "B1";
+};
+
 export type StoryExercise = {
   id: string;
   title: string;
@@ -234,6 +254,58 @@ const ARTICLE_A1_BASE: ReadonlyArray<ArticleSeed> = [
   ["Ohr", "das", "ear", "👂"],
   ["Gesicht", "das", "face", "🙂"],
   ["Bein", "das", "leg", "🦵"],
+  ["Familie", "die", "family", "👨‍👩‍👧‍👦"],
+  ["Kollege", "der", "colleague", "👥"],
+  ["Schrank", "der", "wardrobe", "🗄️"],
+  ["Balkon", "der", "balcony", "🏙️"],
+  ["Schokolade", "die", "chocolate", "🍫"],
+  ["Obst", "das", "fruit", "🍎"],
+  ["Tag", "der", "day", "📅"],
+  ["Zeit", "die", "time", "⏰"],
+  ["Morgen", "der", "morning", "🌅"],
+  ["Abend", "der", "evening", "🌙"],
+  ["Arbeit", "die", "work", "💼"],
+  ["Termin", "der", "appointment", "📆"],
+  ["Pause", "die", "break", "☕"],
+  ["Weg", "der", "way", "🛣️"],
+  ["Straße", "die", "street", "🛣️"],
+  ["Platz", "der", "square", "🏙️"],
+  ["Geschäft", "das", "shop", "🏪"],
+  ["Supermarkt", "der", "supermarket", "🛒"],
+  ["Haltestelle", "die", "stop", "🚏"],
+  ["Bahnhof", "der", "station", "🚉"],
+  ["Ticket", "das", "ticket", "🎫"],
+  ["Reise", "die", "trip", "🧳"],
+  ["Frage", "die", "question", "❓"],
+  ["Problem", "das", "problem", "⚠️"],
+  ["Sprache", "die", "language", "🗣️"],
+  ["Wort", "das", "word", "🔤"],
+  ["Satz", "der", "sentence", "💬"],
+  ["Idee", "die", "idea", "💡"],
+  ["Hilfe", "die", "help", "🤝"],
+  ["Anfang", "der", "beginning", "🏁"],
+  ["Lösung", "die", "solution", "✅"],
+  ["Fehler", "der", "mistake", "⚠️"],
+  ["Beispiel", "das", "example", "📝"],
+  ["Übung", "die", "exercise", "📝"],
+  ["Lernen", "das", "learning", "📚"],
+  ["Erfahrung", "die", "experience", "🌍"],
+  ["Erfolg", "der", "success", "🏆"],
+  ["Kuli", "der", "pen", "🖊️"],
+  ["Buch", "das", "book", "📘"],
+  ["Heft", "das", "notebook", "📓"],
+  ["Tasche", "die", "bag", "👜"],
+  ["Brille", "die", "glasses", "👓"],
+  ["Geld", "das", "money", "💶"],
+  ["Karte", "die", "map", "🗺️"],
+  ["Ausweis", "der", "id card", "🪪"],
+  ["Formular", "das", "form", "📄"],
+  ["Rechnung", "die", "bill", "🧾"],
+  ["Vertrag", "der", "contract", "📑"],
+  ["Nummer", "die", "number", "🔢"],
+  ["Name", "der", "name", "🏷️"],
+  ["Adresse", "die", "address", "📍"],
+  ["Preis", "der", "price", "💶"],
 ];
 
 function slugifyWord(value: string): string {
@@ -248,14 +320,12 @@ function slugifyWord(value: string): string {
 }
 
 function buildArticleExercises(locale: string): ArticleExercise[] {
-  const localizedBase = ARTICLE_A1_BASE.filter(([, , hint]) =>
-    hasMiniGamesGloss(hint, locale),
-  );
-  const base = localizedBase.length ? localizedBase : ARTICLE_A1_BASE;
+  // Keep the article pool stable across locales. If a glossary entry is missing,
+  // the hint falls back to the source gloss instead of dropping the noun.
   return Array.from({ length: ARTICLE_EXERCISE_TARGET }, (_, index) => {
-    const seed = base[index % base.length];
+    const seed = ARTICLE_A1_BASE[index % ARTICLE_A1_BASE.length];
     const [noun, article, hint, emoji] = seed;
-    const variant = Math.floor(index / base.length) + 1;
+    const variant = Math.floor(index / ARTICLE_A1_BASE.length) + 1;
     return {
       id: `artikel-${slugifyWord(noun)}-${variant}`,
       noun,
@@ -2377,6 +2447,273 @@ export const STORY_EXERCISES: StoryExercise[] = STORY_SCENE_GROUPS.flatMap((grou
     level: variant.level,
   })),
 );
+
+export const GRAMMAR_EXERCISES: GrammarExercise[] = [
+  {
+    id: "grammar-a1-1",
+    sentence: "Ich sehe ___ Mann im Park.",
+    translation: "I see the man in the park.",
+    question: "Which form fits the direct object?",
+    correctAnswer: "den",
+    options: ["der", "den", "dem", "des"],
+    explanation: "`sehen` takes Akkusativ. Masculine changes from `der` to `den`.",
+    emoji: "👀",
+    level: "A1",
+  },
+  {
+    id: "grammar-a1-2",
+    sentence: "Wir besuchen ___ Freundin am Abend.",
+    translation: "We are visiting the female friend in the evening.",
+    question: "Which article is correct in Akkusativ feminine?",
+    correctAnswer: "die",
+    options: ["die", "der", "den", "des"],
+    explanation: "Akkusativ feminine keeps the article `die`.",
+    emoji: "👭",
+    level: "A1",
+  },
+  {
+    id: "grammar-a1-3",
+    sentence: "Das Geschenk ist fuer ___ Kind.",
+    translation: "The gift is for the child.",
+    question: "Which form follows `fuer`?",
+    correctAnswer: "das",
+    options: ["der", "dem", "das", "des"],
+    explanation: "`fuer` always takes Akkusativ. Neuter stays `das`.",
+    emoji: "🎁",
+    level: "A1",
+  },
+  {
+    id: "grammar-a1-4",
+    sentence: "Ich fahre mit ___ Bus zur Arbeit.",
+    translation: "I go to work by bus.",
+    question: "Which form follows `mit`?",
+    correctAnswer: "dem",
+    options: ["den", "der", "dem", "des"],
+    explanation: "`mit` takes Dativ. `der Bus` becomes `dem Bus`.",
+    emoji: "🚌",
+    level: "A1",
+  },
+  {
+    id: "grammar-a1-5",
+    sentence: "Er hilft ___ Frau mit dem Formular.",
+    translation: "He helps the woman with the form.",
+    question: "Which form is correct after `helfen`?",
+    correctAnswer: "der",
+    options: ["die", "der", "den", "das"],
+    explanation: "`helfen` takes Dativ. Feminine changes from `die` to `der`.",
+    emoji: "🤝",
+    level: "A1",
+  },
+  {
+    id: "grammar-a1-6",
+    sentence: "Wir gehen zu ___ Bahnhof.",
+    translation: "We are going to the station.",
+    question: "Which form is correct after `zu`?",
+    correctAnswer: "dem",
+    options: ["den", "der", "dem", "des"],
+    explanation: "`zu` takes Dativ. `der Bahnhof` becomes `dem Bahnhof`.",
+    emoji: "🚉",
+    level: "A1",
+  },
+  {
+    id: "grammar-a1-7",
+    sentence: "Sie kauft ___ Apfel im Supermarkt.",
+    translation: "She buys the apple in the supermarket.",
+    question: "Which form fits the direct object?",
+    correctAnswer: "den",
+    options: ["den", "dem", "der", "des"],
+    explanation: "`kaufen` takes Akkusativ. Masculine changes to `den`.",
+    emoji: "🛒",
+    level: "A1",
+  },
+  {
+    id: "grammar-a2-1",
+    sentence: "Ich stelle die Lampe auf ___ Tisch.",
+    translation: "I put the lamp onto the table.",
+    question: "Movement or location: which form is correct?",
+    correctAnswer: "den",
+    options: ["den", "dem", "der", "des"],
+    explanation: "Movement with `auf` takes Akkusativ: `auf den Tisch`.",
+    emoji: "💡",
+    level: "A2",
+  },
+  {
+    id: "grammar-a2-2",
+    sentence: "Die Lampe steht auf ___ Tisch.",
+    translation: "The lamp is standing on the table.",
+    question: "Movement or location: which form is correct?",
+    correctAnswer: "dem",
+    options: ["den", "dem", "der", "des"],
+    explanation: "Location with `auf` takes Dativ: `auf dem Tisch`.",
+    emoji: "💡",
+    level: "A2",
+  },
+  {
+    id: "grammar-a2-3",
+    sentence: "Wir gehen in ___ Kueche.",
+    translation: "We are going into the kitchen.",
+    question: "Which form fits a destination with `in`?",
+    correctAnswer: "die",
+    options: ["die", "der", "den", "dem"],
+    explanation: "Movement into a place takes Akkusativ: `in die Kueche`.",
+    emoji: "🚶",
+    level: "A2",
+  },
+  {
+    id: "grammar-a2-4",
+    sentence: "Wir lernen in ___ Kueche.",
+    translation: "We study in the kitchen.",
+    question: "Which form fits a location with `in`?",
+    correctAnswer: "der",
+    options: ["die", "der", "den", "dem"],
+    explanation: "Location in a place takes Dativ: `in der Kueche`.",
+    emoji: "📚",
+    level: "A2",
+  },
+  {
+    id: "grammar-a2-5",
+    sentence: "Er haengt das Foto an ___ Wand.",
+    translation: "He hangs the photo onto the wall.",
+    question: "Which form fits a destination with `an`?",
+    correctAnswer: "die",
+    options: ["die", "der", "den", "dem"],
+    explanation: "Movement to a surface takes Akkusativ: `an die Wand`.",
+    emoji: "🖼️",
+    level: "A2",
+  },
+  {
+    id: "grammar-a2-6",
+    sentence: "Das Foto haengt an ___ Wand.",
+    translation: "The photo is hanging on the wall.",
+    question: "Which form fits a fixed location with `an`?",
+    correctAnswer: "der",
+    options: ["die", "der", "den", "dem"],
+    explanation: "Location on a surface takes Dativ: `an der Wand`.",
+    emoji: "🖼️",
+    level: "A2",
+  },
+  {
+    id: "grammar-a2-7",
+    sentence: "Die Lehrerin erklaert ___ Studenten die Regel.",
+    translation: "The teacher explains the rule to the student.",
+    question: "Which form fits the receiver of the explanation?",
+    correctAnswer: "dem",
+    options: ["den", "dem", "der", "des"],
+    explanation: "The person receiving something is often in Dativ: `dem Studenten`.",
+    emoji: "🧠",
+    level: "A2",
+  },
+  {
+    id: "grammar-a2-8",
+    sentence: "Wir warten auf ___ Bus.",
+    translation: "We are waiting for the bus.",
+    question: "Which form follows `warten auf`?",
+    correctAnswer: "den",
+    options: ["den", "dem", "der", "des"],
+    explanation: "`warten auf` takes Akkusativ: `auf den Bus`.",
+    emoji: "⏳",
+    level: "A2",
+  },
+  {
+    id: "grammar-a2-9",
+    sentence: "Sie spricht mit ___ Aerztin ueber den Termin.",
+    translation: "She is speaking with the doctor about the appointment.",
+    question: "Which form follows `mit`?",
+    correctAnswer: "der",
+    options: ["die", "der", "den", "dem"],
+    explanation: "`mit` takes Dativ. Feminine becomes `der`.",
+    emoji: "🩺",
+    level: "A2",
+  },
+  {
+    id: "grammar-a2-10",
+    sentence: "Ich schenke ___ Kind ein Buch.",
+    translation: "I give the child a book.",
+    question: "Which form marks the receiver?",
+    correctAnswer: "dem",
+    options: ["das", "den", "dem", "des"],
+    explanation: "The receiver is in Dativ: `dem Kind`.",
+    emoji: "📘",
+    level: "A2",
+  },
+  {
+    id: "grammar-b1-1",
+    sentence: "Wegen ___ Problems komme ich spaeter.",
+    translation: "Because of the problem, I am coming later.",
+    question: "Which form is standard after `wegen`?",
+    correctAnswer: "des",
+    options: ["den", "dem", "des", "das"],
+    explanation: "`wegen` is normally used with Genitiv: `wegen des Problems`.",
+    emoji: "⚠️",
+    level: "B1",
+  },
+  {
+    id: "grammar-b1-2",
+    sentence: "Trotz ___ Regens gehen wir spazieren.",
+    translation: "In spite of the rain, we are going for a walk.",
+    question: "Which form is standard after `trotz`?",
+    correctAnswer: "des",
+    options: ["den", "dem", "des", "das"],
+    explanation: "`trotz` normally takes Genitiv: `trotz des Regens`.",
+    emoji: "🌧️",
+    level: "B1",
+  },
+  {
+    id: "grammar-b1-3",
+    sentence: "Das ist das Auto ___ neuen Kollegen.",
+    translation: "That is the new colleague's car.",
+    question: "Which article starts the Genitiv phrase?",
+    correctAnswer: "des",
+    options: ["den", "dem", "des", "der"],
+    explanation: "Possession with a masculine noun uses Genitiv: `des neuen Kollegen`.",
+    emoji: "🚗",
+    level: "B1",
+  },
+  {
+    id: "grammar-b1-4",
+    sentence: "Ich erinnere mich an ___ ersten Tag in Berlin.",
+    translation: "I remember the first day in Berlin.",
+    question: "Which form follows `sich erinnern an`?",
+    correctAnswer: "den",
+    options: ["den", "dem", "des", "der"],
+    explanation: "`sich erinnern an` takes Akkusativ: `an den ersten Tag`.",
+    emoji: "🧳",
+    level: "B1",
+  },
+  {
+    id: "grammar-b1-5",
+    sentence: "Sie bedankt sich bei ___ netten Nachbarin.",
+    translation: "She thanks the nice neighbor.",
+    question: "Which form follows `bei`?",
+    correctAnswer: "der",
+    options: ["die", "der", "den", "dem"],
+    explanation: "`bei` takes Dativ. Feminine becomes `der`.",
+    emoji: "🙏",
+    level: "B1",
+  },
+  {
+    id: "grammar-b1-6",
+    sentence: "Waehrend ___ Kurses sind die Handys aus.",
+    translation: "During the course, the phones are off.",
+    question: "Which form is standard after `waehrend`?",
+    correctAnswer: "des",
+    options: ["den", "dem", "des", "der"],
+    explanation: "`waehrend` is normally used with Genitiv: `waehrend des Kurses`.",
+    emoji: "📵",
+    level: "B1",
+  },
+  {
+    id: "grammar-b1-7",
+    sentence: "Statt ___ Autos nehmen wir den Zug.",
+    translation: "Instead of the car, we are taking the train.",
+    question: "Which form is standard after `statt`?",
+    correctAnswer: "des",
+    options: ["den", "dem", "des", "das"],
+    explanation: "`statt` normally takes Genitiv: `statt des Autos`.",
+    emoji: "🚆",
+    level: "B1",
+  },
+];
 
 export const STORY_EPISODES: StoryEpisode[] = [
   {

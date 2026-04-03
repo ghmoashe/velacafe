@@ -4762,6 +4762,10 @@ button:focus-visible {
   justify-content: center;
 }
 
+.miniGamesGrammarTopicRow {
+  flex-wrap: wrap;
+}
+
 .miniGamesLevelButton {
   min-width: 78px;
   min-height: 38px;
@@ -4790,6 +4794,10 @@ button:focus-visible {
 .miniGamesLevelButton:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.miniGamesGrammarTopicButton {
+  min-width: 140px;
 }
 
 .miniGamesSyncStatus {
@@ -4961,6 +4969,87 @@ button:focus-visible {
   display: grid;
   gap: 10px;
   text-align: center;
+}
+
+.miniGamesGrammarFlow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 10px;
+  margin: 0 auto;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.12);
+  max-width: min(100%, 760px);
+}
+
+.miniGamesGrammarFlowLabel {
+  color: rgba(239, 245, 255, 0.72);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.miniGamesGrammarFlowChip,
+.miniGamesGrammarFlowProgress {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.miniGamesGrammarFlowChip {
+  background: rgba(97, 214, 255, 0.18);
+  color: #d7fbff;
+}
+
+.miniGamesGrammarFlowProgress {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.miniGamesGrammarFlowText {
+  color: rgba(255, 255, 255, 0.94);
+  font-weight: 700;
+}
+
+.miniGamesGrammarRule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 10px;
+  margin: 0 auto 6px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  background: rgba(26, 47, 137, 0.28);
+  max-width: min(100%, 720px);
+}
+
+.miniGamesGrammarRuleLabel {
+  color: rgba(239, 245, 255, 0.72);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.miniGamesGrammarRuleTopic {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 227, 122, 0.16);
+  color: #fff2b4;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.miniGamesGrammarRuleText {
+  color: rgba(255, 255, 255, 0.94);
+  font-weight: 700;
 }
 
 .miniGamesWordLine {
