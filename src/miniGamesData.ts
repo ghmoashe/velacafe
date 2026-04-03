@@ -8,7 +8,7 @@ export type ArticleExercise = {
   article: ArticleOption;
   hint: string;
   emoji?: string;
-  level: "A1" | "A2" | "B1";
+  level: "A1" | "A2" | "B1" | "B2";
 };
 
 export type TranslationExercise = {
@@ -16,7 +16,7 @@ export type TranslationExercise = {
   source: string;
   target: string;
   emoji: string;
-  level: "A1" | "A2" | "B1";
+  level: "A1" | "A2" | "B1" | "B2";
 };
 
 export type SentenceExercise = {
@@ -24,7 +24,7 @@ export type SentenceExercise = {
   translation: string;
   words: string[];
   emoji: string;
-  level: "A1" | "A2" | "B1";
+  level: "A1" | "A2" | "B1" | "B2";
 };
 
 export type ChatExercise = {
@@ -37,7 +37,7 @@ export type ChatExercise = {
   options: string[];
   feedback: string;
   emoji: string;
-  level: "A1" | "A2" | "B1";
+  level: "A1" | "A2" | "B1" | "B2";
 };
 
 export type GrammarTopic =
@@ -57,7 +57,7 @@ export type GrammarExercise = {
   options: string[];
   explanation: string;
   emoji: string;
-  level: "A1" | "A2" | "B1";
+  level: "A1" | "A2" | "B1" | "B2";
 };
 
 export type StoryExercise = {
@@ -73,7 +73,7 @@ export type StoryExercise = {
   options: string[];
   explanation: string;
   emoji: string;
-  level: "A1" | "A2" | "B1";
+  level: "A1" | "A2" | "B1" | "B2";
 };
 
 export type StoryEpisodeStep = {
@@ -93,7 +93,7 @@ export type StoryEpisode = {
   characters: string[];
   setup: string;
   emoji: string;
-  level: "A1" | "A2" | "B1";
+  level: "A1" | "A2" | "B1" | "B2";
   steps: StoryEpisodeStep[];
 };
 
@@ -837,20 +837,244 @@ const B1_IF_TAILS: SentenceTail[] = [
   { words: ["fühlen", "sich", "alle", "sicherer"], translation: "everyone feels more confident." },
 ];
 
+const A1_NEED_STEMS: SentenceStem[] = [
+  { words: ["Ich", "brauche"], translation: "I need", emoji: "\u{1F4CC}" },
+  { words: ["Wir", "brauchen"], translation: "We need", emoji: "\u{1F4CC}" },
+  { words: ["Mein", "Freund", "braucht"], translation: "My friend needs", emoji: "\u{1F4CC}" },
+  { words: ["Die", "Besucherin", "braucht"], translation: "The visitor needs", emoji: "\u{1F4CC}" },
+  { words: ["Das", "Kind", "braucht"], translation: "The child needs", emoji: "\u{1F4CC}" },
+];
+
+const A1_NEED_TAILS: SentenceTail[] = [
+  { words: ["heute", "Hilfe"], translation: "help today." },
+  { words: ["jetzt", "ein", "Ticket"], translation: "a ticket now." },
+  { words: ["fuer", "den", "Kurs", "ein", "Heft"], translation: "a notebook for the course." },
+  { words: ["am", "Bahnhof", "eine", "Information"], translation: "some information at the station." },
+];
+
+const A1_HAVE_STEMS: SentenceStem[] = [
+  { words: ["Ich", "habe"], translation: "I have", emoji: "\u{1F4C5}" },
+  { words: ["Wir", "haben"], translation: "We have", emoji: "\u{1F4C5}" },
+  { words: ["Meine", "Schwester", "hat"], translation: "My sister has", emoji: "\u{1F4C5}" },
+  { words: ["Der", "Gast", "hat"], translation: "The guest has", emoji: "\u{1F4C5}" },
+  { words: ["Die", "Familie", "hat"], translation: "The family has", emoji: "\u{1F4C5}" },
+];
+
+const A1_HAVE_TAILS: SentenceTail[] = [
+  { words: ["heute", "wenig", "Zeit"], translation: "little time today." },
+  { words: ["am", "Morgen", "Hunger"], translation: "hunger in the morning." },
+  { words: ["eine", "Frage", "zum", "Kurs"], translation: "a question about the course." },
+  { words: ["am", "Abend", "einen", "Termin"], translation: "an appointment in the evening." },
+];
+
+const A1_SEARCH_STEMS: SentenceStem[] = [
+  { words: ["Ich", "suche"], translation: "I am looking for", emoji: "\u{1F50D}" },
+  { words: ["Wir", "suchen"], translation: "We are looking for", emoji: "\u{1F50D}" },
+  { words: ["Meine", "Freundin", "sucht"], translation: "My friend is looking for", emoji: "\u{1F50D}" },
+  { words: ["Der", "Tourist", "sucht"], translation: "The tourist is looking for", emoji: "\u{1F50D}" },
+  { words: ["Die", "Familie", "sucht"], translation: "The family is looking for", emoji: "\u{1F50D}" },
+];
+
+const A1_SEARCH_TAILS: SentenceTail[] = [
+  { words: ["den", "Bahnhof"], translation: "the station." },
+  { words: ["ein", "Cafe", "in", "der", "Naehe"], translation: "a cafe nearby." },
+  { words: ["das", "richtige", "Gleis"], translation: "the correct platform." },
+  { words: ["eine", "Apotheke"], translation: "a pharmacy." },
+];
+
+const A1_PAY_STEMS: SentenceStem[] = [
+  { words: ["Ich", "bezahle"], translation: "I pay", emoji: "\u{1F4B3}" },
+  { words: ["Wir", "bezahlen"], translation: "We pay", emoji: "\u{1F4B3}" },
+  { words: ["Mein", "Bruder", "bezahlt"], translation: "My brother pays", emoji: "\u{1F4B3}" },
+  { words: ["Die", "Studentin", "bezahlt"], translation: "The student pays", emoji: "\u{1F4B3}" },
+  { words: ["Der", "Gast", "bezahlt"], translation: "The guest pays", emoji: "\u{1F4B3}" },
+];
+
+const A1_PAY_TAILS: SentenceTail[] = [
+  { words: ["heute", "bar"], translation: "in cash today." },
+  { words: ["im", "Cafe", "mit", "Karte"], translation: "by card in the cafe." },
+  { words: ["die", "Rechnung", "sofort"], translation: "the bill right away." },
+  { words: ["am", "Abend", "an", "der", "Kasse"], translation: "at the cashier in the evening." },
+];
+
+const A2_CALL_STEMS: SentenceStem[] = [
+  { words: ["Ich", "rufe"], translation: "I call", emoji: "\u{1F4DE}" },
+  { words: ["Wir", "rufen"], translation: "We call", emoji: "\u{1F4DE}" },
+  { words: ["Meine", "Kollegin", "ruft"], translation: "My colleague calls", emoji: "\u{1F4DE}" },
+  { words: ["Der", "Kunde", "ruft"], translation: "The customer calls", emoji: "\u{1F4DE}" },
+  { words: ["Die", "Studentin", "ruft"], translation: "The student calls", emoji: "\u{1F4DE}" },
+];
+
+const A2_CALL_TAILS: SentenceTail[] = [
+  { words: ["spaeter", "im", "Buero", "an"], translation: "later at the office." },
+  { words: ["morgen", "beim", "Hotel", "an"], translation: "the hotel tomorrow." },
+  { words: ["nach", "dem", "Kurs", "zurueck"], translation: "back after the course." },
+  { words: ["heute", "noch", "einmal", "an"], translation: "once more today." },
+];
+
+const A2_RESERVE_STEMS: SentenceStem[] = [
+  { words: ["Ich", "moechte"], translation: "I would like to", emoji: "\u{1F4C6}" },
+  { words: ["Wir", "moechten"], translation: "We would like to", emoji: "\u{1F4C6}" },
+  { words: ["Meine", "Freundin", "moechte"], translation: "My friend would like to", emoji: "\u{1F4C6}" },
+  { words: ["Der", "Gast", "moechte"], translation: "The guest would like to", emoji: "\u{1F4C6}" },
+  { words: ["Die", "Gruppe", "moechte"], translation: "The group would like to", emoji: "\u{1F4C6}" },
+];
+
+const A2_RESERVE_TAILS: SentenceTail[] = [
+  { words: ["einen", "Tisch", "fuer", "heute", "Abend", "reservieren"], translation: "reserve a table for this evening." },
+  { words: ["zwei", "Tickets", "fuer", "morgen", "buchen"], translation: "book two tickets for tomorrow." },
+  { words: ["das", "Zimmer", "fuer", "eine", "Nacht", "verlaengern"], translation: "extend the room for one night." },
+  { words: ["einen", "Termin", "fuer", "Montag", "vereinbaren"], translation: "arrange an appointment for Monday." },
+];
+
+const A2_SEND_STEMS: SentenceStem[] = [
+  { words: ["Ich", "schicke"], translation: "I send", emoji: "\u{1F4E7}" },
+  { words: ["Wir", "schicken"], translation: "We send", emoji: "\u{1F4E7}" },
+  { words: ["Meine", "Kollegin", "schickt"], translation: "My colleague sends", emoji: "\u{1F4E7}" },
+  { words: ["Der", "Nachbar", "schickt"], translation: "The neighbor sends", emoji: "\u{1F4E7}" },
+  { words: ["Die", "Familie", "schickt"], translation: "The family sends", emoji: "\u{1F4E7}" },
+];
+
+const A2_SEND_TAILS: SentenceTail[] = [
+  { words: ["dir", "heute", "die", "Adresse"], translation: "you the address today." },
+  { words: ["morgen", "eine", "kurze", "Nachricht"], translation: "a short message tomorrow." },
+  { words: ["dem", "Lehrer", "die", "Unterlagen"], translation: "the documents to the teacher." },
+  { words: ["spaeter", "die", "neuen", "Informationen"], translation: "the new information later." },
+];
+
+const A2_ORGANIZE_STEMS: SentenceStem[] = [
+  { words: ["Ich", "muss"], translation: "I must", emoji: "\u{1F5D3}" },
+  { words: ["Wir", "muessen"], translation: "We must", emoji: "\u{1F5D3}" },
+  { words: ["Meine", "Freundin", "muss"], translation: "My friend must", emoji: "\u{1F5D3}" },
+  { words: ["Der", "Student", "muss"], translation: "The student must", emoji: "\u{1F5D3}" },
+  { words: ["Die", "Familie", "muss"], translation: "The family must", emoji: "\u{1F5D3}" },
+];
+
+const A2_ORGANIZE_TAILS: SentenceTail[] = [
+  { words: ["heute", "noch", "einkaufen", "gehen"], translation: "go shopping today." },
+  { words: ["vor", "dem", "Termin", "ein", "Formular", "ausfuellen"], translation: "fill in a form before the appointment." },
+  { words: ["die", "Wohnung", "am", "Wochenende", "aufraeumen"], translation: "tidy the apartment on the weekend." },
+  { words: ["den", "Arzttermin", "verschieben"], translation: "reschedule the doctor's appointment." },
+];
+
+const B1_PLAN_STEMS: SentenceStem[] = [
+  { words: ["Ich", "denke"], translation: "I think", emoji: "\u{1F4AC}" },
+  { words: ["Wir", "glauben"], translation: "We believe", emoji: "\u{1F4AC}" },
+  { words: ["Meine", "Kollegin", "meint"], translation: "My colleague thinks", emoji: "\u{1F4AC}" },
+  { words: ["Der", "Trainer", "sagt"], translation: "The trainer says", emoji: "\u{1F4AC}" },
+  { words: ["Die", "Gruppe", "findet"], translation: "The group thinks", emoji: "\u{1F4AC}" },
+];
+
+const B1_PLAN_TAILS: SentenceTail[] = [
+  { words: ["dass", "wir", "frueher", "anfangen", "sollten"], translation: "that we should start earlier." },
+  { words: ["dass", "wir", "den", "Termin", "verschieben", "muessen"], translation: "that we need to move the appointment." },
+  { words: ["dass", "wir", "zuerst", "die", "wichtigsten", "Punkte", "besprechen", "sollten"], translation: "that we should discuss the most important points first." },
+  { words: ["dass", "wir", "mehr", "Zeit", "fuer", "die", "Vorbereitung", "brauchen"], translation: "that we need more time for the preparation." },
+];
+
+const B1_LIMIT_STEMS: SentenceStem[] = [
+  { words: ["Leider", "kann", "ich"], translation: "Unfortunately I can", emoji: "\u{26A0}" },
+  { words: ["Leider", "koennen", "wir"], translation: "Unfortunately we can", emoji: "\u{26A0}" },
+  { words: ["Meine", "Kollegin", "kann"], translation: "My colleague can", emoji: "\u{26A0}" },
+  { words: ["Der", "Kunde", "kann"], translation: "The customer can", emoji: "\u{26A0}" },
+  { words: ["Die", "Nachbarin", "kann"], translation: "The neighbor can", emoji: "\u{26A0}" },
+];
+
+const B1_LIMIT_TAILS: SentenceTail[] = [
+  { words: ["heute", "nicht", "teilnehmen"], translation: "not attend today." },
+  { words: ["erst", "spaeter", "antworten"], translation: "reply later." },
+  { words: ["den", "Termin", "morgen", "wahrnehmen"], translation: "make the appointment tomorrow." },
+  { words: ["die", "Unterlagen", "erst", "am", "Abend", "schicken"], translation: "send the documents only in the evening." },
+];
+
+const B1_NOTICE_STEMS: SentenceStem[] = [
+  { words: ["Ich", "habe", "gemerkt"], translation: "I noticed", emoji: "\u{1F50E}" },
+  { words: ["Wir", "haben", "gemerkt"], translation: "We noticed", emoji: "\u{1F50E}" },
+  { words: ["Meine", "Kollegin", "hat", "gemerkt"], translation: "My colleague noticed", emoji: "\u{1F50E}" },
+  { words: ["Der", "Kunde", "hat", "gemerkt"], translation: "The customer noticed", emoji: "\u{1F50E}" },
+  { words: ["Die", "Gruppe", "hat", "gemerkt"], translation: "The group noticed", emoji: "\u{1F50E}" },
+];
+
+const B1_NOTICE_TAILS: SentenceTail[] = [
+  { words: ["dass", "eine", "Datei", "fehlt"], translation: "that a file is missing." },
+  { words: ["dass", "der", "Raum", "zu", "klein", "ist"], translation: "that the room is too small." },
+  { words: ["dass", "wir", "mehr", "Zeit", "brauchen"], translation: "that we need more time." },
+  { words: ["dass", "die", "Information", "unklar", "war"], translation: "that the information was unclear." },
+];
+
+const B2_CLARIFY_STEMS: SentenceStem[] = [
+  { words: ["Ich", "wuerde", "gern", "klaeren"], translation: "I would like to clarify", emoji: "\u{1F9ED}" },
+  { words: ["Wir", "wuerden", "gern", "klaeren"], translation: "We would like to clarify", emoji: "\u{1F9ED}" },
+  { words: ["Meine", "Kollegin", "wuerde", "gern", "klaeren"], translation: "My colleague would like to clarify", emoji: "\u{1F9ED}" },
+  { words: ["Der", "Kunde", "wuerde", "gern", "klaeren"], translation: "The customer would like to clarify", emoji: "\u{1F9ED}" },
+  { words: ["Die", "Leitung", "wuerde", "gern", "klaeren"], translation: "The management would like to clarify", emoji: "\u{1F9ED}" },
+];
+
+const B2_CLARIFY_TAILS: SentenceTail[] = [
+  { words: ["welche", "Prioritaeten", "wir", "heute", "setzen"], translation: "which priorities we are setting today." },
+  { words: ["ob", "der", "Vorschlag", "noch", "geaendert", "werden", "kann"], translation: "whether the proposal can still be changed." },
+  { words: ["wie", "wir", "in", "dieser", "Situation", "am", "besten", "vorgehen"], translation: "how we should proceed best in this situation." },
+  { words: ["wer", "den", "naechsten", "Schritt", "uebernimmt"], translation: "who is taking the next step." },
+];
+
+const B2_FEEDBACK_STEMS: SentenceStem[] = [
+  { words: ["Ich", "habe", "den", "Eindruck"], translation: "I have the impression", emoji: "\u{1F4CA}" },
+  { words: ["Wir", "haben", "den", "Eindruck"], translation: "We have the impression", emoji: "\u{1F4CA}" },
+  { words: ["Meine", "Kollegin", "hat", "den", "Eindruck"], translation: "My colleague has the impression", emoji: "\u{1F4CA}" },
+  { words: ["Der", "Kunde", "hat", "den", "Eindruck"], translation: "The customer has the impression", emoji: "\u{1F4CA}" },
+  { words: ["Die", "Gruppe", "hat", "den", "Eindruck"], translation: "The group has the impression", emoji: "\u{1F4CA}" },
+];
+
+const B2_FEEDBACK_TAILS: SentenceTail[] = [
+  { words: ["dass", "der", "Ablauf", "zu", "kompliziert", "geworden", "ist"], translation: "that the process has become too complicated." },
+  { words: ["dass", "wir", "frueher", "informieren", "sollten"], translation: "that we should inform earlier." },
+  { words: ["dass", "die", "Aufgaben", "unfair", "verteilt", "sind"], translation: "that the tasks are distributed unfairly." },
+  { words: ["dass", "noch", "wichtige", "Details", "fehlen"], translation: "that important details are still missing." },
+];
+
+const B2_PROPOSE_STEMS: SentenceStem[] = [
+  { words: ["Ich", "schlage", "vor"], translation: "I suggest", emoji: "\u{1F4DD}" },
+  { words: ["Wir", "schlagen", "vor"], translation: "We suggest", emoji: "\u{1F4DD}" },
+  { words: ["Meine", "Kollegin", "schlaegt", "vor"], translation: "My colleague suggests", emoji: "\u{1F4DD}" },
+  { words: ["Der", "Kunde", "schlaegt", "vor"], translation: "The customer suggests", emoji: "\u{1F4DD}" },
+  { words: ["Die", "Leitung", "schlaegt", "vor"], translation: "The management suggests", emoji: "\u{1F4DD}" },
+];
+
+const B2_PROPOSE_TAILS: SentenceTail[] = [
+  { words: ["den", "Prozess", "neu", "zu", "strukturieren"], translation: "to restructure the process." },
+  { words: ["die", "Rueckmeldung", "schriftlich", "festzuhalten"], translation: "to record the feedback in writing." },
+  { words: ["zuerst", "die", "dringendsten", "Fragen", "zu", "klaeren"], translation: "to clarify the most urgent questions first." },
+  { words: ["einen", "realistischen", "Zeitplan", "zu", "vereinbaren"], translation: "to agree on a realistic schedule." },
+];
+
 export const SENTENCE_EXERCISES: SentenceExercise[] = [
   ...composeSentenceExercises("satz-a1-lernen", "A1", A1_LEARN_STEMS, A1_LEARN_TAILS),
   ...composeSentenceExercises("satz-a1-trinken", "A1", A1_DRINK_STEMS, A1_DRINK_TAILS),
   ...composeSentenceExercises("satz-a1-essen", "A1", A1_EAT_STEMS, A1_EAT_TAILS),
   ...composeSentenceExercises("satz-a1-gehen", "A1", A1_GO_STEMS, A1_GO_TAILS),
   ...composeSentenceExercises("satz-a1-wohnen", "A1", A1_LIVE_STEMS, A1_LIVE_TAILS),
+  ...composeSentenceExercises("satz-a1-brauchen", "A1", A1_NEED_STEMS, A1_NEED_TAILS),
+  ...composeSentenceExercises("satz-a1-haben", "A1", A1_HAVE_STEMS, A1_HAVE_TAILS),
+  ...composeSentenceExercises("satz-a1-suchen", "A1", A1_SEARCH_STEMS, A1_SEARCH_TAILS),
+  ...composeSentenceExercises("satz-a1-bezahlen", "A1", A1_PAY_STEMS, A1_PAY_TAILS),
   ...composeSentenceExercises("satz-a2-kaufen", "A2", A2_BUY_STEMS, A2_BUY_TAILS),
   ...composeSentenceExercises("satz-a2-muessen", "A2", A2_MUST_STEMS, A2_MUST_TAILS),
   ...composeSentenceExercises("satz-a2-koennen", "A2", A2_CAN_STEMS, A2_CAN_TAILS),
   ...composeSentenceExercises("satz-a2-treffen", "A2", A2_MEET_STEMS, A2_MEET_TAILS),
   ...composeSentenceExercises("satz-a2-reisen", "A2", A2_TRAVEL_STEMS, A2_TRAVEL_TAILS),
   ...composeSentenceExercises("satz-a2-erklaeren", "A2", A2_EXPLAIN_STEMS, A2_EXPLAIN_TAILS),
+  ...composeSentenceExercises("satz-a2-anrufen", "A2", A2_CALL_STEMS, A2_CALL_TAILS),
+  ...composeSentenceExercises("satz-a2-reservieren", "A2", A2_RESERVE_STEMS, A2_RESERVE_TAILS),
+  ...composeSentenceExercises("satz-a2-schicken", "A2", A2_SEND_STEMS, A2_SEND_TAILS),
+  ...composeSentenceExercises("satz-a2-organisieren", "A2", A2_ORGANIZE_STEMS, A2_ORGANIZE_TAILS),
   ...composeSentenceExercises("satz-b1-meinung", "B1", B1_OPINION_STEMS, B1_OPINION_TAILS),
   ...composeSentenceExercises("satz-b1-wenn", "B1", B1_IF_STEMS, B1_IF_TAILS),
+  ...composeSentenceExercises("satz-b1-planen", "B1", B1_PLAN_STEMS, B1_PLAN_TAILS),
+  ...composeSentenceExercises("satz-b1-absagen", "B1", B1_LIMIT_STEMS, B1_LIMIT_TAILS),
+  ...composeSentenceExercises("satz-b1-bemerken", "B1", B1_NOTICE_STEMS, B1_NOTICE_TAILS),
+  ...composeSentenceExercises("satz-b2-klaeren", "B2", B2_CLARIFY_STEMS, B2_CLARIFY_TAILS),
+  ...composeSentenceExercises("satz-b2-feedback", "B2", B2_FEEDBACK_STEMS, B2_FEEDBACK_TAILS),
+  ...composeSentenceExercises("satz-b2-vorschlagen", "B2", B2_PROPOSE_STEMS, B2_PROPOSE_TAILS),
 ];
 
 export const CHAT_EXERCISES: ChatExercise[] = [
@@ -1880,7 +2104,7 @@ export const STORY_EXERCISES_LEGACY: StoryExercise[] = [
 ];
 
 type StorySceneVariant = {
-  level: "A1" | "A2" | "B1";
+  level: "A1" | "A2" | "B1" | "B2";
   setup: string;
   beats: string[];
   translation: string;

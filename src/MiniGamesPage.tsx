@@ -177,7 +177,7 @@ type DailyChallengeRound =
   | { mode: "story"; level: ExerciseLevel; key: string; storyRound: StoryRound };
 
 const ARTICLE_OPTIONS: ArticleOption[] = ["der", "die", "das"];
-const LEVEL_OPTIONS: ExerciseLevel[] = ["A1", "A2", "B1"];
+const LEVEL_OPTIONS: ExerciseLevel[] = ["A1", "A2", "B1", "B2"];
 const GRAMMAR_TOPIC_ORDER: GrammarTopic[] = [
   "akkusativ",
   "dativ",
@@ -741,31 +741,37 @@ function buildDailyChallengeRound(params: {
       A1: articleExercises.filter((exercise) => exercise.level === "A1"),
       A2: articleExercises.filter((exercise) => exercise.level === "A2"),
       B1: articleExercises.filter((exercise) => exercise.level === "B1"),
+      B2: articleExercises.filter((exercise) => exercise.level === "B2"),
     },
     grammar: {
       A1: grammarExercises.filter((exercise) => exercise.level === "A1"),
       A2: grammarExercises.filter((exercise) => exercise.level === "A2"),
       B1: grammarExercises.filter((exercise) => exercise.level === "B1"),
+      B2: grammarExercises.filter((exercise) => exercise.level === "B2"),
     },
     translate: {
       A1: translationExercises.filter((exercise) => exercise.level === "A1"),
       A2: translationExercises.filter((exercise) => exercise.level === "A2"),
       B1: translationExercises.filter((exercise) => exercise.level === "B1"),
+      B2: translationExercises.filter((exercise) => exercise.level === "B2"),
     },
     sentence: {
       A1: sentenceExercises.filter((exercise) => exercise.level === "A1"),
       A2: sentenceExercises.filter((exercise) => exercise.level === "A2"),
       B1: sentenceExercises.filter((exercise) => exercise.level === "B1"),
+      B2: sentenceExercises.filter((exercise) => exercise.level === "B2"),
     },
     chat: {
       A1: chatExercises.filter((exercise) => exercise.level === "A1"),
       A2: chatExercises.filter((exercise) => exercise.level === "A2"),
       B1: chatExercises.filter((exercise) => exercise.level === "B1"),
+      B2: chatExercises.filter((exercise) => exercise.level === "B2"),
     },
     story: {
       A1: storyEpisodes.filter((episode) => episode.level === "A1"),
       A2: storyEpisodes.filter((episode) => episode.level === "A2"),
       B1: storyEpisodes.filter((episode) => episode.level === "B1"),
+      B2: storyEpisodes.filter((episode) => episode.level === "B2"),
     },
   };
   const availableLevels = LEVEL_OPTIONS.filter(
