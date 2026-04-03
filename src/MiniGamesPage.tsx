@@ -22,6 +22,11 @@ import {
   getWQuestionExercises,
   type WQuestionExercise,
 } from "./wQuestionExercises";
+import {
+  listElevenLabsVoices,
+  synthesizeElevenLabsSpeech,
+  type ElevenLabsVoiceOption,
+} from "./elevenLabsTts";
 
 type MiniGamesPageProps = {
   locale: string;
@@ -30,8 +35,7 @@ type MiniGamesPageProps = {
 };
 
 type SpeechRatePreset = 0.68 | 0.8 | 1;
-
-const SPEECH_VOICE_STORAGE_KEY = "vela-mini-games-speech-voice";
+const ELEVENLABS_VOICE_STORAGE_KEY = "vela-mini-games-elevenlabs-voice";
 
 type GameMode =
   | "article"
@@ -990,13 +994,18 @@ export default function MiniGamesPage({
     getTodayChallengeKey(),
   );
   const audioContextRef = useRef<AudioContext | null>(null);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const elevenLabsAudioCacheRef = useRef<Map<string, string>>(new Map());
   const previousChallengeKeyRef = useRef(todayChallengeKey);
   const [speechRate, setSpeechRate] = useState<SpeechRatePreset>(0.8);
-  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [selectedVoiceURI, setSelectedVoiceURI] = useState(() => {
+  const [elevenLabsVoices, setElevenLabsVoices] = useState<ElevenLabsVoiceOption[]>([]);
+  const [elevenLabsLoadingVoices, setElevenLabsLoadingVoices] = useState(false);
+  const [elevenLabsDefaultVoiceId, setElevenLabsDefaultVoiceId] = useState<string | null>(null);
+  const [selectedElevenLabsVoiceId, setSelectedElevenLabsVoiceId] = useState(() => {
     if (typeof window === "undefined") return "auto";
-    return window.localStorage.getItem(SPEECH_VOICE_STORAGE_KEY) || "auto";
+    return window.localStorage.getItem(ELEVENLABS_VOICE_STORAGE_KEY) || "auto";
   });
+  const [ttsMessage, setTtsMessage] = useState("");
   const [mode, setMode] = useState<GameMode>("article");
   const [level, setLevel] = useState<ExerciseLevel>("A1");
   const [articleSeed, setArticleSeed] = useState(0);
@@ -1425,25 +1434,17 @@ export default function MiniGamesPage({
     wQuestionRound.exercise.correctAnswer,
     wQuestionRound.exercise.questionTemplate,
   ]);
-  const canUseSpeechSynthesis =
-    typeof window !== "undefined" &&
-    "speechSynthesis" in window &&
-    typeof SpeechSynthesisUtterance !== "undefined";
-  const voiceOptions = useMemo(() => {
-    return [...availableVoices].sort((left, right) => {
-      const leftGerman = left.lang.toLowerCase().startsWith("de") ? 0 : 1;
-      const rightGerman = right.lang.toLowerCase().startsWith("de") ? 0 : 1;
-      if (leftGerman !== rightGerman) return leftGerman - rightGerman;
-      return `${left.name} ${left.lang}`.localeCompare(`${right.name} ${right.lang}`);
-    });
-  }, [availableVoices]);
-  const selectedVoice = useMemo(
-    () => voiceOptions.find((voice) => voice.voiceURI === selectedVoiceURI) ?? null,
-    [selectedVoiceURI, voiceOptions],
-  );
-  const canPronounceCurrentExercise =
-    canUseSpeechSynthesis &&
-    pronunciationText.trim().length > 0;
+  const elevenLabsVoiceOptions = useMemo(() => {
+    return [...elevenLabsVoices].sort((left, right) =>
+      left.name.localeCompare(right.name, undefined, { sensitivity: "base" }),
+    );
+  }, [elevenLabsVoices]);
+  const activeElevenLabsVoiceId =
+    selectedElevenLabsVoiceId !== "auto"
+      ? selectedElevenLabsVoiceId
+      : elevenLabsDefaultVoiceId ?? elevenLabsVoiceOptions[0]?.voiceId ?? null;
+  const canUseElevenLabs = Boolean(sessionUserId);
+  const canPronounceCurrentExercise = pronunciationText.trim().length > 0 && canUseElevenLabs;
 
   const extractErrorMessage = useCallback((error: unknown) => {
     if (error && typeof error === "object" && "message" in error) {
@@ -1647,33 +1648,60 @@ export default function MiniGamesPage({
     });
   }, []);
 
-  const speakGermanText = useCallback((value: string, rateOverride?: number) => {
-    if (
-      typeof window === "undefined" ||
-      !("speechSynthesis" in window) ||
-      typeof SpeechSynthesisUtterance === "undefined"
-    ) {
-      return;
-    }
-    const speech = window.speechSynthesis;
-    const trimmedValue = value.replace(/\s+/g, " ").trim();
-    if (!trimmedValue) return;
+  const speakGermanText = useCallback(
+    async (value: string, rateOverride?: number) => {
+      if (typeof window === "undefined") return;
+      const trimmedValue = value.replace(/\s+/g, " ").trim();
+      if (!trimmedValue) return;
 
-    speech.cancel();
-    const utterance = new SpeechSynthesisUtterance(trimmedValue);
-    utterance.lang = selectedVoice?.lang ?? "de-DE";
-    utterance.rate = rateOverride ?? speechRate;
-    utterance.pitch = 1;
+      const stopCurrentPlayback = () => {
+        if (audioElementRef.current) {
+          audioElementRef.current.pause();
+          audioElementRef.current.currentTime = 0;
+        }
+      };
 
-    const fallbackGermanVoice =
-      availableVoices.find((voice) => voice.lang.toLowerCase().startsWith("de")) ?? null;
-    const activeVoice = selectedVoice ?? fallbackGermanVoice;
-    if (activeVoice) {
-      utterance.voice = activeVoice;
-    }
+      if (!canUseElevenLabs) {
+        setTtsMessage("Sign in to use ElevenLabs voice.");
+        return;
+      }
 
-    speech.speak(utterance);
-  }, [availableVoices, selectedVoice, speechRate]);
+      try {
+        setTtsMessage("");
+        const voiceId = activeElevenLabsVoiceId;
+        if (!voiceId) {
+          throw new Error("No ElevenLabs voice is available.");
+        }
+        const rate = rateOverride ?? speechRate;
+        const cacheKey = `${voiceId}|${rate}|${trimmedValue}`;
+        let objectUrl = elevenLabsAudioCacheRef.current.get(cacheKey) ?? null;
+        if (!objectUrl) {
+          const audioBlob = await synthesizeElevenLabsSpeech({
+            text: trimmedValue,
+            voiceId,
+            rate,
+            languageCode: "de",
+          });
+          objectUrl = URL.createObjectURL(audioBlob);
+          elevenLabsAudioCacheRef.current.set(cacheKey, objectUrl);
+        }
+
+        stopCurrentPlayback();
+        const audio = audioElementRef.current ?? new Audio();
+        audioElementRef.current = audio;
+        audio.src = objectUrl;
+        audio.currentTime = 0;
+        await audio.play();
+      } catch (error) {
+        setTtsMessage(
+          error instanceof Error
+            ? error.message
+            : "ElevenLabs voice is temporarily unavailable.",
+        );
+      }
+    },
+    [activeElevenLabsVoiceId, canUseElevenLabs, speechRate],
+  );
 
   const resetRoundState = useCallback((nextDuration: number) => {
     setAnswerState(null);
@@ -1685,7 +1713,9 @@ export default function MiniGamesPage({
 
   const renderOptionListenButton = useCallback(
     (value: string, optionKey: string) => {
-      if (!canUseSpeechSynthesis || !value.trim()) return null;
+      if (!value.trim() || !canUseElevenLabs) {
+        return null;
+      }
       return (
         <button
           key={`${optionKey}-listen`}
@@ -1702,7 +1732,7 @@ export default function MiniGamesPage({
         </button>
       );
     },
-    [canUseSpeechSynthesis, speakGermanText, text.listenAriaLabel],
+    [canUseElevenLabs, speakGermanText, text.listenAriaLabel],
   );
 
   const resetStoryEpisodeState = useCallback(() => {
@@ -2259,42 +2289,55 @@ export default function MiniGamesPage({
   }, [answerState]);
 
   useEffect(() => {
-    if (!canUseSpeechSynthesis || typeof window === "undefined") return;
-    const speech = window.speechSynthesis;
-    const syncVoices = () => {
-      const nextVoices = speech.getVoices();
-      setAvailableVoices((current) => {
-        if (
-          current.length === nextVoices.length &&
-          current.every((voice, index) => voice.voiceURI === nextVoices[index]?.voiceURI)
-        ) {
-          return current;
-        }
-        return nextVoices;
-      });
-    };
-
-    syncVoices();
-    speech.addEventListener("voiceschanged", syncVoices);
-    return () => speech.removeEventListener("voiceschanged", syncVoices);
-  }, [canUseSpeechSynthesis]);
-
-  useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(SPEECH_VOICE_STORAGE_KEY, selectedVoiceURI);
-  }, [selectedVoiceURI]);
+    window.localStorage.setItem(ELEVENLABS_VOICE_STORAGE_KEY, selectedElevenLabsVoiceId);
+  }, [selectedElevenLabsVoiceId]);
 
   useEffect(() => {
-    if (selectedVoiceURI === "auto") return;
-    if (voiceOptions.some((voice) => voice.voiceURI === selectedVoiceURI)) return;
-    setSelectedVoiceURI("auto");
-  }, [selectedVoiceURI, voiceOptions]);
+    if (!sessionUserId) return;
+    let active = true;
+    setElevenLabsLoadingVoices(true);
+    void listElevenLabsVoices()
+      .then((payload) => {
+        if (!active) return;
+        setElevenLabsVoices(payload.voices);
+        setElevenLabsDefaultVoiceId(payload.defaultVoiceId);
+        setTtsMessage("");
+      })
+      .catch((error) => {
+        if (!active) return;
+        setElevenLabsVoices([]);
+        setElevenLabsDefaultVoiceId(null);
+        setTtsMessage(
+          error instanceof Error
+            ? error.message
+            : "ElevenLabs voices are temporarily unavailable.",
+        );
+      })
+      .finally(() => {
+        if (active) {
+          setElevenLabsLoadingVoices(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [sessionUserId]);
+
+  useEffect(() => {
+    if (selectedElevenLabsVoiceId === "auto") return;
+    if (elevenLabsVoiceOptions.some((voice) => voice.voiceId === selectedElevenLabsVoiceId)) return;
+    setSelectedElevenLabsVoiceId("auto");
+  }, [elevenLabsVoiceOptions, selectedElevenLabsVoiceId]);
 
   useEffect(
     () => () => {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current.src = "";
       }
+      elevenLabsAudioCacheRef.current.forEach((value) => URL.revokeObjectURL(value));
+      elevenLabsAudioCacheRef.current.clear();
     },
     [],
   );
@@ -2819,11 +2862,14 @@ export default function MiniGamesPage({
             )}
           </p>
           {canPronounceCurrentExercise ? (
-            <div className="miniGamesPronounceRow">
-              <button
+            <>
+              <div className="miniGamesPronounceRow">
+                <button
                 className="miniGamesPronounceButton"
                 type="button"
-                onClick={() => speakGermanText(pronunciationText)}
+                onClick={() => {
+                  void speakGermanText(pronunciationText);
+                }}
                 aria-label={text.listenAriaLabel ?? "Play German pronunciation"}
                 title={text.listenAriaLabel ?? "Play German pronunciation"}
               >
@@ -2848,30 +2894,36 @@ export default function MiniGamesPage({
                   </button>
                 ))}
               </div>
-              {voiceOptions.length ? (
                 <label
                   className="miniGamesVoicePicker"
                   aria-label={text.voiceSelectAriaLabel ?? "Select pronunciation voice"}
                   title={text.voiceSelectAriaLabel ?? "Select pronunciation voice"}
                 >
-                  <span aria-hidden="true">🎙️</span>
+                  <span aria-hidden="true">TTS</span>
                   <select
                     className="miniGamesVoiceSelect"
-                    value={selectedVoiceURI}
-                    onChange={(event) => setSelectedVoiceURI(event.target.value)}
+                    value={selectedElevenLabsVoiceId}
+                    disabled={elevenLabsLoadingVoices || !elevenLabsVoiceOptions.length}
+                    onChange={(event) => setSelectedElevenLabsVoiceId(event.target.value)}
                   >
-                    <option value="auto">{text.voiceAutoLabel ?? "Auto"}</option>
-                    {voiceOptions.map((voice) => (
-                      <option key={voice.voiceURI} value={voice.voiceURI}>
-                        {voice.name} ({voice.lang})
+                    <option value="auto">
+                      {elevenLabsLoadingVoices
+                        ? text.voiceLoadingLabel ?? "Loading voices..."
+                        : text.voiceAutoLabel ?? "Auto"}
+                    </option>
+                    {elevenLabsVoiceOptions.map((voice) => (
+                      <option key={voice.voiceId} value={voice.voiceId}>
+                        {voice.name}
+                        {voice.category ? ` (${voice.category})` : ""}
                       </option>
                     ))}
                   </select>
                 </label>
-              ) : null}
-            </div>
+              </div>
+              {ttsMessage ? <p className="miniGamesTtsMessage">{ttsMessage}</p> : null}
+            </>
           ) : null}
-        </div>
+          </div>
 
         <div
           className={`miniGamesOptions miniGamesOptions${

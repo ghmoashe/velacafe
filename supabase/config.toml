@@ -19,3 +19,8 @@ entrypoint = "./functions/mux-video/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/mux-webhook/index.ts"
+
+[functions.elevenlabs-tts]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/elevenlabs-tts/index.ts"

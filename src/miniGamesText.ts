@@ -90,7 +90,11 @@ export type MiniGamesText = {
   leaderboardUnavailable?: string;
   listenLabel?: string;
   listenAriaLabel?: string;
+  speechProviderBrowserLabel?: string;
+  speechProviderElevenLabsLabel?: string;
   voiceAutoLabel?: string;
+  voiceLoadingLabel?: string;
+  voiceSignInLabel?: string;
   voiceSelectAriaLabel?: string;
 };
 
@@ -208,7 +212,11 @@ const ENGLISH_TEXT: MiniGamesText = {
     "Leaderboard is temporarily unavailable. Check your connection and try again.",
   listenLabel: "Listen",
   listenAriaLabel: "Play German pronunciation",
+  speechProviderBrowserLabel: "Browser",
+  speechProviderElevenLabsLabel: "11Labs",
   voiceAutoLabel: "Auto",
+  voiceLoadingLabel: "Loading voices...",
+  voiceSignInLabel: "Sign in to use ElevenLabs",
   voiceSelectAriaLabel: "Select pronunciation voice",
 };
 
