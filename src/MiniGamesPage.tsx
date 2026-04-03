@@ -31,6 +31,8 @@ type MiniGamesPageProps = {
 
 type SpeechRatePreset = 0.68 | 0.8 | 1;
 
+const SPEECH_VOICE_STORAGE_KEY = "vela-mini-games-speech-voice";
+
 type GameMode =
   | "article"
   | "grammar"
@@ -990,6 +992,11 @@ export default function MiniGamesPage({
   const audioContextRef = useRef<AudioContext | null>(null);
   const previousChallengeKeyRef = useRef(todayChallengeKey);
   const [speechRate, setSpeechRate] = useState<SpeechRatePreset>(0.8);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState(() => {
+    if (typeof window === "undefined") return "auto";
+    return window.localStorage.getItem(SPEECH_VOICE_STORAGE_KEY) || "auto";
+  });
   const [mode, setMode] = useState<GameMode>("article");
   const [level, setLevel] = useState<ExerciseLevel>("A1");
   const [articleSeed, setArticleSeed] = useState(0);
@@ -1422,6 +1429,18 @@ export default function MiniGamesPage({
     typeof window !== "undefined" &&
     "speechSynthesis" in window &&
     typeof SpeechSynthesisUtterance !== "undefined";
+  const voiceOptions = useMemo(() => {
+    return [...availableVoices].sort((left, right) => {
+      const leftGerman = left.lang.toLowerCase().startsWith("de") ? 0 : 1;
+      const rightGerman = right.lang.toLowerCase().startsWith("de") ? 0 : 1;
+      if (leftGerman !== rightGerman) return leftGerman - rightGerman;
+      return `${left.name} ${left.lang}`.localeCompare(`${right.name} ${right.lang}`);
+    });
+  }, [availableVoices]);
+  const selectedVoice = useMemo(
+    () => voiceOptions.find((voice) => voice.voiceURI === selectedVoiceURI) ?? null,
+    [selectedVoiceURI, voiceOptions],
+  );
   const canPronounceCurrentExercise =
     canUseSpeechSynthesis &&
     pronunciationText.trim().length > 0;
@@ -1642,20 +1661,19 @@ export default function MiniGamesPage({
 
     speech.cancel();
     const utterance = new SpeechSynthesisUtterance(trimmedValue);
-    utterance.lang = "de-DE";
+    utterance.lang = selectedVoice?.lang ?? "de-DE";
     utterance.rate = rateOverride ?? speechRate;
     utterance.pitch = 1;
 
-    const germanVoice =
-      speech
-        .getVoices()
-        .find((voice) => voice.lang.toLowerCase().startsWith("de")) ?? null;
-    if (germanVoice) {
-      utterance.voice = germanVoice;
+    const fallbackGermanVoice =
+      availableVoices.find((voice) => voice.lang.toLowerCase().startsWith("de")) ?? null;
+    const activeVoice = selectedVoice ?? fallbackGermanVoice;
+    if (activeVoice) {
+      utterance.voice = activeVoice;
     }
 
     speech.speak(utterance);
-  }, [speechRate]);
+  }, [availableVoices, selectedVoice, speechRate]);
 
   const resetRoundState = useCallback((nextDuration: number) => {
     setAnswerState(null);
@@ -2240,6 +2258,38 @@ export default function MiniGamesPage({
     return () => window.clearTimeout(timeoutId);
   }, [answerState]);
 
+  useEffect(() => {
+    if (!canUseSpeechSynthesis || typeof window === "undefined") return;
+    const speech = window.speechSynthesis;
+    const syncVoices = () => {
+      const nextVoices = speech.getVoices();
+      setAvailableVoices((current) => {
+        if (
+          current.length === nextVoices.length &&
+          current.every((voice, index) => voice.voiceURI === nextVoices[index]?.voiceURI)
+        ) {
+          return current;
+        }
+        return nextVoices;
+      });
+    };
+
+    syncVoices();
+    speech.addEventListener("voiceschanged", syncVoices);
+    return () => speech.removeEventListener("voiceschanged", syncVoices);
+  }, [canUseSpeechSynthesis]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(SPEECH_VOICE_STORAGE_KEY, selectedVoiceURI);
+  }, [selectedVoiceURI]);
+
+  useEffect(() => {
+    if (selectedVoiceURI === "auto") return;
+    if (voiceOptions.some((voice) => voice.voiceURI === selectedVoiceURI)) return;
+    setSelectedVoiceURI("auto");
+  }, [selectedVoiceURI, voiceOptions]);
+
   useEffect(
     () => () => {
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -2798,6 +2848,27 @@ export default function MiniGamesPage({
                   </button>
                 ))}
               </div>
+              {voiceOptions.length ? (
+                <label
+                  className="miniGamesVoicePicker"
+                  aria-label={text.voiceSelectAriaLabel ?? "Select pronunciation voice"}
+                  title={text.voiceSelectAriaLabel ?? "Select pronunciation voice"}
+                >
+                  <span aria-hidden="true">🎙️</span>
+                  <select
+                    className="miniGamesVoiceSelect"
+                    value={selectedVoiceURI}
+                    onChange={(event) => setSelectedVoiceURI(event.target.value)}
+                  >
+                    <option value="auto">{text.voiceAutoLabel ?? "Auto"}</option>
+                    {voiceOptions.map((voice) => (
+                      <option key={voice.voiceURI} value={voice.voiceURI}>
+                        {voice.name} ({voice.lang})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
             </div>
           ) : null}
         </div>

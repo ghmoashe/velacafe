@@ -5155,6 +5155,34 @@ button:focus-visible {
   color: #fff;
 }
 
+.miniGamesVoicePicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: min(100%, 280px);
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.miniGamesVoiceSelect {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  outline: none;
+}
+
+.miniGamesVoiceSelect option {
+  color: #1f1654;
+}
+
 .miniGamesOptions {
   display: grid;
   gap: 12px;
