@@ -5092,6 +5092,63 @@ button:focus-visible {
   unicode-bidi: plaintext;
 }
 
+.miniGamesPronounceRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.miniGamesPronounceButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 12px 26px rgba(31, 16, 92, 0.18);
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.miniGamesPronounceButton:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.miniGamesSpeechSpeed {
+  display: inline-flex;
+  gap: 8px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.miniGamesSpeechSpeedButton {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  padding: 8px 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.miniGamesSpeechSpeedButtonActive {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
 .miniGamesOptions {
   display: grid;
   gap: 12px;
@@ -5130,6 +5187,38 @@ button:focus-visible {
     inset 0 2px 0 rgba(255, 255, 255, 0.22),
     inset 0 -4px 0 rgba(0, 0, 0, 0.15),
     0 12px 22px rgba(27, 24, 89, 0.18);
+}
+
+.miniGamesOptionWithAudio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.miniGamesOptionMain {
+  width: 100%;
+}
+
+.miniGamesOptionListen {
+  min-width: 52px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 12px 22px rgba(27, 24, 89, 0.14);
+  transition: transform 0.16s ease, background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.miniGamesOptionListen:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.miniGamesOptionsArticle .miniGamesOptionWithAudio {
+  grid-template-columns: 1fr;
 }
 
 .miniGamesOption:hover {

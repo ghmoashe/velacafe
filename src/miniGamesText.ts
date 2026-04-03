@@ -88,6 +88,8 @@ export type MiniGamesText = {
   leaderboardAllTime?: string;
   leaderboardEmpty?: string;
   leaderboardUnavailable?: string;
+  listenLabel?: string;
+  listenAriaLabel?: string;
 };
 
 type MiniGamesLocale =
@@ -202,6 +204,8 @@ const ENGLISH_TEXT: MiniGamesText = {
   leaderboardEmpty: "No results yet.",
   leaderboardUnavailable:
     "Leaderboard is temporarily unavailable. Check your connection and try again.",
+  listenLabel: "Listen",
+  listenAriaLabel: "Play German pronunciation",
 };
 
 const MINI_GAMES_TEXT: Record<MiniGamesLocale, MiniGamesText> = {

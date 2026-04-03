@@ -29,6 +29,8 @@ type MiniGamesPageProps = {
   isPremium?: boolean;
 };
 
+type SpeechRatePreset = 0.68 | 0.8 | 1;
+
 type GameMode =
   | "article"
   | "grammar"
@@ -969,6 +971,7 @@ export default function MiniGamesPage({
   );
   const audioContextRef = useRef<AudioContext | null>(null);
   const previousChallengeKeyRef = useRef(todayChallengeKey);
+  const [speechRate, setSpeechRate] = useState<SpeechRatePreset>(0.8);
   const [mode, setMode] = useState<GameMode>("article");
   const [level, setLevel] = useState<ExerciseLevel>("A1");
   const [articleSeed, setArticleSeed] = useState(0);
@@ -1310,6 +1313,74 @@ export default function MiniGamesPage({
     const selected = new Set(sentenceSelection);
     return sentenceRound.tokens.filter((token) => !selected.has(token.id));
   }, [sentenceRound.tokens, sentenceSelection]);
+  const pronunciationText = useMemo(() => {
+    if (isArticleMode) {
+      return answerState
+        ? `${articleRound.exercise.article} ${articleRound.exercise.noun}`
+        : articleRound.exercise.noun;
+    }
+    if (isGrammarMode) return grammarRound.exercise.sentence;
+    if (isWQuestionMode) return wQuestionRound.exercise.answer;
+    if (isTranslateMode) return translationRound.exercise.source;
+    if (isSentenceMode) {
+      return selectedSentenceTokens.length
+        ? selectedSentenceTokens.map((token) => token.word).join(" ")
+        : "";
+    }
+    if (isChatMode) return chatRound.exercise.incoming;
+    if (isStoryMode) return currentStoryStep.scene;
+    return "";
+  }, [
+    answerState,
+    articleRound.exercise.article,
+    articleRound.exercise.noun,
+    chatRound.exercise.incoming,
+    currentStoryStep.scene,
+    grammarRound.exercise.sentence,
+    isArticleMode,
+    isChatMode,
+    isGrammarMode,
+    isSentenceMode,
+    isStoryMode,
+    isTranslateMode,
+    isWQuestionMode,
+    selectedSentenceTokens,
+    translationRound.exercise.source,
+    wQuestionRound.exercise.answer,
+  ]);
+  const correctPronunciationText = useMemo(() => {
+    if (isArticleMode) return `${articleRound.exercise.article} ${articleRound.exercise.noun}`;
+    if (isGrammarMode) return grammarRound.exercise.sentence;
+    if (isWQuestionMode) return wQuestionRound.exercise.answer;
+    if (isTranslateMode) return translationRound.exercise.source;
+    if (isSentenceMode) return sentenceRound.exercise.words.join(" ");
+    if (isChatMode) return chatRound.exercise.correctReply;
+    if (isStoryMode) return currentStoryStep.correctAnswer;
+    return "";
+  }, [
+    articleRound.exercise.article,
+    articleRound.exercise.noun,
+    chatRound.exercise.correctReply,
+    currentStoryStep.correctAnswer,
+    grammarRound.exercise.sentence,
+    isArticleMode,
+    isChatMode,
+    isGrammarMode,
+    isSentenceMode,
+    isStoryMode,
+    isTranslateMode,
+    isWQuestionMode,
+    sentenceRound.exercise.words,
+    translationRound.exercise.source,
+    wQuestionRound.exercise.answer,
+  ]);
+  const canUseSpeechSynthesis =
+    typeof window !== "undefined" &&
+    "speechSynthesis" in window &&
+    typeof SpeechSynthesisUtterance !== "undefined";
+  const canPronounceCurrentExercise =
+    canUseSpeechSynthesis &&
+    pronunciationText.trim().length > 0;
 
   const extractErrorMessage = useCallback((error: unknown) => {
     if (error && typeof error === "object" && "message" in error) {
@@ -1513,6 +1584,35 @@ export default function MiniGamesPage({
     });
   }, []);
 
+  const speakGermanText = useCallback((value: string, rateOverride?: number) => {
+    if (
+      typeof window === "undefined" ||
+      !("speechSynthesis" in window) ||
+      typeof SpeechSynthesisUtterance === "undefined"
+    ) {
+      return;
+    }
+    const speech = window.speechSynthesis;
+    const trimmedValue = value.replace(/\s+/g, " ").trim();
+    if (!trimmedValue) return;
+
+    speech.cancel();
+    const utterance = new SpeechSynthesisUtterance(trimmedValue);
+    utterance.lang = "de-DE";
+    utterance.rate = rateOverride ?? speechRate;
+    utterance.pitch = 1;
+
+    const germanVoice =
+      speech
+        .getVoices()
+        .find((voice) => voice.lang.toLowerCase().startsWith("de")) ?? null;
+    if (germanVoice) {
+      utterance.voice = germanVoice;
+    }
+
+    speech.speak(utterance);
+  }, [speechRate]);
+
   const resetRoundState = useCallback((nextDuration: number) => {
     setAnswerState(null);
     setAnswerAnimation(null);
@@ -1520,6 +1620,28 @@ export default function MiniGamesPage({
     setSentenceSelection([]);
     setTranslationInput("");
   }, []);
+
+  const renderOptionListenButton = useCallback(
+    (value: string, optionKey: string) => {
+      if (!canUseSpeechSynthesis || !value.trim()) return null;
+      return (
+        <button
+          key={`${optionKey}-listen`}
+          className="miniGamesOptionListen"
+          type="button"
+          aria-label={text.listenAriaLabel ?? "Play German pronunciation"}
+          title={text.listenAriaLabel ?? "Play German pronunciation"}
+          onClick={(event) => {
+            event.stopPropagation();
+            speakGermanText(value);
+          }}
+        >
+          <span aria-hidden="true">🔊</span>
+        </button>
+      );
+    },
+    [canUseSpeechSynthesis, speakGermanText, text.listenAriaLabel],
+  );
 
   const resetStoryEpisodeState = useCallback(() => {
     setStoryDecisionIndex(0);
@@ -1677,6 +1799,9 @@ export default function MiniGamesPage({
         setDailyChallengeState(nextDailyState);
       }
       playFeedbackSound(isCorrect ? "correct" : "wrong");
+      if (isCorrect && correctPronunciationText.trim()) {
+        speakGermanText(correctPronunciationText);
+      }
 
       if (!sessionUserId) return;
       const supabase = getSupabaseClient();
@@ -1750,9 +1875,11 @@ export default function MiniGamesPage({
       overallProgress,
       persistUserStatePatch,
       playFeedbackSound,
+      correctPronunciationText,
       recoveredLivesState,
       refreshLeaderboards,
       sessionUserId,
+      speakGermanText,
       timeLeft,
       todayChallengeKey,
     ],
@@ -2068,6 +2195,15 @@ export default function MiniGamesPage({
     const timeoutId = window.setTimeout(() => setAnswerAnimation(null), 700);
     return () => window.clearTimeout(timeoutId);
   }, [answerState]);
+
+  useEffect(
+    () => () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    },
+    [],
+  );
 
   const feedbackTitle = answerState
     ? answerState.correct
@@ -2570,6 +2706,38 @@ export default function MiniGamesPage({
               </>
             )}
           </p>
+          {canPronounceCurrentExercise ? (
+            <div className="miniGamesPronounceRow">
+              <button
+                className="miniGamesPronounceButton"
+                type="button"
+                onClick={() => speakGermanText(pronunciationText)}
+                aria-label={text.listenAriaLabel ?? "Play German pronunciation"}
+                title={text.listenAriaLabel ?? "Play German pronunciation"}
+              >
+                <span aria-hidden="true">🔊</span>
+              </button>
+              <div className="miniGamesSpeechSpeed" aria-label="Speech speed">
+                {([
+                  { value: 0.68 as SpeechRatePreset, label: "🐢" },
+                  { value: 0.8 as SpeechRatePreset, label: "0.8x" },
+                  { value: 1 as SpeechRatePreset, label: "1x" },
+                ]).map((preset) => (
+                  <button
+                    key={preset.label}
+                    className={`miniGamesSpeechSpeedButton${
+                      speechRate === preset.value ? " miniGamesSpeechSpeedButtonActive" : ""
+                    }`}
+                    type="button"
+                    onClick={() => setSpeechRate(preset.value)}
+                    aria-pressed={speechRate === preset.value}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div
@@ -2594,21 +2762,23 @@ export default function MiniGamesPage({
                 const isCorrect = option === articleRound.exercise.article;
                 const isSelected = answerState?.value === option;
                 return (
-                  <button
-                    key={option}
-                    className={`miniGamesOption miniGamesOptionArticle miniGamesOptionArticle${option[0].toUpperCase()}${option.slice(1)}${
-                      answerState && isCorrect ? " miniGamesOptionCorrect" : ""
-                    }${
-                      answerState && isSelected && !isCorrect
-                        ? " miniGamesOptionWrong"
-                        : ""
-                    }`}
-                    type="button"
-                    disabled={Boolean(answerState) || !hasAvailableLives}
-                    onClick={() => handleAnswer(option)}
-                  >
-                    <span className="miniGamesOptionTitle">{option}</span>
-                  </button>
+                  <div key={option} className="miniGamesOptionWithAudio">
+                    <button
+                      className={`miniGamesOption miniGamesOptionMain miniGamesOptionArticle miniGamesOptionArticle${option[0].toUpperCase()}${option.slice(1)}${
+                        answerState && isCorrect ? " miniGamesOptionCorrect" : ""
+                      }${
+                        answerState && isSelected && !isCorrect
+                          ? " miniGamesOptionWrong"
+                          : ""
+                      }`}
+                      type="button"
+                      disabled={Boolean(answerState) || !hasAvailableLives}
+                      onClick={() => handleAnswer(option)}
+                    >
+                      <span className="miniGamesOptionTitle">{option}</span>
+                    </button>
+                    {renderOptionListenButton(option, option)}
+                  </div>
                 );
               })
             : isGrammarMode
@@ -2616,26 +2786,31 @@ export default function MiniGamesPage({
                   const isCorrect = option === grammarRound.exercise.correctAnswer;
                   const isSelected = answerState?.value === option;
                   return (
-                    <button
+                    <div
                       key={`${grammarRound.exercise.id}-${option}`}
-                      className={`miniGamesOption miniGamesOptionTranslate miniGamesOptionGrammar${
-                        answerState && isCorrect ? " miniGamesOptionCorrect" : ""
-                      }${
-                        answerState && isSelected && !isCorrect
-                          ? " miniGamesOptionWrong"
-                          : ""
-                      }`}
-                      type="button"
-                      disabled={Boolean(answerState) || !hasAvailableLives}
-                      onClick={() => handleAnswer(option)}
+                      className="miniGamesOptionWithAudio"
                     >
-                      <span
-                        className={`miniGamesOptionBody${germanExerciseClassName}`}
-                        {...germanExerciseTextProps}
+                      <button
+                        className={`miniGamesOption miniGamesOptionMain miniGamesOptionTranslate miniGamesOptionGrammar${
+                          answerState && isCorrect ? " miniGamesOptionCorrect" : ""
+                        }${
+                          answerState && isSelected && !isCorrect
+                            ? " miniGamesOptionWrong"
+                            : ""
+                        }`}
+                        type="button"
+                        disabled={Boolean(answerState) || !hasAvailableLives}
+                        onClick={() => handleAnswer(option)}
                       >
-                        {option}
-                      </span>
-                    </button>
+                        <span
+                          className={`miniGamesOptionBody${germanExerciseClassName}`}
+                          {...germanExerciseTextProps}
+                        >
+                          {option}
+                        </span>
+                      </button>
+                      {renderOptionListenButton(option, `${grammarRound.exercise.id}-${option}`)}
+                    </div>
                   );
                 })
             : isWQuestionMode
@@ -2643,26 +2818,31 @@ export default function MiniGamesPage({
                   const isCorrect = option === wQuestionRound.exercise.correctAnswer;
                   const isSelected = answerState?.value === option;
                   return (
-                    <button
+                    <div
                       key={`${wQuestionRound.exercise.id}-${option}`}
-                      className={`miniGamesOption miniGamesOptionTranslate miniGamesOptionGrammar${
-                        answerState && isCorrect ? " miniGamesOptionCorrect" : ""
-                      }${
-                        answerState && isSelected && !isCorrect
-                          ? " miniGamesOptionWrong"
-                          : ""
-                      }`}
-                      type="button"
-                      disabled={Boolean(answerState) || !hasAvailableLives}
-                      onClick={() => handleAnswer(option)}
+                      className="miniGamesOptionWithAudio"
                     >
-                      <span
-                        className={`miniGamesOptionBody${germanExerciseClassName}`}
-                        {...germanExerciseTextProps}
+                      <button
+                        className={`miniGamesOption miniGamesOptionMain miniGamesOptionTranslate miniGamesOptionGrammar${
+                          answerState && isCorrect ? " miniGamesOptionCorrect" : ""
+                        }${
+                          answerState && isSelected && !isCorrect
+                            ? " miniGamesOptionWrong"
+                            : ""
+                        }`}
+                        type="button"
+                        disabled={Boolean(answerState) || !hasAvailableLives}
+                        onClick={() => handleAnswer(option)}
                       >
-                        {option}
-                      </span>
-                    </button>
+                        <span
+                          className={`miniGamesOptionBody${germanExerciseClassName}`}
+                          {...germanExerciseTextProps}
+                        >
+                          {option}
+                        </span>
+                      </button>
+                      {renderOptionListenButton(option, `${wQuestionRound.exercise.id}-${option}`)}
+                    </div>
                   );
                 })
             : isTranslateMode
@@ -2768,26 +2948,28 @@ export default function MiniGamesPage({
                   const isCorrect = option === chatRound.exercise.correctReply;
                   const isSelected = answerState?.value === option;
                   return (
-                    <button
-                      key={option}
-                      className={`miniGamesOption miniGamesOptionTranslate miniGamesOptionChat${
-                        answerState && isCorrect ? " miniGamesOptionCorrect" : ""
-                      }${
-                        answerState && isSelected && !isCorrect
-                          ? " miniGamesOptionWrong"
-                          : ""
-                      }`}
-                      type="button"
-                      disabled={Boolean(answerState) || !hasAvailableLives}
-                      onClick={() => handleAnswer(option)}
-                    >
-                      <span
-                        className={`miniGamesOptionBody${germanExerciseClassName}`}
-                        {...germanExerciseTextProps}
+                    <div key={option} className="miniGamesOptionWithAudio">
+                      <button
+                        className={`miniGamesOption miniGamesOptionMain miniGamesOptionTranslate miniGamesOptionChat${
+                          answerState && isCorrect ? " miniGamesOptionCorrect" : ""
+                        }${
+                          answerState && isSelected && !isCorrect
+                            ? " miniGamesOptionWrong"
+                            : ""
+                        }`}
+                        type="button"
+                        disabled={Boolean(answerState) || !hasAvailableLives}
+                        onClick={() => handleAnswer(option)}
                       >
-                        {option}
-                      </span>
-                    </button>
+                        <span
+                          className={`miniGamesOptionBody${germanExerciseClassName}`}
+                          {...germanExerciseTextProps}
+                        >
+                          {option}
+                        </span>
+                      </button>
+                      {renderOptionListenButton(option, option)}
+                    </div>
                   );
                 })
               ) : (
@@ -2795,26 +2977,31 @@ export default function MiniGamesPage({
                   const isCorrect = option === currentStoryStep.correctAnswer;
                   const isSelected = answerState?.value === option;
                   return (
-                    <button
+                    <div
                       key={`${currentStoryStep.id}-${option}`}
-                      className={`miniGamesOption miniGamesOptionTranslate miniGamesOptionStory${
-                        answerState && isCorrect ? " miniGamesOptionCorrect" : ""
-                      }${
-                        answerState && isSelected && !isCorrect
-                          ? " miniGamesOptionWrong"
-                          : ""
-                      }`}
-                      type="button"
-                      disabled={Boolean(answerState) || !hasAvailableLives}
-                      onClick={() => handleAnswer(option)}
+                      className="miniGamesOptionWithAudio"
                     >
-                      <span
-                        className={`miniGamesOptionBody${germanExerciseClassName}`}
-                        {...germanExerciseTextProps}
+                      <button
+                        className={`miniGamesOption miniGamesOptionMain miniGamesOptionTranslate miniGamesOptionStory${
+                          answerState && isCorrect ? " miniGamesOptionCorrect" : ""
+                        }${
+                          answerState && isSelected && !isCorrect
+                            ? " miniGamesOptionWrong"
+                            : ""
+                        }`}
+                        type="button"
+                        disabled={Boolean(answerState) || !hasAvailableLives}
+                        onClick={() => handleAnswer(option)}
                       >
-                        {option}
-                      </span>
-                    </button>
+                        <span
+                          className={`miniGamesOptionBody${germanExerciseClassName}`}
+                          {...germanExerciseTextProps}
+                        >
+                          {option}
+                        </span>
+                      </button>
+                      {renderOptionListenButton(option, `${currentStoryStep.id}-${option}`)}
+                    </div>
                   );
                 })
               )}
