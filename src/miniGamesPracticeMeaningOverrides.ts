@@ -724,4 +724,148 @@ export const PRACTICE_MEANING_OVERRIDES: Record<
     it: "La sera Nadia e Karim parlano del viaggio fino a quel momento.",
     pl: "Wieczorem Nadia i Karim rozmawiają o dotychczasowej podróży.",
   },
+  "Hi! Are you coming to the language cafe today?": {
+    fa: "سلام! امروز به کافه زبان می‌آیی؟",
+    ar: "مرحبًا! هل ستأتي إلى مقهى اللغات اليوم؟",
+  },
+  "What is your name?": {
+    fa: "اسم تو چیست؟",
+    ar: "ما اسمك؟",
+  },
+  "When does the course start?": {
+    fa: "دوره چه زمانی شروع می‌شود؟",
+    ar: "متى تبدأ الدورة؟",
+  },
+  "Can you help me with this word?": {
+    fa: "می‌توانی در مورد این کلمه به من کمک کنی؟",
+    ar: "هل يمكنك أن تساعدني في هذه الكلمة؟",
+  },
+  "Where are you right now?": {
+    fa: "الان کجا هستی؟",
+    ar: "أين أنت الآن؟",
+  },
+  "Would you like coffee or tea?": {
+    fa: "قهوه می‌خواهی یا چای؟",
+    ar: "هل تود قهوة أم شايًا؟",
+  },
+  "Are you in class today?": {
+    fa: "امروز در کلاس هستی؟",
+    ar: "هل أنت في الصف اليوم؟",
+  },
+  "Shall we meet at the station?": {
+    fa: "در ایستگاه همدیگر را ببینیم؟",
+    ar: "هل نلتقي في المحطة؟",
+  },
+  "Is this seat free?": {
+    fa: "این صندلی خالی است؟",
+    ar: "هل هذا المقعد شاغر؟",
+  },
+  "Do you speak German or English?": {
+    fa: "آلمانی صحبت می‌کنی یا انگلیسی؟",
+    ar: "هل تتحدث الألمانية أم الإنجليزية؟",
+  },
+  "Did you find the classroom?": {
+    fa: "کلاس را پیدا کردی؟",
+    ar: "هل وجدت قاعة الدرس؟",
+  },
+  "Can you send me the address?": {
+    fa: "می‌توانی آدرس را برایم بفرستی؟",
+    ar: "هل يمكنك أن ترسل لي العنوان؟",
+  },
+  "I am ten minutes late. Is that okay?": {
+    fa: "من ده دقیقه دیر می‌رسم. اشکالی ندارد؟",
+    ar: "سأتأخر عشر دقائق. هل هذا مناسب؟",
+  },
+  "Can you bring your notebook, please?": {
+    fa: "می‌شود دفترت را هم بیاوری؟",
+    ar: "هل يمكنك أن تحضر دفترك، من فضلك؟",
+  },
+  "Do you still have time after work?": {
+    fa: "بعد از کار هنوز وقت داری؟",
+    ar: "هل لا يزال لديك وقت بعد العمل؟",
+  },
+  "Can you reserve two seats?": {
+    fa: "می‌توانی دو جا رزرو کنی؟",
+    ar: "هل يمكنك حجز مقعدين؟",
+  },
+  "Do you know when the train arrives?": {
+    fa: "می‌دانی قطار چه وقت می‌رسد؟",
+    ar: "هل تعرف متى يصل القطار؟",
+  },
+  "Can you explain the homework to me?": {
+    fa: "می‌توانی تکلیف را برایم توضیح بدهی؟",
+    ar: "هل يمكنك أن تشرح لي الواجب؟",
+  },
+  "We meet on Thursday instead of Wednesday now.": {
+    fa: "حالا به‌جای چهارشنبه، پنجشنبه همدیگر را می‌بینیم.",
+    ar: "سنلتقي الآن يوم الخميس بدلًا من الأربعاء.",
+  },
+  "Would you like to join our study group?": {
+    fa: "دوست داری به گروه مطالعه ما بپیوندی؟",
+    ar: "هل تود الانضمام إلى مجموعة الدراسة الخاصة بنا؟",
+  },
+  "Please call me when you are there.": {
+    fa: "لطفاً وقتی رسیدی به من زنگ بزن.",
+    ar: "من فضلك اتصل بي عندما تصل إلى هناك.",
+  },
+  "Have you bought the tickets already?": {
+    fa: "آیا بلیت‌ها را قبلاً خریده‌ای؟",
+    ar: "هل اشتريت التذاكر بالفعل؟",
+  },
+  "Can you quickly take a photo of us?": {
+    fa: "می‌توانی سریع از ما یک عکس بگیری؟",
+    ar: "هل يمكنك أن تلتقط لنا صورة بسرعة؟",
+  },
+  "Please do not forget the documents.": {
+    fa: "لطفاً مدارک را فراموش نکن.",
+    ar: "من فضلك لا تنسَ المستندات.",
+  },
+  "How did you like today's language evening?": {
+    fa: "از برنامه زبانی امروز خوشت آمد؟",
+    ar: "كيف وجدت أمسية اللغات اليوم؟",
+  },
+  "It should rain heavily tomorrow. Should we postpone the meeting?": {
+    fa: "فردا احتمالاً باران شدیدی می‌بارد. قرار را عقب بیندازیم؟",
+    ar: "من المفترض أن يهطل المطر بغزارة غدًا. هل نؤجل اللقاء؟",
+  },
+  "How can we practise our German regularly outside class?": {
+    fa: "چطور می‌توانیم بیرون از کلاس به‌طور منظم آلمانی تمرین کنیم؟",
+    ar: "كيف يمكننا أن نمارس الألمانية بانتظام خارج الصف؟",
+  },
+  "Can you briefly summarize the most important points?": {
+    fa: "می‌توانی مهم‌ترین نکته‌ها را خیلی کوتاه خلاصه کنی؟",
+    ar: "هل يمكنك أن تلخص أهم النقاط باختصار؟",
+  },
+  "Can you help at the event on Saturday?": {
+    fa: "می‌توانی شنبه در رویداد کمک کنی؟",
+    ar: "هل يمكنك المساعدة في الفعالية يوم السبت؟",
+  },
+  "I am not sure how we should divide the groups.": {
+    fa: "مطمئن نیستم باید گروه‌ها را چطور تقسیم کنیم.",
+    ar: "لست متأكدًا كيف ينبغي أن نقسم المجموعات.",
+  },
+  "What could we improve in the course?": {
+    fa: "در این دوره چه چیزی را می‌توانیم بهتر کنیم؟",
+    ar: "ما الذي يمكننا تحسينه في الدورة؟",
+  },
+  "The video loads very slowly for me. Do you have the same problem?": {
+    fa: "ویدئو برای من خیلی کند باز می‌شود. تو هم همین مشکل را داری؟",
+    ar: "الفيديو يحمّل ببطء شديد عندي. هل لديك المشكلة نفسها؟",
+  },
+  "Can you prepare the first part if I take over the moderation?": {
+    fa: "اگر اداره جلسه را من بر عهده بگیرم، تو می‌توانی بخش اول را آماده کنی؟",
+    ar: "هل يمكنك تحضير الجزء الأول إذا توليت أنا إدارة الحوار؟",
+  },
+  "Will you manage the text today?": {
+    fa: "امروز متن را تو مدیریت می‌کنی؟",
+    ar: "هل ستتولى النص اليوم؟",
+  },
+  "Thanks again for your help yesterday.": {
+    fa: "باز هم بابت کمکت دیروز ممنونم.",
+    ar: "شكرًا مرة أخرى على مساعدتك أمس.",
+  },
+  "I think we need one more rehearsal.": {
+    fa: "فکر می‌کنم به یک تمرین دیگر نیاز داریم.",
+    ar: "أعتقد أننا نحتاج إلى بروفة أخرى.",
+  },
 };

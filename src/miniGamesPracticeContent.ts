@@ -1,5 +1,6 @@
 import { getMiniGamesGloss, hasMiniGamesGloss } from "./miniGamesGlossary";
 import { PRACTICE_MEANING_OVERRIDES } from "./miniGamesPracticeMeaningOverrides";
+import { PRACTICE_PHRASE_OVERRIDES } from "./miniGamesPracticePhraseOverrides";
 
 export type MiniGamesPracticeLocale =
   | "de"
@@ -224,6 +225,84 @@ function normalizePracticeLocale(locale: string): MiniGamesPracticeLocale {
   return "en";
 }
 
+type PhraseOverrideLocale = "fa" | "ar";
+
+const PHRASE_OVERRIDE_ENTRIES = Object.entries(PRACTICE_PHRASE_OVERRIDES)
+  .map(([phrase, translations]) => ({
+    phrase,
+    lowered: phrase.toLowerCase(),
+    translations,
+  }))
+  .sort((left, right) => right.phrase.length - left.phrase.length);
+
+const FA_SENTENCE_POLISH_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/^من (?=(می|باید|دار|فکر می|پیشنهاد می|متوجه شدم|می‌خواهم))/u, ""],
+  [/^ما (?=(می|باید|دار|فکر می|پیشنهاد می|متوجه شدیم|می‌خواهیم))/u, ""],
+  [/دوست من/gu, "دوستم"],
+  [/در وقت استراحت/gu, "سرِ استراحت"],
+  [/وقت ناهار/gu, "برای ناهار"],
+  [/پیش خانواده/gu, "با خانواده"],
+  [/فوراً صورت‌حساب را/gu, "صورت‌حساب را همان‌جا"],
+  [/باور داریم/gu, "فکر می‌کنیم"],
+  [/این برداشت را دارم که/gu, "به نظرم"],
+  [/این برداشت را داریم که/gu, "به نظرمان"],
+  [/همکارم این برداشت را دارد که/gu, "همکارم فکر می‌کند که"],
+  [/مشتری این برداشت را دارد که/gu, "مشتری فکر می‌کند که"],
+  [/گروه این برداشت را دارد که/gu, "گروه فکر می‌کند که"],
+  [/می‌خواهم روشن کنم که/gu, "می‌خواهم روشن کنم"],
+  [/می‌خواهیم روشن کنیم که/gu, "می‌خواهیم روشن کنیم"],
+  [/روی یک برنامه زمانی واقع‌بینانه توافق کنیم/gu, "روی یک زمان‌بندی واقع‌بینانه به توافق برسیم"],
+  [/اول پرسش‌های فوری‌تر را روشن کنیم/gu, "اول تکلیف پرسش‌های فوری‌تر را روشن کنیم"],
+];
+
+const AR_SENTENCE_POLISH_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/^أنا /u, ""],
+  [/^نحن /u, ""],
+  [/^أود أن /u, "أريد أن "],
+  [/^نود أن /u, "نريد أن "],
+  [/صديقي يود أن/gu, "صديقي يريد أن"],
+  [/السائح يود أن/gu, "السائح يريد أن"],
+  [/الزائر يود أن/gu, "الزائر يريد أن"],
+  [/الضيف يود أن/gu, "الضيف يريد أن"],
+  [/المجموعة تود أن/gu, "المجموعة تريد أن"],
+  [/زميلتي تود أن توضح/gu, "زميلتي تريد أن توضح"],
+  [/العميل يود أن يوضح/gu, "العميل يريد أن يوضح"],
+  [/الإدارة تود أن توضح/gu, "الإدارة تريد أن توضح"],
+  [/لدي انطباع بأن/gu, "أشعر أن"],
+  [/لدينا انطباع بأن/gu, "نشعر أن"],
+  [/لدى زميلتي انطباع بأن/gu, "تشعر زميلتي أن"],
+  [/لدى العميل انطباع بأن/gu, "يشعر العميل أن"],
+  [/لدى المجموعة انطباع بأن/gu, "تشعر المجموعة أن"],
+  [/في المقهى عند الثامنة\./gu, "في المقهى الساعة الثامنة."],
+];
+
+const FA_CONVERSATIONAL_SENTENCE_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/^من /u, ""],
+  [/^ما /u, ""],
+  [/برای دوره به یک دفتر/gu, "برای کلاس یک دفتر"],
+  [/در ایستگاه به کمی اطلاعات/gu, "در ایستگاه به کمی راهنمایی"],
+  [/بعداً با اداره تماس می‌گیرم/gu, "بعداً به دفتر زنگ می‌زنم"],
+  [/فردا با هتل تماس می‌گیرم/gu, "فردا به هتل زنگ می‌زنم"],
+  [/بعد از دوره دوباره تماس می‌گیرم/gu, "بعد از کلاس دوباره زنگ می‌زنم"],
+  [/امروز یک بار دیگر تماس می‌گیرم/gu, "امروز یک بار دیگر زنگ می‌زنم"],
+  [/اول تکلیف پرسش‌های فوری‌تر را روشن کنیم/gu, "اول تکلیف پرسش‌های فوری‌تر را مشخص کنیم"],
+];
+
+const AR_CONVERSATIONAL_SENTENCE_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/ما الأولويات التي نحددها اليوم\./gu, "ما أولوياتنا اليوم؟"],
+  [/هل لا يزال من الممكن تغيير الاقتراح\./gu, "هل ما زال بالإمكان تغيير الاقتراح؟"],
+  [/كيف ينبغي أن نتصرف بأفضل طريقة في هذه الحالة\./gu, "ما أفضل طريقة للتصرف في هذه الحالة؟"],
+  [/من الذي سيتولى الخطوة التالية\./gu, "من سيتولى الخطوة التالية؟"],
+  [/العملية أصبحت معقدة جدًا\./gu, "العملية صارت معقدة جدًا."],
+  [/علينا أن نبلغ أبكر\./gu, "علينا أن نبلّغ في وقت أبكر."],
+  [/المهام موزعة بشكل غير عادل\./gu, "المهام موزعة بطريقة غير عادلة."],
+  [/لا تزال هناك تفاصيل مهمة ناقصة\./gu, "ما زالت هناك تفاصيل مهمة ناقصة."],
+  [/إعادة هيكلة العملية من جديد\./gu, "إعادة تنظيم سير العمل من جديد."],
+  [/تدوين الملاحظات كتابةً\./gu, "توثيق الملاحظات كتابيًا."],
+  [/توضيح الأسئلة الأكثر إلحاحًا أولًا\./gu, "حسم الأسئلة الأكثر إلحاحًا أولًا."],
+  [/الاتفاق على جدول زمني واقعي\./gu, "وضع جدول زمني واقعي."],
+];
+
 function normalizeEnglishWord(word: string): string {
   const lower = word.toLowerCase().replace(/^'+|'+$/g, "");
   if (!lower) return lower;
@@ -262,10 +341,73 @@ function translateWord(word: string, locale: Exclude<MiniGamesPracticeLocale, "e
   return word;
 }
 
+function isEnglishWordChar(value: string | undefined): boolean {
+  return typeof value === "string" && /[A-Za-z']/.test(value);
+}
+
+function matchPhraseOverride(
+  source: string,
+  index: number,
+  locale: PhraseOverrideLocale,
+): { translated: string; length: number } | null {
+  const loweredSource = source.toLowerCase();
+
+  for (const entry of PHRASE_OVERRIDE_ENTRIES) {
+    const translated = entry.translations[locale];
+    if (typeof translated !== "string" || !translated.trim()) continue;
+    if (!loweredSource.startsWith(entry.lowered, index)) continue;
+
+    const previousChar = source[index - 1];
+    const nextChar = source[index + entry.phrase.length];
+    if (isEnglishWordChar(previousChar) || isEnglishWordChar(nextChar)) continue;
+
+    return {
+      translated,
+      length: entry.phrase.length,
+    };
+  }
+
+  return null;
+}
+
 function translateEnglishMeaning(
   englishText: string,
   locale: Exclude<MiniGamesPracticeLocale, "en" | "de">,
 ): string {
+  if (locale === "fa" || locale === "ar") {
+    const translatedParts: string[] = [];
+    let index = 0;
+
+    while (index < englishText.length) {
+      const phraseMatch = matchPhraseOverride(englishText, index, locale);
+      if (phraseMatch) {
+        translatedParts.push(phraseMatch.translated);
+        index += phraseMatch.length;
+        continue;
+      }
+
+      const currentChar = englishText[index];
+      if (isEnglishWordChar(currentChar)) {
+        let wordEnd = index + 1;
+        while (wordEnd < englishText.length && isEnglishWordChar(englishText[wordEnd])) {
+          wordEnd += 1;
+        }
+        translatedParts.push(translateWord(englishText.slice(index, wordEnd), locale));
+        index = wordEnd;
+        continue;
+      }
+
+      translatedParts.push(currentChar);
+      index += 1;
+    }
+
+    return translatedParts
+      .join("")
+      .replace(/\s+/g, " ")
+      .replace(/\s+([.,!?;:])/g, "$1")
+      .trim();
+  }
+
   const parts = englishText.match(/([A-Za-z']+|[^A-Za-z']+)/g) ?? [englishText];
   const translatedParts: string[] = [];
 
@@ -319,4 +461,32 @@ export function localizePracticeMeta(
     englishText,
     normalizedLocale as Exclude<MiniGamesPracticeLocale, "en" | "de">,
   );
+}
+
+export function polishSentenceMeaningForLocale(text: string, locale: string): string {
+  const normalizedLocale = normalizePracticeLocale(locale);
+  const replacements =
+    normalizedLocale === "fa"
+      ? FA_SENTENCE_POLISH_REPLACEMENTS
+      : normalizedLocale === "ar"
+        ? AR_SENTENCE_POLISH_REPLACEMENTS
+        : null;
+  const conversationalReplacements =
+    normalizedLocale === "fa"
+      ? FA_CONVERSATIONAL_SENTENCE_REPLACEMENTS
+      : normalizedLocale === "ar"
+        ? AR_CONVERSATIONAL_SENTENCE_REPLACEMENTS
+        : null;
+
+  if (!replacements && !conversationalReplacements) return text;
+
+  let polished = text;
+  for (const [pattern, replacement] of replacements ?? []) {
+    polished = polished.replace(pattern, replacement);
+  }
+  for (const [pattern, replacement] of conversationalReplacements ?? []) {
+    polished = polished.replace(pattern, replacement);
+  }
+
+  return polished.replace(/\s+/g, " ").trim();
 }

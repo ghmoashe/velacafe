@@ -947,6 +947,9 @@ export default function MiniGamesPage({
   sessionUserId = null,
   isPremium = false,
 }: MiniGamesPageProps) {
+  const normalizedLocale = locale.toLowerCase();
+  const isRtlExerciseLocale =
+    normalizedLocale.startsWith("ar") || normalizedLocale.startsWith("fa");
   const text = getMiniGamesText(locale);
   const articleExercises = useMemo(() => getArticleExercises(locale), [locale]);
   const grammarExercises = useMemo(
@@ -1007,6 +1010,18 @@ export default function MiniGamesPage({
   const [answerAnimation, setAnswerAnimation] = useState<"correct" | "wrong" | null>(null);
   const [answerState, setAnswerState] = useState<AnswerState | null>(null);
   const [timeLeft, setTimeLeft] = useState(ROUND_DURATIONS.article);
+  const germanExerciseTextProps = isRtlExerciseLocale
+    ? ({ dir: "ltr", lang: "de" } as const)
+    : ({ lang: "de" } as const);
+  const germanExerciseClassName = isRtlExerciseLocale ? " miniGamesExerciseTextLtr" : "";
+  const inlineValueClassName = isRtlExerciseLocale ? " miniGamesInlineValue" : "";
+  const inlineValueProps = isRtlExerciseLocale
+    ? ({ dir: "ltr" } as const)
+    : ({} as const);
+  const isolateGermanExerciseText = useCallback(
+    (value: string) => (isRtlExerciseLocale ? `\u2066${value}\u2069` : value),
+    [isRtlExerciseLocale],
+  );
 
   const modeExercises = useMemo(() => {
     switch (mode) {
@@ -2076,24 +2091,30 @@ export default function MiniGamesPage({
 
   const feedbackBody = answerState
     ? isArticleMode
-      ? `${articleRound.exercise.article} ${articleRound.exercise.noun} (${articleRound.exercise.hint})`
+      ? `${isolateGermanExerciseText(
+          `${articleRound.exercise.article} ${articleRound.exercise.noun}`,
+        )} (${articleRound.exercise.hint})`
       : isGrammarMode
         ? `${grammarRound.exercise.correctAnswer} (${
             text.explainGrammar ??
             "Watch the signal word: verb, preposition, and movement vs. location decide the case."
           })`
       : isWQuestionMode
-        ? `${wQuestionRound.exercise.questionTemplate.replace(
-            "___",
-            wQuestionRound.exercise.correctAnswer,
+        ? `${isolateGermanExerciseText(
+            wQuestionRound.exercise.questionTemplate.replace(
+              "___",
+              wQuestionRound.exercise.correctAnswer,
+            ),
           )} (${wQuestionRound.exercise.explanation})`
       : isTranslateMode
         ? `${translationRound.exercise.source} = ${translationRound.exercise.target}`
-        : isSentenceMode
-          ? `${sentenceRound.exercise.words.join(" ")} (${sentenceRound.exercise.translation})`
+      : isSentenceMode
+          ? `${isolateGermanExerciseText(
+              sentenceRound.exercise.words.join(" "),
+            )} (${sentenceRound.exercise.translation})`
           : isChatMode
-            ? `${chatRound.exercise.correctReply} (${text.explainChat})`
-            : `${currentStoryStep.correctAnswer} (${
+            ? `${isolateGermanExerciseText(chatRound.exercise.correctReply)} (${text.explainChat})`
+            : `${isolateGermanExerciseText(currentStoryStep.correctAnswer)} (${
                 text.explainStory ??
                 "Look for the response that solves the situation clearly and naturally."
               })`
@@ -2112,15 +2133,12 @@ export default function MiniGamesPage({
           : isChatMode
             ? text.explainChat
             : text.explainStory ?? "Look for the response that solves the situation clearly and naturally.";
-  const storyDecisionLabel = `${
-    text.storyDecisionLabel ?? "Decision"
-  } ${Math.min(storyDecisionIndex + 1, currentStoryEpisode.steps.length)}/${currentStoryEpisode.steps.length}`;
-  const storyEpisodeScoreLabel = `${
-    text.storyEpisodeScoreLabel ?? "Episode score"
-  }: ${storyEpisodeScore}`;
-  const storyEpisodeResultLabel = `${
-    text.storyEpisodeResultLabel ?? "Episode result"
-  }: ${storyEpisodeCorrectCount}/${currentStoryEpisode.steps.length}`;
+  const storyDecisionValue = `${Math.min(
+    storyDecisionIndex + 1,
+    currentStoryEpisode.steps.length,
+  )}/${currentStoryEpisode.steps.length}`;
+  const storyEpisodeScoreValue = `${storyEpisodeScore}`;
+  const storyEpisodeResultValue = `${storyEpisodeCorrectCount}/${currentStoryEpisode.steps.length}`;
   const storyHistory = currentStoryEpisode.steps.slice(0, storyDecisionIndex);
   const nextButtonLabel = isStoryMode
     ? isFinalStoryDecision
@@ -2299,25 +2317,29 @@ export default function MiniGamesPage({
         <div className="miniGamesHud">
           <div className="miniGamesHudPill">
             <span aria-hidden="true">🔥</span>
-            <span>
-              {text.scoreBadge}: {overallProgress.totalScore}
-            </span>
+            <span>{text.scoreBadge}:</span>
+            <strong className={inlineValueClassName.trim()} {...inlineValueProps}>
+              {overallProgress.totalScore}
+            </strong>
           </div>
           <div className="miniGamesHudPill">
             <span aria-hidden="true">⏱️</span>
-            <span>
-              {text.timerBadge}: {formatTimer(timeLeft)}
-            </span>
+            <span>{text.timerBadge}:</span>
+            <strong className={inlineValueClassName.trim()} {...inlineValueProps}>
+              {formatTimer(timeLeft)}
+            </strong>
           </div>
           <div className="miniGamesHudPill">
             <span>{text.livesBadge ?? "Lives"}:</span>
-            <strong>
+            <strong className={inlineValueClassName.trim()} {...inlineValueProps}>
               {recoveredLivesState.infinite
                 ? text.livesInfinite ?? "Premium"
                 : recoveredLivesState.lives}
             </strong>
             {!recoveredLivesState.infinite && nextLifeCountdown ? (
-              <small>{nextLifeCountdown}</small>
+              <small className={inlineValueClassName.trim()} {...inlineValueProps}>
+                {nextLifeCountdown}
+              </small>
             ) : null}
           </div>
         </div>
@@ -2353,47 +2375,90 @@ export default function MiniGamesPage({
           <div className="miniGamesChatPreview">
               <div className="miniGamesChatMeta">
                 <span>{chatRound.exercise.contact}</span>
-                <span>{effectiveLevel}</span>
+                <span className={inlineValueClassName.trim()} {...inlineValueProps}>
+                  {effectiveLevel}
+                </span>
               </div>
-              <div className="miniGamesChatBubble">
+              <div
+                className={`miniGamesChatBubble${germanExerciseClassName}`}
+                {...germanExerciseTextProps}
+              >
                 {chatRound.exercise.incoming}
               </div>
             </div>
           ) : isStoryMode ? (
             <div className="miniGamesStoryPreview">
               <div className="miniGamesStoryTitle">
-                <span>{currentStoryEpisode.title}</span>
-                <small>{effectiveLevel}</small>
+                <span
+                  className={germanExerciseClassName.trim()}
+                  {...germanExerciseTextProps}
+                >
+                  {currentStoryEpisode.title}
+                </span>
+                <small className={inlineValueClassName.trim()} {...inlineValueProps}>
+                  {effectiveLevel}
+                </small>
               </div>
               <div className="miniGamesStoryMetaRow">
                 <span className="miniGamesStoryMetaChip">
                   {text.storySettingLabel ?? "Place"}: {currentStoryEpisode.setting}
                 </span>
-                <span className="miniGamesStoryMetaChip">{storyDecisionLabel}</span>
-                <span className="miniGamesStoryMetaChip">{storyEpisodeScoreLabel}</span>
+                <span className="miniGamesStoryMetaChip">
+                  <span>{text.storyDecisionLabel ?? "Decision"}</span>{" "}
+                  <span className={inlineValueClassName.trim()} {...inlineValueProps}>
+                    {storyDecisionValue}
+                  </span>
+                </span>
+                <span className="miniGamesStoryMetaChip">
+                  <span>{text.storyEpisodeScoreLabel ?? "Episode score"}:</span>{" "}
+                  <span className={inlineValueClassName.trim()} {...inlineValueProps}>
+                    {storyEpisodeScoreValue}
+                  </span>
+                </span>
                 {(currentStoryEpisode.characters ?? []).map((character) => (
                   <span className="miniGamesStoryMetaChip" key={character}>
                     {character}
                   </span>
                 ))}
               </div>
-              <div className="miniGamesStorySetup">{currentStoryEpisode.setup}</div>
+              <div
+                className={`miniGamesStorySetup${germanExerciseClassName}`}
+                {...germanExerciseTextProps}
+              >
+                {currentStoryEpisode.setup}
+              </div>
               {storyHistory.length ? (
                 <div className="miniGamesStoryBeats">
                   {storyHistory.map((step, index) => (
                     <div className="miniGamesStoryBeat" key={`${currentStoryEpisode.id}-beat-${step.id}`}>
                       <span className="miniGamesStoryBeatIndex">{index + 1}</span>
-                      <span>{step.scene}</span>
+                      <span
+                        className={germanExerciseClassName.trim()}
+                        {...germanExerciseTextProps}
+                      >
+                        {step.scene}
+                      </span>
                     </div>
                   ))}
                 </div>
               ) : null}
               <div className="miniGamesStoryQuestion">
-                <strong>{text.storySceneLabel ?? "Scene"}:</strong> {currentStoryStep.scene}
+                <strong>{text.storySceneLabel ?? "Scene"}:</strong>{" "}
+                <span
+                  className={germanExerciseClassName.trim()}
+                  {...germanExerciseTextProps}
+                >
+                  {currentStoryStep.scene}
+                </span>
               </div>
               <div className="miniGamesStoryQuestion">
                 <strong>{text.storyQuestionLabel ?? "Question"}:</strong>{" "}
-                {currentStoryStep.question}
+                <span
+                  className={germanExerciseClassName.trim()}
+                  {...germanExerciseTextProps}
+                >
+                  {currentStoryStep.question}
+                </span>
               </div>
             </div>
           ) : isWQuestionMode ? (
@@ -2401,16 +2466,31 @@ export default function MiniGamesPage({
               <div className="miniGamesChatPreview">
                 <div className="miniGamesChatMeta">
                   <span>{text.wQuestionAnswerLabel ?? "Answer"}</span>
-                  <span>{effectiveLevel}</span>
+                  <span className={inlineValueClassName.trim()} {...inlineValueProps}>
+                    {effectiveLevel}
+                  </span>
                 </div>
-                <div className="miniGamesChatBubble">{wQuestionRound.exercise.answer}</div>
+                <div
+                  className={`miniGamesChatBubble${germanExerciseClassName}`}
+                  {...germanExerciseTextProps}
+                >
+                  {wQuestionRound.exercise.answer}
+                </div>
               </div>
-              <div className="miniGamesWordLine">
+              <div
+                className={`miniGamesWordLine${germanExerciseClassName}`}
+                {...germanExerciseTextProps}
+              >
                 <span>{wQuestionRound.exercise.questionTemplate}</span>
               </div>
             </>
           ) : (
-            <div className="miniGamesWordLine">
+            <div
+              className={`miniGamesWordLine${
+                isArticleMode || isGrammarMode ? germanExerciseClassName : ""
+              }`}
+              {...(isArticleMode || isGrammarMode ? germanExerciseTextProps : {})}
+            >
               {isArticleMode ? (
                 <>
                   <span className="miniGamesMissingArticle">___</span>
@@ -2448,28 +2528,45 @@ export default function MiniGamesPage({
             ) : isGrammarMode ? (
               <>
                 {text.hintLabel}: {grammarRound.exercise.translation} (
-                {effectiveLevel} / {currentGrammarTopicLabel})
+                <span className={inlineValueClassName.trim()} {...inlineValueProps}>
+                  {effectiveLevel}
+                </span>{" "}
+                / {currentGrammarTopicLabel})
               </>
             ) : isWQuestionMode ? (
               <>
                 {text.wQuestionHintLabel ?? "Meaning"}: {wQuestionRound.exercise.translation} (
-                {effectiveLevel})
+                <span className={inlineValueClassName.trim()} {...inlineValueProps}>
+                  {effectiveLevel}
+                </span>)
               </>
             ) : isTranslateMode ? (
               <>
-                {text.levelLabel}: {effectiveLevel}
+                {text.levelLabel}:{" "}
+                <span className={inlineValueClassName.trim()} {...inlineValueProps}>
+                  {effectiveLevel}
+                </span>
               </>
             ) : isSentenceMode ? (
               <>
-                {text.sentenceHintLabel}: {sentenceRound.exercise.translation} ({effectiveLevel})
+                {text.sentenceHintLabel}: {sentenceRound.exercise.translation} (
+                <span className={inlineValueClassName.trim()} {...inlineValueProps}>
+                  {effectiveLevel}
+                </span>)
               </>
             ) : isChatMode ? (
               <>
-                {text.chatHintLabel}: {chatRound.exercise.translation} ({effectiveLevel})
+                {text.chatHintLabel}: {chatRound.exercise.translation} (
+                <span className={inlineValueClassName.trim()} {...inlineValueProps}>
+                  {effectiveLevel}
+                </span>)
               </>
             ) : (
               <>
-                {text.storyHintLabel ?? "Story"}: {currentStoryStep.translation} ({effectiveLevel})
+                {text.storyHintLabel ?? "Story"}: {currentStoryStep.translation} (
+                <span className={inlineValueClassName.trim()} {...inlineValueProps}>
+                  {effectiveLevel}
+                </span>)
               </>
             )}
           </p>
@@ -2532,7 +2629,12 @@ export default function MiniGamesPage({
                       disabled={Boolean(answerState) || !hasAvailableLives}
                       onClick={() => handleAnswer(option)}
                     >
-                      <span className="miniGamesOptionBody">{option}</span>
+                      <span
+                        className={`miniGamesOptionBody${germanExerciseClassName}`}
+                        {...germanExerciseTextProps}
+                      >
+                        {option}
+                      </span>
                     </button>
                   );
                 })
@@ -2554,7 +2656,12 @@ export default function MiniGamesPage({
                       disabled={Boolean(answerState) || !hasAvailableLives}
                       onClick={() => handleAnswer(option)}
                     >
-                      <span className="miniGamesOptionBody">{option}</span>
+                      <span
+                        className={`miniGamesOptionBody${germanExerciseClassName}`}
+                        {...germanExerciseTextProps}
+                      >
+                        {option}
+                      </span>
                     </button>
                   );
                 })
@@ -2594,7 +2701,10 @@ export default function MiniGamesPage({
               )
               : isSentenceMode ? (
                 <div className="miniGamesSentenceBoard">
-                  <div className="miniGamesSentenceAnswer">
+                  <div
+                    className={`miniGamesSentenceAnswer${germanExerciseClassName}`}
+                    {...germanExerciseTextProps}
+                  >
                     {selectedSentenceTokens.length ? (
                       selectedSentenceTokens.map((token) => (
                         <button
@@ -2613,7 +2723,10 @@ export default function MiniGamesPage({
                     )}
                   </div>
 
-                  <div className="miniGamesSentenceBank">
+                  <div
+                    className={`miniGamesSentenceBank${germanExerciseClassName}`}
+                    {...germanExerciseTextProps}
+                  >
                     {availableSentenceTokens.map((token) => (
                       <button
                         key={token.id}
@@ -2668,7 +2781,12 @@ export default function MiniGamesPage({
                       disabled={Boolean(answerState) || !hasAvailableLives}
                       onClick={() => handleAnswer(option)}
                     >
-                      <span className="miniGamesOptionBody">{option}</span>
+                      <span
+                        className={`miniGamesOptionBody${germanExerciseClassName}`}
+                        {...germanExerciseTextProps}
+                      >
+                        {option}
+                      </span>
                     </button>
                   );
                 })
@@ -2690,7 +2808,12 @@ export default function MiniGamesPage({
                       disabled={Boolean(answerState) || !hasAvailableLives}
                       onClick={() => handleAnswer(option)}
                     >
-                      <span className="miniGamesOptionBody">{option}</span>
+                      <span
+                        className={`miniGamesOptionBody${germanExerciseClassName}`}
+                        {...germanExerciseTextProps}
+                      >
+                        {option}
+                      </span>
                     </button>
                   );
                 })
@@ -2740,7 +2863,10 @@ export default function MiniGamesPage({
 
           <div className="miniGamesStreakRow">
             <span>
-              {text.starsLabel}: {activeStats.streak}
+              {text.starsLabel}:{" "}
+              <span className={inlineValueClassName.trim()} {...inlineValueProps}>
+                {activeStats.streak}
+              </span>
             </span>
             <span className="miniGamesStars" aria-hidden="true">
               {renderStreakStars(activeStats.streak)}
@@ -2749,8 +2875,18 @@ export default function MiniGamesPage({
 
           {isStoryMode && (answerState || storyDecisionIndex > 0 || storyEpisodeScore > 0) ? (
             <div className="miniGamesStoryEpisodeSummary">
-              <span>{storyEpisodeResultLabel}</span>
-              <strong>{storyEpisodeScoreLabel}</strong>
+              <span>
+                <span>{text.storyEpisodeResultLabel ?? "Episode result"}:</span>{" "}
+                <span className={inlineValueClassName.trim()} {...inlineValueProps}>
+                  {storyEpisodeResultValue}
+                </span>
+              </span>
+              <strong>
+                <span>{text.storyEpisodeScoreLabel ?? "Episode score"}:</span>{" "}
+                <span className={inlineValueClassName.trim()} {...inlineValueProps}>
+                  {storyEpisodeScoreValue}
+                </span>
+              </strong>
             </div>
           ) : null}
 
@@ -2769,19 +2905,27 @@ export default function MiniGamesPage({
       <div className="miniGamesStats">
         <article className="miniGamesStatCard">
           <span>{text.scoreLabel}</span>
-          <strong>{overallProgress.totalScore}</strong>
+          <strong className={inlineValueClassName.trim()} {...inlineValueProps}>
+            {overallProgress.totalScore}
+          </strong>
         </article>
         <article className="miniGamesStatCard">
           <span>{text.statsAccuracy}</span>
-          <strong>{formatAccuracy(activeStats)}</strong>
+          <strong className={inlineValueClassName.trim()} {...inlineValueProps}>
+            {formatAccuracy(activeStats)}
+          </strong>
         </article>
         <article className="miniGamesStatCard">
           <span>{text.statsStreak}</span>
-          <strong>{activeStats.streak}</strong>
+          <strong className={inlineValueClassName.trim()} {...inlineValueProps}>
+            {activeStats.streak}
+          </strong>
         </article>
         <article className="miniGamesStatCard">
           <span>{text.statsBest}</span>
-          <strong>{activeStats.bestStreak}</strong>
+          <strong className={inlineValueClassName.trim()} {...inlineValueProps}>
+            {activeStats.bestStreak}
+          </strong>
         </article>
       </div>
 

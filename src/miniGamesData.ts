@@ -2,7 +2,9 @@ import { getMiniGamesGloss, hasMiniGamesGloss } from "./miniGamesGlossary";
 import {
   localizePracticeMeaning,
   localizePracticeMeta,
+  polishSentenceMeaningForLocale,
 } from "./miniGamesPracticeContent";
+import { SENTENCE_MEANING_OVERRIDES } from "./miniGamesSentenceMeaningOverrides";
 
 export type ArticleOption = "der" | "die" | "das";
 
@@ -1084,10 +1086,22 @@ const SENTENCE_EXERCISES_BASE: SentenceExercise[] = [
 function buildSentenceExercises(locale: string): SentenceExercise[] {
   return SENTENCE_EXERCISES_BASE.map((exercise) => ({
     ...exercise,
-    translation: localizePracticeMeaning(
-      exercise.translation,
+    translation: polishSentenceMeaningForLocale(
+      locale.startsWith("fa") || locale.startsWith("ar")
+        ? SENTENCE_MEANING_OVERRIDES[exercise.id]?.[
+            locale.startsWith("fa") ? "fa" : "ar"
+          ] ??
+            localizePracticeMeaning(
+              exercise.translation,
+              locale,
+              exercise.words.join(" "),
+            )
+        : localizePracticeMeaning(
+            exercise.translation,
+            locale,
+            exercise.words.join(" "),
+          ),
       locale,
-      exercise.words.join(" "),
     ),
   }));
 }

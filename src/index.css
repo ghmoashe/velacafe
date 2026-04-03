@@ -5064,6 +5064,17 @@ button:focus-visible {
   text-shadow: 0 8px 20px rgba(42, 30, 98, 0.3);
 }
 
+.miniGamesExerciseTextLtr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.miniGamesInlineValue {
+  display: inline-block;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
 .miniGamesMissingArticle {
   opacity: 0.88;
 }
@@ -5078,6 +5089,7 @@ button:focus-visible {
   margin: 0;
   color: rgba(239, 245, 255, 0.84);
   font-weight: 600;
+  unicode-bidi: plaintext;
 }
 
 .miniGamesOptions {
@@ -5458,6 +5470,12 @@ button:focus-visible {
   padding: 12px 14px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.14);
+}
+
+[dir="rtl"] .miniGamesFeedbackBadge,
+[dir="rtl"] .miniGamesLivesEmptyCard,
+[dir="rtl"] .miniGamesStatCard {
+  text-align: right;
 }
 
 .miniGamesFeedbackBadgeSuccess {
