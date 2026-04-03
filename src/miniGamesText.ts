@@ -4,6 +4,7 @@ export type MiniGamesText = {
   subtitle: string;
   articleMode: string;
   grammarMode?: string;
+  wQuestionMode?: string;
   translateMode: string;
   sentenceMode: string;
   chatMode: string;
@@ -14,6 +15,7 @@ export type MiniGamesText = {
   statsStreak: string;
   statsBest: string;
   articlePrompt: string;
+  wQuestionPrompt?: string;
   translatePrompt: string;
   translateInputPlaceholder?: string;
   submitTranslation?: string;
@@ -22,6 +24,7 @@ export type MiniGamesText = {
   storyPrompt?: string;
   chooseArticle: string;
   chooseGrammar?: string;
+  chooseWQuestion?: string;
   chooseTranslation: string;
   chooseSentence: string;
   chooseChat: string;
@@ -35,6 +38,7 @@ export type MiniGamesText = {
   scoreLabel: string;
   explainArticle: string;
   explainGrammar?: string;
+  explainWQuestion?: string;
   explainTranslation: string;
   explainSentence: string;
   explainChat: string;
@@ -46,6 +50,8 @@ export type MiniGamesText = {
   clearSentence: string;
   sentenceHintLabel: string;
   sentenceEmpty: string;
+  wQuestionHintLabel?: string;
+  wQuestionAnswerLabel?: string;
   chatHintLabel: string;
   chatScenarioLabel: string;
   storyHintLabel?: string;
@@ -81,6 +87,7 @@ export type MiniGamesText = {
   leaderboardDaily?: string;
   leaderboardAllTime?: string;
   leaderboardEmpty?: string;
+  leaderboardUnavailable?: string;
 };
 
 type MiniGamesLocale =
@@ -105,6 +112,7 @@ const ENGLISH_TEXT: MiniGamesText = {
     "Train vocabulary with quick rounds: guess the article, translate words, build sentences, and pick natural chat replies.",
   articleMode: "Guess article",
   grammarMode: "Grammar cases",
+  wQuestionMode: "W-Fragen",
   translateMode: "Translate words",
   sentenceMode: "Build sentence",
   chatMode: "Chat simulator",
@@ -115,6 +123,7 @@ const ENGLISH_TEXT: MiniGamesText = {
   statsStreak: "Streak",
   statsBest: "Best streak",
   articlePrompt: "Choose the correct German article.",
+  wQuestionPrompt: "Choose the correct W-question word.",
   translatePrompt: "Choose the correct translation.",
   translateInputPlaceholder: "Type the translation",
   submitTranslation: "Check answer",
@@ -123,6 +132,7 @@ const ENGLISH_TEXT: MiniGamesText = {
   storyPrompt: "Read the scene and choose the best continuation.",
   chooseArticle: "Pick der, die, or das.",
   chooseGrammar: "Choose the correct case form.",
+  chooseWQuestion: "Pick the W-word that completes the question.",
   chooseTranslation: "Pick the right meaning.",
   chooseSentence: "Tap the words to build the sentence.",
   chooseChat: "Pick the most natural reply.",
@@ -137,6 +147,8 @@ const ENGLISH_TEXT: MiniGamesText = {
   explainArticle: "Remember the noun together with its article.",
   explainGrammar:
     "Watch the signal word: verb, preposition, and movement vs. location decide the case.",
+  explainWQuestion:
+    "Match the missing information: person, thing, place, time, reason, direction, or possession.",
   explainTranslation: "Repeat the pair aloud to lock it in faster.",
   explainSentence: "Build the sentence from left to right and listen for the rhythm.",
   explainChat: "Focus on the goal of the message: confirm, ask, help, or respond politely.",
@@ -148,6 +160,8 @@ const ENGLISH_TEXT: MiniGamesText = {
   clearSentence: "Clear",
   sentenceHintLabel: "Meaning",
   sentenceEmpty: "Tap a word below to start the sentence.",
+  wQuestionHintLabel: "Meaning",
+  wQuestionAnswerLabel: "Answer",
   chatHintLabel: "Meaning",
   chatScenarioLabel: "Scenario",
   storyHintLabel: "Story",
@@ -186,6 +200,8 @@ const ENGLISH_TEXT: MiniGamesText = {
   leaderboardDaily: "Today",
   leaderboardAllTime: "All time",
   leaderboardEmpty: "No results yet.",
+  leaderboardUnavailable:
+    "Leaderboard is temporarily unavailable. Check your connection and try again.",
 };
 
 const MINI_GAMES_TEXT: Record<MiniGamesLocale, MiniGamesText> = {
@@ -740,9 +756,165 @@ const MINI_GAMES_TEXT: Record<MiniGamesLocale, MiniGamesText> = {
   },
 };
 
+const W_QUESTION_TEXT_OVERRIDES: Partial<
+  Record<MiniGamesLocale, Partial<MiniGamesText>>
+> = {
+  de: {
+    wQuestionMode: "W-Fragen",
+    wQuestionPrompt: "Wähle das passende W-Fragewort.",
+    chooseWQuestion: "Wähle das W-Wort, das die Frage ergänzt.",
+    explainWQuestion:
+      "Achte darauf, ob nach Person, Sache, Ort, Richtung, Grund, Mittel oder Zweck gefragt wird.",
+    wQuestionHintLabel: "Bedeutung",
+    wQuestionAnswerLabel: "Antwortsatz",
+  },
+  ru: {
+    wQuestionMode: "W-вопросы",
+    wQuestionPrompt: "Выбери правильное W-слово для вопроса.",
+    chooseWQuestion: "Выбери W-слово, которое дополняет вопрос.",
+    explainWQuestion:
+      "Смотри, спрашивает ли вопрос о человеке, предмете, месте, направлении, причине, средстве или цели.",
+    wQuestionHintLabel: "Перевод",
+    wQuestionAnswerLabel: "Пример ответа",
+  },
+};
+
+const W_QUESTION_TEXT_OVERRIDES_ALL_LOCALES: Partial<
+  Record<MiniGamesLocale, Partial<MiniGamesText>>
+> = {
+  de: {
+    wQuestionMode: "W-Fragen",
+    wQuestionPrompt: "Wähle das passende W-Fragewort.",
+    chooseWQuestion: "Wähle das W-Wort, das die Frage ergänzt.",
+    explainWQuestion:
+      "Achte darauf, ob nach Person, Sache, Ort, Richtung, Grund, Mittel oder Zweck gefragt wird.",
+    wQuestionHintLabel: "Bedeutung",
+    wQuestionAnswerLabel: "Antwortsatz",
+  },
+  vi: {
+    wQuestionMode: "Câu hỏi W",
+    wQuestionPrompt: "Chọn từ hỏi W phù hợp.",
+    chooseWQuestion: "Chọn từ W hoàn thành câu hỏi.",
+    explainWQuestion:
+      "Hãy chú ý xem câu hỏi hỏi về người, vật, địa điểm, hướng, lý do, phương tiện hay mục đích.",
+    wQuestionHintLabel: "Nghĩa",
+    wQuestionAnswerLabel: "Câu trả lời mẫu",
+  },
+  ru: {
+    wQuestionMode: "W-вопросы",
+    wQuestionPrompt: "Выбери правильное W-слово для вопроса.",
+    chooseWQuestion: "Выбери W-слово, которое дополняет вопрос.",
+    explainWQuestion:
+      "Смотри, спрашивает ли вопрос о человеке, предмете, месте, направлении, причине, средстве или цели.",
+    wQuestionHintLabel: "Перевод",
+    wQuestionAnswerLabel: "Пример ответа",
+  },
+  uk: {
+    wQuestionMode: "W-запитання",
+    wQuestionPrompt: "Вибери правильне W-слово для запитання.",
+    chooseWQuestion: "Вибери W-слово, яке доповнює запитання.",
+    explainWQuestion:
+      "Дивись, чи йдеться про людину, предмет, місце, напрямок, причину, засіб або мету.",
+    wQuestionHintLabel: "Переклад",
+    wQuestionAnswerLabel: "Приклад відповіді",
+  },
+  fa: {
+    wQuestionMode: "پرسش‌های W",
+    wQuestionPrompt: "واژهٔ W درست را برای پرسش انتخاب کن.",
+    chooseWQuestion: "واژهٔ W را انتخاب کن که پرسش را کامل می‌کند.",
+    explainWQuestion:
+      "دقت کن که پرسش دربارهٔ شخص، چیز، مکان، جهت، دلیل، وسیله یا هدف است.",
+    wQuestionHintLabel: "معنا",
+    wQuestionAnswerLabel: "نمونه پاسخ",
+  },
+  ar: {
+    wQuestionMode: "أسئلة W",
+    wQuestionPrompt: "اختر كلمة W المناسبة للسؤال.",
+    chooseWQuestion: "اختر كلمة W التي تكمل السؤال.",
+    explainWQuestion:
+      "انتبه هل السؤال عن شخص أو شيء أو مكان أو اتجاه أو سبب أو وسيلة أو غاية.",
+    wQuestionHintLabel: "المعنى",
+    wQuestionAnswerLabel: "جملة الإجابة",
+  },
+  sq: {
+    wQuestionMode: "Pyetjet W",
+    wQuestionPrompt: "Zgjidh fjalën e duhur W për pyetjen.",
+    chooseWQuestion: "Zgjidh fjalën W që plotëson pyetjen.",
+    explainWQuestion:
+      "Shiko nëse pyetja kërkon person, send, vend, drejtim, arsye, mjet ose qëllim.",
+    wQuestionHintLabel: "Kuptimi",
+    wQuestionAnswerLabel: "Fjalia e përgjigjes",
+  },
+  tr: {
+    wQuestionMode: "W soruları",
+    wQuestionPrompt: "Soru için doğru W sözcüğünü seç.",
+    chooseWQuestion: "Soruyu tamamlayan W sözcüğünü seç.",
+    explainWQuestion:
+      "Sorunun kişi, şey, yer, yön, neden, araç ya da amaç sorduğuna dikkat et.",
+    wQuestionHintLabel: "Anlam",
+    wQuestionAnswerLabel: "Cevap cümlesi",
+  },
+  fr: {
+    wQuestionMode: "Questions en W",
+    wQuestionPrompt: "Choisis le bon mot interrogatif en W.",
+    chooseWQuestion: "Choisis le mot en W qui complète la question.",
+    explainWQuestion:
+      "Regarde si la question porte sur une personne, une chose, un lieu, une direction, une raison, un moyen ou un but.",
+    wQuestionHintLabel: "Sens",
+    wQuestionAnswerLabel: "Phrase-réponse",
+  },
+  es: {
+    wQuestionMode: "Preguntas con W",
+    wQuestionPrompt: "Elige la palabra W correcta para la pregunta.",
+    chooseWQuestion: "Elige la palabra W que completa la pregunta.",
+    explainWQuestion:
+      "Fíjate si la pregunta va sobre una persona, una cosa, un lugar, una dirección, una razón, un medio o una finalidad.",
+    wQuestionHintLabel: "Significado",
+    wQuestionAnswerLabel: "Frase de respuesta",
+  },
+  it: {
+    wQuestionMode: "Domande con W",
+    wQuestionPrompt: "Scegli la parola W corretta per la domanda.",
+    chooseWQuestion: "Scegli la parola W che completa la domanda.",
+    explainWQuestion:
+      "Osserva se la domanda riguarda una persona, una cosa, un luogo, una direzione, una ragione, un mezzo o uno scopo.",
+    wQuestionHintLabel: "Significato",
+    wQuestionAnswerLabel: "Frase di risposta",
+  },
+  pl: {
+    wQuestionMode: "Pytania z W",
+    wQuestionPrompt: "Wybierz poprawne słowo W do pytania.",
+    chooseWQuestion: "Wybierz słowo W, które uzupełnia pytanie.",
+    explainWQuestion:
+      "Zwróć uwagę, czy pytanie dotyczy osoby, rzeczy, miejsca, kierunku, powodu, środka czy celu.",
+    wQuestionHintLabel: "Znaczenie",
+    wQuestionAnswerLabel: "Zdanie z odpowiedzią",
+  },
+};
+
+function normalizeMiniGamesLocale(locale: string): MiniGamesLocale {
+  const normalizedLocale = locale.toLowerCase();
+  if (normalizedLocale.startsWith("de")) return "de";
+  if (normalizedLocale.startsWith("ru")) return "ru";
+  if (normalizedLocale.startsWith("uk")) return "uk";
+  if (normalizedLocale.startsWith("vi")) return "vi";
+  if (normalizedLocale.startsWith("fa")) return "fa";
+  if (normalizedLocale.startsWith("ar")) return "ar";
+  if (normalizedLocale.startsWith("sq")) return "sq";
+  if (normalizedLocale.startsWith("tr")) return "tr";
+  if (normalizedLocale.startsWith("fr")) return "fr";
+  if (normalizedLocale.startsWith("es")) return "es";
+  if (normalizedLocale.startsWith("it")) return "it";
+  if (normalizedLocale.startsWith("pl")) return "pl";
+  return "en";
+}
+
 export function getMiniGamesText(locale: string): MiniGamesText {
+  const normalizedLocale = normalizeMiniGamesLocale(locale);
   return {
     ...ENGLISH_TEXT,
-    ...(MINI_GAMES_TEXT[locale as MiniGamesLocale] ?? MINI_GAMES_TEXT.en),
+    ...(MINI_GAMES_TEXT[normalizedLocale] ?? MINI_GAMES_TEXT.en),
+    ...(W_QUESTION_TEXT_OVERRIDES[normalizedLocale] ?? {}),
+    ...(W_QUESTION_TEXT_OVERRIDES_ALL_LOCALES[normalizedLocale] ?? {}),
   };
 }

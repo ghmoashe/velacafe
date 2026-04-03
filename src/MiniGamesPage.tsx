@@ -17,6 +17,10 @@ import {
 } from "./miniGamesData";
 import { getMiniGamesText } from "./miniGamesText";
 import { getSupabaseClient } from "./supabaseClient";
+import {
+  getWQuestionExercises,
+  type WQuestionExercise,
+} from "./wQuestionExercises";
 
 type MiniGamesPageProps = {
   locale: string;
@@ -24,7 +28,14 @@ type MiniGamesPageProps = {
   isPremium?: boolean;
 };
 
-type GameMode = "article" | "grammar" | "translate" | "sentence" | "chat" | "story";
+type GameMode =
+  | "article"
+  | "grammar"
+  | "wQuestion"
+  | "translate"
+  | "sentence"
+  | "chat"
+  | "story";
 type ExerciseLevel = ArticleExercise["level"];
 
 type GameStats = {
@@ -60,6 +71,12 @@ type SentenceRound = {
 type ChatRound = {
   key: string;
   exercise: ChatExercise;
+  options: string[];
+};
+
+type WQuestionRound = {
+  key: string;
+  exercise: WQuestionExercise;
   options: string[];
 };
 
@@ -166,6 +183,7 @@ type DailyChallengeState = {
 type DailyChallengeRound =
   | { mode: "article"; level: ExerciseLevel; key: string; articleRound: ArticleRound }
   | { mode: "grammar"; level: ExerciseLevel; key: string; grammarRound: GrammarRound }
+  | { mode: "wQuestion"; level: ExerciseLevel; key: string; wQuestionRound: WQuestionRound }
   | {
       mode: "translate";
       level: ExerciseLevel;
@@ -305,6 +323,7 @@ const GRAMMAR_EXERCISE_META: Record<
 const GAME_MODE_ORDER: GameMode[] = [
   "article",
   "grammar",
+  "wQuestion",
   "translate",
   "sentence",
   "chat",
@@ -313,6 +332,7 @@ const GAME_MODE_ORDER: GameMode[] = [
 const ROUND_DURATIONS: Record<GameMode, number> = {
   article: 10,
   grammar: 20,
+  wQuestion: 18,
   translate: 30,
   sentence: 15,
   chat: 20,
@@ -321,6 +341,7 @@ const ROUND_DURATIONS: Record<GameMode, number> = {
 const ROUND_SCORE_BONUS: Record<GameMode, number> = {
   article: 10,
   grammar: 18,
+  wQuestion: 16,
   translate: 14,
   sentence: 18,
   chat: 20,
@@ -332,6 +353,7 @@ const LIFE_REFILL_MS = 2 * 60 * 60 * 1000;
 const INITIAL_STATS: Record<GameMode, GameStats> = {
   article: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
   grammar: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
+  wQuestion: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
   translate: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
   sentence: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
   chat: { attempts: 0, correct: 0, streak: 0, bestStreak: 0 },
@@ -422,6 +444,17 @@ function createChatRoundFromExercise(
   exercise: ChatExercise,
   seed: string | number,
 ): ChatRound {
+  return {
+    key: `${exercise.id}-${seed}`,
+    exercise,
+    options: shuffleWithSeed(exercise.options, `${exercise.id}-${seed}`),
+  };
+}
+
+function createWQuestionRoundFromExercise(
+  exercise: WQuestionExercise,
+  seed: string | number,
+): WQuestionRound {
   return {
     key: `${exercise.id}-${seed}`,
     exercise,
@@ -574,6 +607,8 @@ function getModeLabel(text: ReturnType<typeof getMiniGamesText>, mode: GameMode)
       return text.articleMode;
     case "grammar":
       return text.grammarMode ?? "Grammar cases";
+    case "wQuestion":
+      return text.wQuestionMode ?? "W-Fragen";
     case "translate":
       return text.translateMode;
     case "sentence":
@@ -628,6 +663,18 @@ function createSentenceRound(
 }
 
 function createChatRound(exercises: readonly ChatExercise[], seed: number): ChatRound {
+  const exercise = randomItem(exercises);
+  return {
+    key: `${exercise.id}-${seed}`,
+    exercise,
+    options: shuffle(exercise.options),
+  };
+}
+
+function createWQuestionRound(
+  exercises: readonly WQuestionExercise[],
+  seed: number,
+): WQuestionRound {
   const exercise = randomItem(exercises);
   return {
     key: `${exercise.id}-${seed}`,
@@ -710,6 +757,7 @@ function buildDailyChallengeRound(params: {
   challengeKey: string;
   articleExercises: readonly ArticleExercise[];
   grammarExercises: readonly GrammarPracticeExercise[];
+  wQuestionExercises: readonly WQuestionExercise[];
   translationExercises: readonly TranslationExercise[];
   sentenceExercises: readonly SentenceExercise[];
   chatExercises: readonly ChatExercise[];
@@ -719,6 +767,7 @@ function buildDailyChallengeRound(params: {
     challengeKey,
     articleExercises,
     grammarExercises,
+    wQuestionExercises,
     translationExercises,
     sentenceExercises,
     chatExercises,
@@ -731,6 +780,7 @@ function buildDailyChallengeRound(params: {
       ExerciseLevel,
       | readonly ArticleExercise[]
       | readonly GrammarPracticeExercise[]
+      | readonly WQuestionExercise[]
       | readonly TranslationExercise[]
       | readonly SentenceExercise[]
       | readonly ChatExercise[]
@@ -748,6 +798,12 @@ function buildDailyChallengeRound(params: {
       A2: grammarExercises.filter((exercise) => exercise.level === "A2"),
       B1: grammarExercises.filter((exercise) => exercise.level === "B1"),
       B2: grammarExercises.filter((exercise) => exercise.level === "B2"),
+    },
+    wQuestion: {
+      A1: wQuestionExercises.filter((exercise) => exercise.level === "A1"),
+      A2: wQuestionExercises.filter((exercise) => exercise.level === "A2"),
+      B1: wQuestionExercises.filter((exercise) => exercise.level === "B1"),
+      B2: wQuestionExercises.filter((exercise) => exercise.level === "B2"),
     },
     translate: {
       A1: translationExercises.filter((exercise) => exercise.level === "A1"),
@@ -800,6 +856,17 @@ function buildDailyChallengeRound(params: {
       level,
       grammarRound: createGrammarRoundFromExercise(
         exercise as GrammarPracticeExercise,
+        challengeKey,
+      ),
+    };
+  }
+  if (mode === "wQuestion") {
+    return {
+      key: challengeKey,
+      mode,
+      level,
+      wQuestionRound: createWQuestionRoundFromExercise(
+        exercise as WQuestionExercise,
         challengeKey,
       ),
     };
@@ -857,6 +924,7 @@ export default function MiniGamesPage({
     () => getTranslationExercises(locale),
     [locale],
   );
+  const wQuestionExercises = useMemo(() => getWQuestionExercises(locale), [locale]);
   const [todayChallengeKey, setTodayChallengeKey] = useState(() =>
     getTodayChallengeKey(),
   );
@@ -866,6 +934,7 @@ export default function MiniGamesPage({
   const [level, setLevel] = useState<ExerciseLevel>("A1");
   const [articleSeed, setArticleSeed] = useState(0);
   const [grammarSeed, setGrammarSeed] = useState(0);
+  const [wQuestionSeed, setWQuestionSeed] = useState(0);
   const [grammarTopic, setGrammarTopic] = useState<GrammarTopic>("akkusativ");
   const [grammarMastery, setGrammarMastery] = useState<Record<GrammarTopic, number>>(
     () => createInitialGrammarMastery(),
@@ -889,6 +958,7 @@ export default function MiniGamesPage({
   const [leaderboardTab, setLeaderboardTab] = useState<"daily" | "allTime">("daily");
   const [allTimeLeaderboard, setAllTimeLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [dailyLeaderboard, setDailyLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardUnavailable, setLeaderboardUnavailable] = useState(false);
   const [dailyChallengeState, setDailyChallengeState] = useState<DailyChallengeState>({
     date: todayChallengeKey,
     completed: false,
@@ -908,6 +978,8 @@ export default function MiniGamesPage({
         return articleExercises;
       case "grammar":
         return grammarExercises;
+      case "wQuestion":
+        return wQuestionExercises;
       case "translate":
         return translationExercises;
       case "sentence":
@@ -917,7 +989,7 @@ export default function MiniGamesPage({
       case "story":
         return STORY_EPISODES;
     }
-  }, [articleExercises, grammarExercises, mode, translationExercises]);
+  }, [articleExercises, grammarExercises, mode, translationExercises, wQuestionExercises]);
 
   const availableLevels = useMemo(
     () =>
@@ -951,6 +1023,10 @@ export default function MiniGamesPage({
       translationExercises.filter((exercise) => exercise.level === effectiveLevel),
     [effectiveLevel, translationExercises],
   );
+  const filteredWQuestionExercises = useMemo(
+    () => wQuestionExercises.filter((exercise) => exercise.level === effectiveLevel),
+    [effectiveLevel, wQuestionExercises],
+  );
   const filteredSentenceExercises = useMemo(
     () => SENTENCE_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
     [effectiveLevel],
@@ -970,12 +1046,13 @@ export default function MiniGamesPage({
         challengeKey: todayChallengeKey,
         articleExercises,
         grammarExercises,
+        wQuestionExercises,
         translationExercises,
         sentenceExercises: SENTENCE_EXERCISES,
         chatExercises: CHAT_EXERCISES,
         storyEpisodes: STORY_EPISODES,
       }),
-    [articleExercises, grammarExercises, todayChallengeKey, translationExercises],
+    [articleExercises, grammarExercises, todayChallengeKey, translationExercises, wQuestionExercises],
   );
   const currentGrammarTopic =
     dailyChallengeActive && dailyChallengeRound.mode === "grammar"
@@ -1088,6 +1165,12 @@ export default function MiniGamesPage({
     filteredTranslationExercises,
     translationSeed,
   ]);
+  const wQuestionRound = useMemo(() => {
+    if (dailyChallengeActive && dailyChallengeRound.mode === "wQuestion") {
+      return dailyChallengeRound.wQuestionRound;
+    }
+    return createWQuestionRound(filteredWQuestionExercises, wQuestionSeed);
+  }, [dailyChallengeActive, dailyChallengeRound, filteredWQuestionExercises, wQuestionSeed]);
   const sentenceRound = useMemo(() => {
     if (dailyChallengeActive && dailyChallengeRound.mode === "sentence") {
       return dailyChallengeRound.sentenceRound;
@@ -1111,6 +1194,7 @@ export default function MiniGamesPage({
   const currentRoundDuration = ROUND_DURATIONS[mode];
   const isArticleMode = mode === "article";
   const isGrammarMode = mode === "grammar";
+  const isWQuestionMode = mode === "wQuestion";
   const isTranslateMode = mode === "translate";
   const isSentenceMode = mode === "sentence";
   const isChatMode = mode === "chat";
@@ -1136,6 +1220,8 @@ export default function MiniGamesPage({
     ? articleRound.exercise
     : isGrammarMode
       ? grammarRound.exercise
+    : isWQuestionMode
+      ? wQuestionRound.exercise
     : isTranslateMode
       ? translationRound.exercise
       : isSentenceMode
@@ -1156,15 +1242,38 @@ export default function MiniGamesPage({
     return sentenceRound.tokens.filter((token) => !selected.has(token.id));
   }, [sentenceRound.tokens, sentenceSelection]);
 
-  const getErrorMessage = useCallback((error: unknown, fallback: string) => {
+  const extractErrorMessage = useCallback((error: unknown) => {
     if (error && typeof error === "object" && "message" in error) {
       const message = (error as { message?: unknown }).message;
       if (typeof message === "string" && message.trim()) {
-        return message;
+        return message.trim();
       }
     }
-    return fallback;
+    return "";
   }, []);
+
+  const isNetworkFetchError = useCallback(
+    (error: unknown) => {
+      const message = extractErrorMessage(error).toLowerCase();
+      return (
+        message.includes("failed to fetch") ||
+        message.includes("networkerror") ||
+        message.includes("load failed")
+      );
+    },
+    [extractErrorMessage],
+  );
+
+  const getErrorMessage = useCallback(
+    (error: unknown, fallback: string, networkFallback = fallback) => {
+      if (isNetworkFetchError(error)) {
+        return networkFallback;
+      }
+      const message = extractErrorMessage(error);
+      return message || fallback;
+    },
+    [extractErrorMessage, isNetworkFetchError],
+  );
 
   const persistUserStatePatch = useCallback(
     async (patch: Partial<MiniGameUserStateRow>) => {
@@ -1190,82 +1299,95 @@ export default function MiniGamesPage({
   const refreshLeaderboards = useCallback(async () => {
     const supabase = getSupabaseClient();
     if (!supabase) {
+      setLeaderboardUnavailable(false);
       setAllTimeLeaderboard([]);
       setDailyLeaderboard([]);
       return;
     }
-    const [allTimeResult, dailyResult] = await Promise.all([
-      supabase
-        .from("mini_game_user_state")
-        .select("user_id,total_score,best_streak,total_correct")
-        .order("total_score", { ascending: false })
-        .limit(10),
-      supabase
-        .from("mini_game_daily_results")
-        .select("challenge_date,user_id,mode,level,score,correct")
-        .eq("challenge_date", todayChallengeKey)
-        .order("score", { ascending: false })
-        .limit(10),
-    ]);
-    if (allTimeResult.error || dailyResult.error) {
-      throw allTimeResult.error ?? dailyResult.error;
-    }
+    try {
+      const [allTimeResult, dailyResult] = await Promise.all([
+        supabase
+          .from("mini_game_user_state")
+          .select("user_id,total_score,best_streak,total_correct")
+          .order("total_score", { ascending: false })
+          .limit(10),
+        supabase
+          .from("mini_game_daily_results")
+          .select("challenge_date,user_id,mode,level,score,correct")
+          .eq("challenge_date", todayChallengeKey)
+          .order("score", { ascending: false })
+          .limit(10),
+      ]);
+      if (allTimeResult.error || dailyResult.error) {
+        throw allTimeResult.error ?? dailyResult.error;
+      }
 
-    const allTimeRows = (allTimeResult.data ?? []) as Array<
-      Pick<MiniGameUserStateRow, "user_id" | "total_score" | "best_streak" | "total_correct">
-    >;
-    const dailyRows = (dailyResult.data ?? []) as MiniGameDailyResultRow[];
-    const userIds = Array.from(
-      new Set([
-        ...allTimeRows.map((row) => row.user_id),
-        ...dailyRows.map((row) => row.user_id),
-      ]),
-    );
-    let profileMap = new Map<string, { full_name: string | null; avatar_url: string | null }>();
-    if (userIds.length) {
-      const { data: profileRows, error: profileError } = await supabase
-        .from("profiles")
-        .select("id,full_name,avatar_url")
-        .in("id", userIds);
-      if (profileError) throw profileError;
-      profileMap = new Map(
-        (profileRows ?? []).map((profile) => [
-          profile.id as string,
-          {
-            full_name:
-              typeof profile.full_name === "string" ? profile.full_name : null,
-            avatar_url:
-              typeof profile.avatar_url === "string" ? profile.avatar_url : null,
-          },
+      const allTimeRows = (allTimeResult.data ?? []) as Array<
+        Pick<MiniGameUserStateRow, "user_id" | "total_score" | "best_streak" | "total_correct">
+      >;
+      const dailyRows = (dailyResult.data ?? []) as MiniGameDailyResultRow[];
+      const userIds = Array.from(
+        new Set([
+          ...allTimeRows.map((row) => row.user_id),
+          ...dailyRows.map((row) => row.user_id),
         ]),
       );
-    }
+      let profileMap = new Map<string, { full_name: string | null; avatar_url: string | null }>();
+      if (userIds.length) {
+        const { data: profileRows, error: profileError } = await supabase
+          .from("profiles")
+          .select("id,full_name,avatar_url")
+          .in("id", userIds);
+        if (profileError) throw profileError;
+        profileMap = new Map(
+          (profileRows ?? []).map((profile) => [
+            profile.id as string,
+            {
+              full_name:
+                typeof profile.full_name === "string" ? profile.full_name : null,
+              avatar_url:
+                typeof profile.avatar_url === "string" ? profile.avatar_url : null,
+            },
+          ]),
+        );
+      }
 
-    setAllTimeLeaderboard(
-      allTimeRows.map((row) => {
-        const profile = profileMap.get(row.user_id);
-        return {
-          userId: row.user_id,
-          name: profile?.full_name?.trim() || "Player",
-          avatarUrl: profile?.avatar_url ?? null,
-          score: row.total_score,
-          detail: `${row.total_correct} / ${row.best_streak}`,
-        };
-      }),
-    );
-    setDailyLeaderboard(
-      dailyRows.map((row) => {
-        const profile = profileMap.get(row.user_id);
-        return {
-          userId: row.user_id,
-          name: profile?.full_name?.trim() || "Player",
-          avatarUrl: profile?.avatar_url ?? null,
-          score: row.score,
-          detail: `${getModeLabel(text, row.mode)} / ${row.level}`,
-        };
-      }),
-    );
-  }, [text, todayChallengeKey]);
+      setAllTimeLeaderboard(
+        allTimeRows.map((row) => {
+          const profile = profileMap.get(row.user_id);
+          return {
+            userId: row.user_id,
+            name: profile?.full_name?.trim() || "Player",
+            avatarUrl: profile?.avatar_url ?? null,
+            score: row.total_score,
+            detail: `${row.total_correct} / ${row.best_streak}`,
+          };
+        }),
+      );
+      setDailyLeaderboard(
+        dailyRows.map((row) => {
+          const profile = profileMap.get(row.user_id);
+          return {
+            userId: row.user_id,
+            name: profile?.full_name?.trim() || "Player",
+            avatarUrl: profile?.avatar_url ?? null,
+            score: row.score,
+            detail: `${getModeLabel(text, row.mode)} / ${row.level}`,
+          };
+        }),
+      );
+      setLeaderboardUnavailable(false);
+    } catch (error) {
+      if (isNetworkFetchError(error)) {
+        setLeaderboardUnavailable(true);
+        setAllTimeLeaderboard([]);
+        setDailyLeaderboard([]);
+        return;
+      }
+      setLeaderboardUnavailable(false);
+      throw error;
+    }
+  }, [isNetworkFetchError, text, todayChallengeKey]);
 
   const syncLivesRecovery = useCallback(async () => {
     const refreshed = recoverLivesState(livesState);
@@ -1342,6 +1464,8 @@ export default function MiniGamesPage({
         ? articleExercises
         : nextMode === "grammar"
           ? grammarExercises
+        : nextMode === "wQuestion"
+          ? wQuestionExercises
         : nextMode === "translate"
           ? translationExercises
           : nextMode === "sentence"
@@ -1537,7 +1661,11 @@ export default function MiniGamesPage({
         } catch (error) {
           setPersistenceStatus({
             type: "error",
-            message: getErrorMessage(error, "Failed to sync game progress."),
+            message: getErrorMessage(
+              error,
+              "Failed to sync game progress.",
+              "Progress sync is temporarily unavailable. Your answer still counted locally.",
+            ),
           });
         }
       })();
@@ -1584,6 +1712,10 @@ export default function MiniGamesPage({
     }
     if (isGrammarMode) {
       setGrammarSeed((value) => value + (wasDailyChallenge ? 2 : 1));
+      return;
+    }
+    if (isWQuestionMode) {
+      setWQuestionSeed((value) => value + (wasDailyChallenge ? 2 : 1));
       return;
     }
     if (isTranslateMode) {
@@ -1637,6 +1769,8 @@ export default function MiniGamesPage({
       ? value === articleRound.exercise.article
       : isGrammarMode
         ? value === grammarRound.exercise.correctAnswer
+      : isWQuestionMode
+        ? value === wQuestionRound.exercise.correctAnswer
       : isTranslateMode
         ? normalizeTranslationAnswer(value) ===
           normalizeTranslationAnswer(translationRound.exercise.target)
@@ -1778,7 +1912,11 @@ export default function MiniGamesPage({
         if (!active) return;
         setPersistenceStatus({
           type: "error",
-          message: getErrorMessage(error, "Failed to load game progress."),
+          message: getErrorMessage(
+            error,
+            "Failed to load game progress.",
+            "Progress is temporarily unavailable. You can keep practicing and try again later.",
+          ),
         });
       }
     })();
@@ -1797,6 +1935,9 @@ export default function MiniGamesPage({
 
   useEffect(() => {
     void refreshLeaderboards().catch((error) => {
+      if (isNetworkFetchError(error)) {
+        return;
+      }
       setPersistenceStatus((current) =>
         current.type === "error"
           ? current
@@ -1806,7 +1947,7 @@ export default function MiniGamesPage({
             },
       );
     });
-  }, [getErrorMessage, refreshLeaderboards]);
+  }, [getErrorMessage, isNetworkFetchError, refreshLeaderboards]);
 
   useEffect(() => {
     if (recoveredLivesState.infinite || !recoveredLivesState.nextRefillAt) return;
@@ -1869,9 +2010,11 @@ export default function MiniGamesPage({
       ? text.chooseArticle
       : isGrammarMode
         ? text.chooseGrammar ?? "Choose the correct case form."
+      : isWQuestionMode
+        ? text.chooseWQuestion ?? "Choose the correct W-question word."
       : isTranslateMode
         ? text.chooseTranslation
-        : isSentenceMode
+      : isSentenceMode
           ? text.chooseSentence
           : isChatMode
             ? text.chooseChat
@@ -1882,6 +2025,11 @@ export default function MiniGamesPage({
       ? `${articleRound.exercise.article} ${articleRound.exercise.noun} (${articleRound.exercise.hint})`
       : isGrammarMode
         ? `${grammarRound.exercise.correctAnswer} (${grammarRound.exercise.explanation})`
+      : isWQuestionMode
+        ? `${wQuestionRound.exercise.questionTemplate.replace(
+            "___",
+            wQuestionRound.exercise.correctAnswer,
+          )} (${wQuestionRound.exercise.explanation})`
       : isTranslateMode
         ? `${translationRound.exercise.source} = ${translationRound.exercise.target}`
         : isSentenceMode
@@ -1894,6 +2042,9 @@ export default function MiniGamesPage({
       : isGrammarMode
         ? text.explainGrammar ??
           "Watch the signal word: verb, preposition, and movement vs. location decide the case."
+      : isWQuestionMode
+        ? text.explainWQuestion ??
+          "Match the missing information: person, place, time, reason, direction, or possession."
       : isTranslateMode
         ? text.explainTranslation
       : isSentenceMode
@@ -1941,6 +2092,15 @@ export default function MiniGamesPage({
           onClick={() => handleModeChange("grammar")}
         >
           {text.grammarMode ?? "Grammar cases"}
+        </button>
+        <button
+          className={`miniGamesModeButton${
+            isWQuestionMode ? " miniGamesModeButtonActive" : ""
+          }`}
+          type="button"
+          onClick={() => handleModeChange("wQuestion")}
+        >
+          {text.wQuestionMode ?? "W-Fragen"}
         </button>
         <button
           className={`miniGamesModeButton${
@@ -2178,6 +2338,19 @@ export default function MiniGamesPage({
                 {currentStoryStep.question}
               </div>
             </div>
+          ) : isWQuestionMode ? (
+            <>
+              <div className="miniGamesChatPreview">
+                <div className="miniGamesChatMeta">
+                  <span>{text.wQuestionAnswerLabel ?? "Answer"}</span>
+                  <span>{effectiveLevel}</span>
+                </div>
+                <div className="miniGamesChatBubble">{wQuestionRound.exercise.answer}</div>
+              </div>
+              <div className="miniGamesWordLine">
+                <span>{wQuestionRound.exercise.questionTemplate}</span>
+              </div>
+            </>
           ) : (
             <div className="miniGamesWordLine">
               {isArticleMode ? (
@@ -2199,6 +2372,8 @@ export default function MiniGamesPage({
               ? text.articleMissingLabel
               : isGrammarMode
                 ? grammarRound.exercise.question
+              : isWQuestionMode
+                ? text.wQuestionPrompt ?? "Choose the correct W-question word."
               : isTranslateMode
                 ? text.translatePrompt
                 : isSentenceMode
@@ -2216,6 +2391,11 @@ export default function MiniGamesPage({
               <>
                 {text.hintLabel}: {grammarRound.exercise.translation} (
                 {effectiveLevel} / {currentGrammarTopicLabel})
+              </>
+            ) : isWQuestionMode ? (
+              <>
+                {text.wQuestionHintLabel ?? "Meaning"}: {wQuestionRound.exercise.translation} (
+                {effectiveLevel})
               </>
             ) : isTranslateMode ? (
               <>
@@ -2242,6 +2422,8 @@ export default function MiniGamesPage({
             isArticleMode
               ? "Article"
               : isGrammarMode
+                ? "Grammar"
+              : isWQuestionMode
                 ? "Grammar"
               : isTranslateMode
                 ? "Translate"
@@ -2281,6 +2463,28 @@ export default function MiniGamesPage({
                   return (
                     <button
                       key={`${grammarRound.exercise.id}-${option}`}
+                      className={`miniGamesOption miniGamesOptionTranslate miniGamesOptionGrammar${
+                        answerState && isCorrect ? " miniGamesOptionCorrect" : ""
+                      }${
+                        answerState && isSelected && !isCorrect
+                          ? " miniGamesOptionWrong"
+                          : ""
+                      }`}
+                      type="button"
+                      disabled={Boolean(answerState) || !hasAvailableLives}
+                      onClick={() => handleAnswer(option)}
+                    >
+                      <span className="miniGamesOptionBody">{option}</span>
+                    </button>
+                  );
+                })
+            : isWQuestionMode
+              ? wQuestionRound.options.map((option) => {
+                  const isCorrect = option === wQuestionRound.exercise.correctAnswer;
+                  const isSelected = answerState?.value === option;
+                  return (
+                    <button
+                      key={`${wQuestionRound.exercise.id}-${option}`}
                       className={`miniGamesOption miniGamesOptionTranslate miniGamesOptionGrammar${
                         answerState && isCorrect ? " miniGamesOptionCorrect" : ""
                       }${
@@ -2579,7 +2783,10 @@ export default function MiniGamesPage({
             )
           ) : (
             <div className="miniGamesLeaderboardEmpty">
-              {text.leaderboardEmpty ?? "No results yet."}
+              {leaderboardUnavailable
+                ? text.leaderboardUnavailable ??
+                  "Leaderboard is temporarily unavailable. Check your connection and try again."
+                : text.leaderboardEmpty ?? "No results yet."}
             </div>
           )}
         </div>
