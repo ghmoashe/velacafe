@@ -617,8 +617,11 @@ export default function MiniGamesPage({
     () => getTranslationExercises(locale),
     [locale],
   );
-  const todayChallengeKey = useMemo(() => getTodayChallengeKey(), []);
+  const [todayChallengeKey, setTodayChallengeKey] = useState(() =>
+    getTodayChallengeKey(),
+  );
   const audioContextRef = useRef<AudioContext | null>(null);
+  const previousChallengeKeyRef = useRef(todayChallengeKey);
   const [mode, setMode] = useState<GameMode>("article");
   const [level, setLevel] = useState<ExerciseLevel>("A1");
   const [articleSeed, setArticleSeed] = useState(0);
@@ -1010,8 +1013,37 @@ export default function MiniGamesPage({
   };
 
   useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const syncTodayChallengeKey = () => {
+      const nextKey = getTodayChallengeKey();
+      setTodayChallengeKey((current) => (current === nextKey ? current : nextKey));
+    };
+    const intervalId = window.setInterval(syncTodayChallengeKey, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
     resetStoryEpisodeState();
   }, [resetStoryEpisodeState, storyRound.key]);
+
+  useEffect(() => {
+    if (previousChallengeKeyRef.current === todayChallengeKey) {
+      return;
+    }
+    previousChallengeKeyRef.current = todayChallengeKey;
+    if (!dailyChallengeActive) {
+      return;
+    }
+    setDailyChallengeActive(false);
+    resetStoryEpisodeState();
+    resetRoundState(ROUND_DURATIONS[mode]);
+  }, [
+    dailyChallengeActive,
+    mode,
+    resetRoundState,
+    resetStoryEpisodeState,
+    todayChallengeKey,
+  ]);
 
   const resolveAnswer = useCallback(
     (

@@ -657,7 +657,7 @@ export default function ShortsPage(props: ShortsPageProps) {
           return true;
         }
         if (post.shorts_visibility === "followers") {
-          return followingOrganizerIdSet.has(post.user_id);
+          return followingOrganizerIdSet.has(post.user_id) || post.user_id === sessionUserId;
         }
         return false;
       })
@@ -670,7 +670,7 @@ export default function ShortsPage(props: ShortsPageProps) {
       filteredVideos.map((item) => item.id),
       filteredVideos
     );
-  }, [followingOrganizerIdSet, loadInteractionSummary, text.notConfigured]);
+  }, [followingOrganizerIdSet, loadInteractionSummary, sessionUserId, text.notConfigured]);
 
   const loadComments = useCallback(
     async (postId: string) => {

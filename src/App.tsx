@@ -1616,10 +1616,13 @@ function getVisibleShortPosts(
     if (!options?.includeHidden && post.shorts_hidden) {
       return false;
     }
-    if (options?.allowFollowersVisibility) {
-      return post.shorts_visibility !== "hidden";
+    if (!post.shorts_visibility || post.shorts_visibility === "public") {
+      return true;
     }
-    return !post.shorts_visibility || post.shorts_visibility === "public";
+    if (post.shorts_visibility === "followers") {
+      return Boolean(options?.allowFollowersVisibility);
+    }
+    return false;
   });
 }
 const LEARN_PRACTICE_LANGS = LANGUAGE_LIST.filter(
@@ -3526,9 +3529,13 @@ export default function App() {
         });
         setOrganizerShorts([]);
       } else {
+        const canViewFollowerShorts =
+          profileIsAdmin ||
+          sessionUser?.id === organizerId ||
+          followingOrganizerIds.includes(organizerId);
         const visibleShorts = getVisibleShortPosts(shortsRows ?? [], {
           includeHidden: profileIsAdmin || sessionUser?.id === organizerId,
-          allowFollowersVisibility: true,
+          allowFollowersVisibility: canViewFollowerShorts,
         });
         const pinnedShortId = profileRow.pinned_short_post_id ?? null;
         const sortedShorts = [...visibleShorts].sort((left, right) => {
@@ -3595,6 +3602,7 @@ export default function App() {
     activeOrganizerId,
     fetchOrganizerFollowStatus,
     fetchOrganizerFollowerCounts,
+    followingOrganizerIds,
     getSupabaseErrorMessage,
     profileIsAdmin,
     route,
