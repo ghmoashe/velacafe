@@ -1,4 +1,8 @@
 import { getMiniGamesGloss, hasMiniGamesGloss } from "./miniGamesGlossary";
+import {
+  localizePracticeMeaning,
+  localizePracticeMeta,
+} from "./miniGamesPracticeContent";
 
 export type ArticleOption = "der" | "die" | "das";
 
@@ -1047,7 +1051,7 @@ const B2_PROPOSE_TAILS: SentenceTail[] = [
   { words: ["einen", "realistischen", "Zeitplan", "zu", "vereinbaren"], translation: "to agree on a realistic schedule." },
 ];
 
-export const SENTENCE_EXERCISES: SentenceExercise[] = [
+const SENTENCE_EXERCISES_BASE: SentenceExercise[] = [
   ...composeSentenceExercises("satz-a1-lernen", "A1", A1_LEARN_STEMS, A1_LEARN_TAILS),
   ...composeSentenceExercises("satz-a1-trinken", "A1", A1_DRINK_STEMS, A1_DRINK_TAILS),
   ...composeSentenceExercises("satz-a1-essen", "A1", A1_EAT_STEMS, A1_EAT_TAILS),
@@ -1077,7 +1081,31 @@ export const SENTENCE_EXERCISES: SentenceExercise[] = [
   ...composeSentenceExercises("satz-b2-vorschlagen", "B2", B2_PROPOSE_STEMS, B2_PROPOSE_TAILS),
 ];
 
-export const CHAT_EXERCISES: ChatExercise[] = [
+function buildSentenceExercises(locale: string): SentenceExercise[] {
+  return SENTENCE_EXERCISES_BASE.map((exercise) => ({
+    ...exercise,
+    translation: localizePracticeMeaning(
+      exercise.translation,
+      locale,
+      exercise.words.join(" "),
+    ),
+  }));
+}
+
+const SENTENCE_EXERCISE_CACHE = new Map<string, SentenceExercise[]>();
+
+export function getSentenceExercises(locale: string): SentenceExercise[] {
+  const cacheKey = locale || "en";
+  const cached = SENTENCE_EXERCISE_CACHE.get(cacheKey);
+  if (cached) return cached;
+  const built = buildSentenceExercises(cacheKey);
+  SENTENCE_EXERCISE_CACHE.set(cacheKey, built);
+  return built;
+}
+
+export const SENTENCE_EXERCISES: SentenceExercise[] = getSentenceExercises("en");
+
+const CHAT_EXERCISES_BASE: ChatExercise[] = [
   {
     id: "chat-a1-1",
     contact: "Anna",
@@ -1692,7 +1720,33 @@ export const CHAT_EXERCISES: ChatExercise[] = [
   },
 ];
 
-export const STORY_EXERCISES_LEGACY: StoryExercise[] = [
+function buildChatExercises(locale: string): ChatExercise[] {
+  return CHAT_EXERCISES_BASE.map((exercise) => ({
+    ...exercise,
+    scenario: localizePracticeMeta(exercise.scenario, locale),
+    translation: localizePracticeMeaning(
+      exercise.translation,
+      locale,
+      exercise.incoming,
+    ),
+    feedback: localizePracticeMeta(exercise.feedback, locale),
+  }));
+}
+
+const CHAT_EXERCISE_CACHE = new Map<string, ChatExercise[]>();
+
+export function getChatExercises(locale: string): ChatExercise[] {
+  const cacheKey = locale || "en";
+  const cached = CHAT_EXERCISE_CACHE.get(cacheKey);
+  if (cached) return cached;
+  const built = buildChatExercises(cacheKey);
+  CHAT_EXERCISE_CACHE.set(cacheKey, built);
+  return built;
+}
+
+export const CHAT_EXERCISES: ChatExercise[] = getChatExercises("en");
+
+const STORY_EXERCISES_LEGACY_BASE: StoryExercise[] = [
   {
     id: "story-a1-1",
     title: "Im Cafe",
@@ -2654,7 +2708,7 @@ const STORY_SCENE_GROUPS: StorySceneGroup[] = [
   },
 ];
 
-export const STORY_EXERCISES: StoryExercise[] = STORY_SCENE_GROUPS.flatMap((group) =>
+const STORY_EXERCISES_BASE: StoryExercise[] = STORY_SCENE_GROUPS.flatMap((group) =>
   group.variants.map((variant) => ({
     id: `story-${group.idPrefix}-${variant.level.toLowerCase()}`,
     title: group.title,
@@ -2672,7 +2726,34 @@ export const STORY_EXERCISES: StoryExercise[] = STORY_SCENE_GROUPS.flatMap((grou
   })),
 );
 
-export const GRAMMAR_EXERCISES: GrammarExercise[] = [
+function buildStoryExercises(locale: string): StoryExercise[] {
+  return STORY_EXERCISES_BASE.map((exercise) => ({
+    ...exercise,
+    translation: localizePracticeMeaning(
+      exercise.translation,
+      locale,
+      exercise.setup,
+    ),
+    explanation: localizePracticeMeta(exercise.explanation, locale),
+  }));
+}
+
+const STORY_EXERCISE_CACHE = new Map<string, StoryExercise[]>();
+
+export function getStoryExercises(locale: string): StoryExercise[] {
+  const cacheKey = locale || "en";
+  const cached = STORY_EXERCISE_CACHE.get(cacheKey);
+  if (cached) return cached;
+  const built = buildStoryExercises(cacheKey);
+  STORY_EXERCISE_CACHE.set(cacheKey, built);
+  return built;
+}
+
+export const STORY_EXERCISES_LEGACY: StoryExercise[] = STORY_EXERCISES_LEGACY_BASE;
+
+export const STORY_EXERCISES: StoryExercise[] = getStoryExercises("en");
+
+const GRAMMAR_EXERCISES_BASE: GrammarExercise[] = [
   {
     id: "grammar-a1-1",
     sentence: "Ich sehe ___ Mann im Park.",
@@ -2939,7 +3020,37 @@ export const GRAMMAR_EXERCISES: GrammarExercise[] = [
   },
 ];
 
-export const STORY_EPISODES: StoryEpisode[] = [
+function resolveGrammarSentence(exercise: GrammarExercise): string {
+  return exercise.sentence.replace("___", exercise.correctAnswer);
+}
+
+function buildGrammarExercises(locale: string): GrammarExercise[] {
+  return GRAMMAR_EXERCISES_BASE.map((exercise) => ({
+    ...exercise,
+    translation: localizePracticeMeaning(
+      exercise.translation,
+      locale,
+      resolveGrammarSentence(exercise),
+    ),
+    question: localizePracticeMeta(exercise.question, locale),
+    explanation: localizePracticeMeta(exercise.explanation, locale),
+  }));
+}
+
+const GRAMMAR_EXERCISE_CACHE = new Map<string, GrammarExercise[]>();
+
+export function getGrammarExercises(locale: string): GrammarExercise[] {
+  const cacheKey = locale || "en";
+  const cached = GRAMMAR_EXERCISE_CACHE.get(cacheKey);
+  if (cached) return cached;
+  const built = buildGrammarExercises(cacheKey);
+  GRAMMAR_EXERCISE_CACHE.set(cacheKey, built);
+  return built;
+}
+
+export const GRAMMAR_EXERCISES: GrammarExercise[] = getGrammarExercises("en");
+
+const STORY_EPISODES_BASE: StoryEpisode[] = [
   {
     id: "story-episode-cafe-a1",
     title: "Erster Abend im Sprachcafe",
@@ -3709,3 +3820,31 @@ export const STORY_EPISODES: StoryEpisode[] = [
     ],
   },
 ];
+
+function buildStoryEpisodes(locale: string): StoryEpisode[] {
+  return STORY_EPISODES_BASE.map((episode) => ({
+    ...episode,
+    steps: episode.steps.map((step) => ({
+      ...step,
+      translation: localizePracticeMeaning(
+        step.translation,
+        locale,
+        step.scene,
+      ),
+      explanation: localizePracticeMeta(step.explanation, locale),
+    })),
+  }));
+}
+
+const STORY_EPISODE_CACHE = new Map<string, StoryEpisode[]>();
+
+export function getStoryEpisodes(locale: string): StoryEpisode[] {
+  const cacheKey = locale || "en";
+  const cached = STORY_EPISODE_CACHE.get(cacheKey);
+  if (cached) return cached;
+  const built = buildStoryEpisodes(cacheKey);
+  STORY_EPISODE_CACHE.set(cacheKey, built);
+  return built;
+}
+
+export const STORY_EPISODES: StoryEpisode[] = getStoryEpisodes("en");

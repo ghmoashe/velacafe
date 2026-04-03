@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  CHAT_EXERCISES,
-  GRAMMAR_EXERCISES,
-  SENTENCE_EXERCISES,
-  STORY_EPISODES,
   getArticleExercises,
+  getChatExercises,
+  getGrammarExercises,
+  getSentenceExercises,
+  getStoryEpisodes,
   getTranslationExercises,
   type ArticleExercise,
   type ArticleOption,
@@ -15,6 +15,7 @@ import {
   type StoryEpisode,
   type TranslationExercise,
 } from "./miniGamesData";
+import { localizePracticeMeta } from "./miniGamesPracticeContent";
 import { getMiniGamesText } from "./miniGamesText";
 import { getSupabaseClient } from "./supabaseClient";
 import {
@@ -320,6 +321,34 @@ const GRAMMAR_EXERCISE_META: Record<
     rule: "`statt` is normally used with Genitiv.",
   },
 };
+
+const GRAMMAR_RULES_DE: Record<string, string> = {
+  "The direct object takes Akkusativ.": "Das direkte Objekt steht im Akkusativ.",
+  "`fuer` always takes Akkusativ.": "`fuer` steht immer mit dem Akkusativ.",
+  "`mit` always takes Dativ.": "`mit` steht immer mit dem Dativ.",
+  "`helfen` takes Dativ.": "`helfen` verlangt den Dativ.",
+  "`zu` always takes Dativ.": "`zu` steht immer mit dem Dativ.",
+  "Movement with a Wechselpraeposition takes Akkusativ.":
+    "Bewegung mit einer Wechselpraeposition nimmt den Akkusativ.",
+  "Location with a Wechselpraeposition takes Dativ.":
+    "Ort mit einer Wechselpraeposition nimmt den Dativ.",
+  "The receiver of something is often in Dativ.":
+    "Der Empfaenger steht oft im Dativ.",
+  "`warten auf` takes Akkusativ.": "`warten auf` steht mit dem Akkusativ.",
+  "`wegen` is normally used with Genitiv.":
+    "`wegen` wird normalerweise mit dem Genitiv verwendet.",
+  "`trotz` is normally used with Genitiv.":
+    "`trotz` wird normalerweise mit dem Genitiv verwendet.",
+  "Possession with a noun phrase uses Genitiv.":
+    "Besitz mit einer Nomenphrase steht im Genitiv.",
+  "`sich erinnern an` takes Akkusativ.":
+    "`sich erinnern an` steht mit dem Akkusativ.",
+  "`bei` always takes Dativ.": "`bei` steht immer mit dem Dativ.",
+  "`waehrend` is normally used with Genitiv.":
+    "`waehrend` wird normalerweise mit dem Genitiv verwendet.",
+  "`statt` is normally used with Genitiv.":
+    "`statt` wird normalerweise mit dem Genitiv verwendet.",
+};
 const GAME_MODE_ORDER: GameMode[] = [
   "article",
   "grammar",
@@ -462,12 +491,16 @@ function createWQuestionRoundFromExercise(
   };
 }
 
-function enrichGrammarExercise(exercise: GrammarExercise): GrammarPracticeExercise {
+function enrichGrammarExercise(
+  exercise: GrammarExercise,
+  locale: string,
+): GrammarPracticeExercise {
   const meta = GRAMMAR_EXERCISE_META[exercise.id];
+  const baseRule = meta?.rule ?? "Choose the correct case form.";
   return {
     ...exercise,
     topic: meta?.topic ?? "akkusativ",
-    rule: meta?.rule ?? "Choose the correct case form.",
+    rule: localizePracticeMeta(baseRule, locale, GRAMMAR_RULES_DE[baseRule]),
   };
 }
 
@@ -917,13 +950,16 @@ export default function MiniGamesPage({
   const text = getMiniGamesText(locale);
   const articleExercises = useMemo(() => getArticleExercises(locale), [locale]);
   const grammarExercises = useMemo(
-    () => GRAMMAR_EXERCISES.map(enrichGrammarExercise),
-    [],
+    () => getGrammarExercises(locale).map((exercise) => enrichGrammarExercise(exercise, locale)),
+    [locale],
   );
   const translationExercises = useMemo(
     () => getTranslationExercises(locale),
     [locale],
   );
+  const sentenceExercises = useMemo(() => getSentenceExercises(locale), [locale]);
+  const chatExercises = useMemo(() => getChatExercises(locale), [locale]);
+  const storyEpisodes = useMemo(() => getStoryEpisodes(locale), [locale]);
   const wQuestionExercises = useMemo(() => getWQuestionExercises(locale), [locale]);
   const [todayChallengeKey, setTodayChallengeKey] = useState(() =>
     getTodayChallengeKey(),
@@ -983,13 +1019,22 @@ export default function MiniGamesPage({
       case "translate":
         return translationExercises;
       case "sentence":
-        return SENTENCE_EXERCISES;
+        return sentenceExercises;
       case "chat":
-        return CHAT_EXERCISES;
+        return chatExercises;
       case "story":
-        return STORY_EPISODES;
+        return storyEpisodes;
     }
-  }, [articleExercises, grammarExercises, mode, translationExercises, wQuestionExercises]);
+  }, [
+    articleExercises,
+    chatExercises,
+    grammarExercises,
+    mode,
+    sentenceExercises,
+    storyEpisodes,
+    translationExercises,
+    wQuestionExercises,
+  ]);
 
   const availableLevels = useMemo(
     () =>
@@ -1028,16 +1073,16 @@ export default function MiniGamesPage({
     [effectiveLevel, wQuestionExercises],
   );
   const filteredSentenceExercises = useMemo(
-    () => SENTENCE_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
-    [effectiveLevel],
+    () => sentenceExercises.filter((exercise) => exercise.level === effectiveLevel),
+    [effectiveLevel, sentenceExercises],
   );
   const filteredChatExercises = useMemo(
-    () => CHAT_EXERCISES.filter((exercise) => exercise.level === effectiveLevel),
-    [effectiveLevel],
+    () => chatExercises.filter((exercise) => exercise.level === effectiveLevel),
+    [chatExercises, effectiveLevel],
   );
   const filteredStoryEpisodes = useMemo(
-    () => STORY_EPISODES.filter((episode) => episode.level === effectiveLevel),
-    [effectiveLevel],
+    () => storyEpisodes.filter((episode) => episode.level === effectiveLevel),
+    [effectiveLevel, storyEpisodes],
   );
 
   const dailyChallengeRound = useMemo(
@@ -1048,11 +1093,20 @@ export default function MiniGamesPage({
         grammarExercises,
         wQuestionExercises,
         translationExercises,
-        sentenceExercises: SENTENCE_EXERCISES,
-        chatExercises: CHAT_EXERCISES,
-        storyEpisodes: STORY_EPISODES,
+        sentenceExercises,
+        chatExercises,
+        storyEpisodes,
       }),
-    [articleExercises, grammarExercises, todayChallengeKey, translationExercises, wQuestionExercises],
+    [
+      articleExercises,
+      chatExercises,
+      grammarExercises,
+      sentenceExercises,
+      storyEpisodes,
+      todayChallengeKey,
+      translationExercises,
+      wQuestionExercises,
+    ],
   );
   const currentGrammarTopic =
     dailyChallengeActive && dailyChallengeRound.mode === "grammar"
@@ -1469,10 +1523,10 @@ export default function MiniGamesPage({
         : nextMode === "translate"
           ? translationExercises
           : nextMode === "sentence"
-            ? SENTENCE_EXERCISES
+            ? sentenceExercises
             : nextMode === "chat"
-              ? CHAT_EXERCISES
-              : STORY_EPISODES;
+              ? chatExercises
+              : storyEpisodes;
     const nextLevels = LEVEL_OPTIONS.filter((entry) =>
       nextModeExercises.some((exercise) => exercise.level === entry),
     );
@@ -2024,7 +2078,10 @@ export default function MiniGamesPage({
     ? isArticleMode
       ? `${articleRound.exercise.article} ${articleRound.exercise.noun} (${articleRound.exercise.hint})`
       : isGrammarMode
-        ? `${grammarRound.exercise.correctAnswer} (${grammarRound.exercise.explanation})`
+        ? `${grammarRound.exercise.correctAnswer} (${
+            text.explainGrammar ??
+            "Watch the signal word: verb, preposition, and movement vs. location decide the case."
+          })`
       : isWQuestionMode
         ? `${wQuestionRound.exercise.questionTemplate.replace(
             "___",
@@ -2035,8 +2092,11 @@ export default function MiniGamesPage({
         : isSentenceMode
           ? `${sentenceRound.exercise.words.join(" ")} (${sentenceRound.exercise.translation})`
           : isChatMode
-            ? `${chatRound.exercise.correctReply} (${chatRound.exercise.feedback})`
-            : `${currentStoryStep.correctAnswer} (${currentStoryStep.explanation})`
+            ? `${chatRound.exercise.correctReply} (${text.explainChat})`
+            : `${currentStoryStep.correctAnswer} (${
+                text.explainStory ??
+                "Look for the response that solves the situation clearly and naturally."
+              })`
     : isArticleMode
       ? text.explainArticle
       : isGrammarMode
@@ -2290,12 +2350,10 @@ export default function MiniGamesPage({
             </div>
           ) : null}
           {isChatMode ? (
-            <div className="miniGamesChatPreview">
+          <div className="miniGamesChatPreview">
               <div className="miniGamesChatMeta">
                 <span>{chatRound.exercise.contact}</span>
-                <span>
-                  {text.chatScenarioLabel}: {chatRound.exercise.scenario}
-                </span>
+                <span>{effectiveLevel}</span>
               </div>
               <div className="miniGamesChatBubble">
                 {chatRound.exercise.incoming}
@@ -2371,7 +2429,7 @@ export default function MiniGamesPage({
             {isArticleMode
               ? text.articleMissingLabel
               : isGrammarMode
-                ? grammarRound.exercise.question
+                ? text.chooseGrammar ?? "Choose the correct case form."
               : isWQuestionMode
                 ? text.wQuestionPrompt ?? "Choose the correct W-question word."
               : isTranslateMode
