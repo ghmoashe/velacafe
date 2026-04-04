@@ -996,6 +996,7 @@ export default function MiniGamesPage({
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const elevenLabsAudioCacheRef = useRef<Map<string, string>>(new Map());
+  const voicePickerRef = useRef<HTMLDivElement | null>(null);
   const previousChallengeKeyRef = useRef(todayChallengeKey);
   const [speechRate, setSpeechRate] = useState<SpeechRatePreset>(0.8);
   const [elevenLabsVoices, setElevenLabsVoices] = useState<ElevenLabsVoiceOption[]>([]);
@@ -1005,6 +1006,7 @@ export default function MiniGamesPage({
     if (typeof window === "undefined") return "auto";
     return window.localStorage.getItem(ELEVENLABS_VOICE_STORAGE_KEY) || "auto";
   });
+  const [voicePickerOpen, setVoicePickerOpen] = useState(false);
   const [ttsMessage, setTtsMessage] = useState("");
   const [mode, setMode] = useState<GameMode>("article");
   const [level, setLevel] = useState<ExerciseLevel>("A1");
@@ -1442,10 +1444,24 @@ export default function MiniGamesPage({
   const selectedElevenLabsVoiceExists =
     selectedElevenLabsVoiceId !== "auto" &&
     elevenLabsVoiceOptions.some((voice) => voice.voiceId === selectedElevenLabsVoiceId);
+  const selectedElevenLabsVoiceOption =
+    selectedElevenLabsVoiceId === "auto"
+      ? null
+      : elevenLabsVoiceOptions.find((voice) => voice.voiceId === selectedElevenLabsVoiceId) ??
+        null;
   const activeElevenLabsVoiceId =
     selectedElevenLabsVoiceExists
       ? selectedElevenLabsVoiceId
       : elevenLabsDefaultVoiceId?.trim() || null;
+  const selectedVoiceLabel = elevenLabsLoadingVoices
+    ? text.voiceLoadingLabel ?? "Loading voices..."
+    : selectedElevenLabsVoiceOption
+      ? `${selectedElevenLabsVoiceOption.name}${
+          selectedElevenLabsVoiceOption.category
+            ? ` (${selectedElevenLabsVoiceOption.category})`
+            : ""
+        }`
+      : text.voiceAutoLabel ?? "Auto";
   const canUseElevenLabs = Boolean(sessionUserId);
   const canPronounceCurrentExercise = pronunciationText.trim().length > 0 && canUseElevenLabs;
 
@@ -2361,6 +2377,40 @@ export default function MiniGamesPage({
     setSelectedElevenLabsVoiceId("auto");
   }, [elevenLabsVoiceOptions, selectedElevenLabsVoiceId]);
 
+  useEffect(() => {
+    if (!voicePickerOpen) return;
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (voicePickerRef.current?.contains(target)) return;
+      setVoicePickerOpen(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setVoicePickerOpen(false);
+      }
+    };
+
+    window.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("touchstart", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("touchstart", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [voicePickerOpen]);
+
+  useEffect(() => {
+    if (!voicePickerOpen) return;
+    if (elevenLabsLoadingVoices || !elevenLabsVoiceOptions.length) {
+      setVoicePickerOpen(false);
+    }
+  }, [elevenLabsLoadingVoices, elevenLabsVoiceOptions.length, voicePickerOpen]);
+
   useEffect(
     () => () => {
       if (audioElementRef.current) {
@@ -2925,31 +2975,83 @@ export default function MiniGamesPage({
                   </button>
                 ))}
               </div>
-                <label
+                <div
+                  ref={voicePickerRef}
                   className="miniGamesVoicePicker"
                   aria-label={text.voiceSelectAriaLabel ?? "Select pronunciation voice"}
                   title={text.voiceSelectAriaLabel ?? "Select pronunciation voice"}
                 >
-                  <span aria-hidden="true">TTS</span>
-                  <select
-                    className="miniGamesVoiceSelect"
-                    value={selectedElevenLabsVoiceId}
+                  <button
+                    className={`miniGamesVoicePickerButton${
+                      voicePickerOpen ? " miniGamesVoicePickerButtonOpen" : ""
+                    }`}
+                    type="button"
                     disabled={elevenLabsLoadingVoices || !elevenLabsVoiceOptions.length}
-                    onChange={(event) => setSelectedElevenLabsVoiceId(event.target.value)}
+                    aria-haspopup="listbox"
+                    aria-expanded={voicePickerOpen}
+                    aria-label={text.voiceSelectAriaLabel ?? "Select pronunciation voice"}
+                    onClick={() => setVoicePickerOpen((current) => !current)}
                   >
-                    <option value="auto">
-                      {elevenLabsLoadingVoices
-                        ? text.voiceLoadingLabel ?? "Loading voices..."
-                        : text.voiceAutoLabel ?? "Auto"}
-                    </option>
-                    {elevenLabsVoiceOptions.map((voice) => (
-                      <option key={voice.voiceId} value={voice.voiceId}>
-                        {voice.name}
-                        {voice.category ? ` (${voice.category})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    <span className="miniGamesVoicePickerTag" aria-hidden="true">
+                      TTS
+                    </span>
+                    <span className="miniGamesVoicePickerLabel">{selectedVoiceLabel}</span>
+                    <span
+                      className={`miniGamesVoicePickerCaret${
+                        voicePickerOpen ? " miniGamesVoicePickerCaretOpen" : ""
+                      }`}
+                      aria-hidden="true"
+                    >
+                      ▾
+                    </span>
+                  </button>
+                  {voicePickerOpen ? (
+                    <div className="miniGamesVoicePickerMenu" role="listbox">
+                      <button
+                        className={`miniGamesVoicePickerOption${
+                          selectedElevenLabsVoiceId === "auto"
+                            ? " miniGamesVoicePickerOptionActive"
+                            : ""
+                        }`}
+                        type="button"
+                        role="option"
+                        aria-selected={selectedElevenLabsVoiceId === "auto"}
+                        onClick={() => {
+                          setSelectedElevenLabsVoiceId("auto");
+                          setVoicePickerOpen(false);
+                        }}
+                      >
+                        {text.voiceAutoLabel ?? "Auto"}
+                      </button>
+                      {elevenLabsVoiceOptions.map((voice) => (
+                        <button
+                          key={voice.voiceId}
+                          className={`miniGamesVoicePickerOption${
+                            selectedElevenLabsVoiceId === voice.voiceId
+                              ? " miniGamesVoicePickerOptionActive"
+                              : ""
+                          }`}
+                          type="button"
+                          role="option"
+                          aria-selected={selectedElevenLabsVoiceId === voice.voiceId}
+                          onClick={() => {
+                            setSelectedElevenLabsVoiceId(voice.voiceId);
+                            setVoicePickerOpen(false);
+                          }}
+                        >
+                          <span className="miniGamesVoicePickerOptionName">
+                            {voice.name}
+                          </span>
+                          {voice.category ? (
+                            <span className="miniGamesVoicePickerOptionMeta">
+                              {voice.category}
+                            </span>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </div>
               {ttsMessage ? <p className="miniGamesTtsMessage">{ttsMessage}</p> : null}
             </>
