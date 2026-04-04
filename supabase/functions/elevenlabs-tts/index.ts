@@ -25,6 +25,73 @@ function json(status: number, body: unknown) {
   });
 }
 
+function tryParseJsonRecord(value: unknown): Record<string, unknown> | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function readFirstString(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
+function normalizeElevenLabsError(payload: Record<string, unknown>, responseText: string) {
+  const detailRecord = tryParseJsonRecord(payload.detail);
+  const voiceRecord = tryParseJsonRecord(payload.voice);
+  const status = readFirstString(detailRecord ?? payload, ["status", "code", "type"]).toLowerCase();
+  const voiceStatus = readFirstString(voiceRecord ?? {}, ["status", "code", "type"]).toLowerCase();
+  const directMessage = readFirstString(payload, ["message", "error"]);
+  const detailMessage = readFirstString(detailRecord ?? {}, ["message", "detail", "error"]);
+  const voiceMessage = readFirstString(voiceRecord ?? {}, ["message", "detail", "error"]);
+  const combinedMessage = [directMessage, detailMessage, voiceMessage, responseText]
+    .filter((value) => value.trim())
+    .join(" ");
+  const normalizedText = combinedMessage.toLowerCase();
+
+  if (status === "invalid_api_key" || normalizedText.includes("invalid api key")) {
+    return "Invalid ElevenLabs API key. Update ELEVENLABS_API_KEY in Supabase secrets and redeploy.";
+  }
+  if (
+    status === "detected_unusual_activity" ||
+    normalizedText.includes("unusual activity detected")
+  ) {
+    return "ElevenLabs Free Tier is temporarily blocked for this account or network. Disable VPN/proxy or use a paid plan.";
+  }
+  if (
+    status === "paid_plan_required" ||
+    voiceStatus === "payment_required" ||
+    normalizedText.includes("paid_plan_required") ||
+    normalizedText.includes("payment_required") ||
+    normalizedText.includes("free users cannot use library voices") ||
+    normalizedText.includes("library voices via the api")
+  ) {
+    return "Selected ElevenLabs voice requires a paid plan or library voice access. Choose another voice or upgrade the plan.";
+  }
+
+  return directMessage || detailMessage || voiceMessage || responseText;
+}
+
 function isVoiceAllowed(voiceId: string) {
   if (!allowedVoiceIds.length) return true;
   return allowedVoiceIds.includes(voiceId.trim());
@@ -86,14 +153,7 @@ async function elevenLabsFetch(path: string, init?: RequestInit) {
     if (contentType.includes("application/json")) {
       try {
         const payload = JSON.parse(responseText) as Record<string, unknown>;
-        message =
-          typeof payload.detail === "string"
-            ? payload.detail
-            : typeof payload.message === "string"
-              ? payload.message
-              : typeof payload.error === "string"
-                ? payload.error
-                : "";
+        message = normalizeElevenLabsError(payload, responseText);
       } catch {
         message = "";
       }
