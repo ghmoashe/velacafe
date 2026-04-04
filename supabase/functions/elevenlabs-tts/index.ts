@@ -3,6 +3,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const elevenLabsApiKey = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
 const defaultVoiceId = Deno.env.get("ELEVENLABS_VOICE_ID") ?? "";
+const allowedVoiceIds = (Deno.env.get("ELEVENLABS_ALLOWED_VOICE_IDS") ?? "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 const defaultModelId = Deno.env.get("ELEVENLABS_MODEL_ID") ?? "eleven_flash_v2_5";
 const outputFormat = Deno.env.get("ELEVENLABS_OUTPUT_FORMAT") ?? "mp3_44100_128";
 const elevenLabsBaseUrl =
@@ -19,6 +23,25 @@ function json(status: number, body: unknown) {
     status,
     headers: { "Content-Type": "application/json", ...corsHeaders },
   });
+}
+
+function isVoiceAllowed(voiceId: string) {
+  if (!allowedVoiceIds.length) return true;
+  return allowedVoiceIds.includes(voiceId.trim());
+}
+
+function resolveVoiceId(requestedVoiceId: string) {
+  const trimmedVoiceId = requestedVoiceId.trim();
+  if (trimmedVoiceId) {
+    return trimmedVoiceId;
+  }
+  if (defaultVoiceId.trim()) {
+    return defaultVoiceId.trim();
+  }
+  if (allowedVoiceIds.length) {
+    return allowedVoiceIds[0];
+  }
+  return "";
 }
 
 async function requireUser(req: Request) {
@@ -117,6 +140,7 @@ Deno.serve(async (req) => {
       const payload = (await response.json()) as { voices?: ElevenLabsVoiceApi[] };
       const voices = (payload.voices ?? [])
         .filter((voice) => typeof voice.voice_id === "string" && typeof voice.name === "string")
+        .filter((voice) => isVoiceAllowed((voice.voice_id as string).trim()))
         .map((voice) => ({
           voiceId: voice.voice_id as string,
           name: voice.name as string,
@@ -135,9 +159,10 @@ Deno.serve(async (req) => {
                 .filter((value): value is string => Boolean(value))
             : [],
         }));
+      const resolvedDefaultVoiceId = resolveVoiceId(defaultVoiceId);
 
       return json(200, {
-        defaultVoiceId: defaultVoiceId || null,
+        defaultVoiceId: resolvedDefaultVoiceId || null,
         defaultModelId: defaultModelId || null,
         voices,
       });
@@ -145,10 +170,7 @@ Deno.serve(async (req) => {
 
     if (action === "speak") {
       const text = typeof body.text === "string" ? body.text.trim() : "";
-      const voiceId =
-        typeof body.voiceId === "string" && body.voiceId.trim()
-          ? body.voiceId.trim()
-          : defaultVoiceId.trim();
+      const voiceId = resolveVoiceId(typeof body.voiceId === "string" ? body.voiceId : "");
       const modelId =
         typeof body.modelId === "string" && body.modelId.trim()
           ? body.modelId.trim()
@@ -169,6 +191,9 @@ Deno.serve(async (req) => {
       }
       if (!voiceId) {
         return json(400, { error: "No ElevenLabs voice is configured." });
+      }
+      if (!isVoiceAllowed(voiceId)) {
+        return json(400, { error: "This ElevenLabs voice is not allowed." });
       }
       if (!modelId) {
         return json(400, { error: "No ElevenLabs model is configured." });

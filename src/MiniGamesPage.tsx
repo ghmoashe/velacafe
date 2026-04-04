@@ -1439,10 +1439,13 @@ export default function MiniGamesPage({
       left.name.localeCompare(right.name, undefined, { sensitivity: "base" }),
     );
   }, [elevenLabsVoices]);
+  const selectedElevenLabsVoiceExists =
+    selectedElevenLabsVoiceId !== "auto" &&
+    elevenLabsVoiceOptions.some((voice) => voice.voiceId === selectedElevenLabsVoiceId);
   const activeElevenLabsVoiceId =
-    selectedElevenLabsVoiceId !== "auto"
+    selectedElevenLabsVoiceExists
       ? selectedElevenLabsVoiceId
-      : elevenLabsDefaultVoiceId ?? elevenLabsVoiceOptions[0]?.voiceId ?? null;
+      : elevenLabsDefaultVoiceId?.trim() || null;
   const canUseElevenLabs = Boolean(sessionUserId);
   const canPronounceCurrentExercise = pronunciationText.trim().length > 0 && canUseElevenLabs;
 
@@ -1673,7 +1676,9 @@ export default function MiniGamesPage({
           setTtsMessage(
             elevenLabsLoadingVoices
               ? text.voiceLoadingLabel ?? "Loading voices..."
-              : ttsMessage.trim() ||
+              : elevenLabsVoiceOptions.length
+                ? "Select an ElevenLabs voice from the list."
+                : ttsMessage.trim() ||
                   "No ElevenLabs voice is available. Check your API key and voice setup.",
           );
           return;
@@ -1710,6 +1715,7 @@ export default function MiniGamesPage({
       activeElevenLabsVoiceId,
       canUseElevenLabs,
       elevenLabsLoadingVoices,
+      elevenLabsVoiceOptions.length,
       speechRate,
       text.voiceLoadingLabel,
       ttsMessage,
@@ -2315,6 +2321,14 @@ export default function MiniGamesPage({
         if (!active) return;
         setElevenLabsVoices(payload.voices);
         setElevenLabsDefaultVoiceId(payload.defaultVoiceId);
+        if (
+          selectedElevenLabsVoiceId === "auto" &&
+          !payload.defaultVoiceId &&
+          payload.voices.length === 1 &&
+          typeof payload.voices[0]?.voiceId === "string"
+        ) {
+          setSelectedElevenLabsVoiceId(payload.voices[0].voiceId);
+        }
         setTtsMessage(
           payload.voices.length || payload.defaultVoiceId
             ? ""
@@ -2339,7 +2353,7 @@ export default function MiniGamesPage({
     return () => {
       active = false;
     };
-  }, [sessionUserId]);
+  }, [selectedElevenLabsVoiceId, sessionUserId]);
 
   useEffect(() => {
     if (selectedElevenLabsVoiceId === "auto") return;
