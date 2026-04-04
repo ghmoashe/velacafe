@@ -45,9 +45,10 @@ async function getAccessToken() {
 
 async function parseFunctionError(response: Response) {
   const contentType = response.headers.get("content-type") ?? "";
+  const responseText = await response.text().catch(() => "");
   if (contentType.includes("application/json")) {
     try {
-      const payload = (await response.json()) as Record<string, unknown>;
+      const payload = JSON.parse(responseText) as Record<string, unknown>;
       const message =
         typeof payload.error === "string"
           ? payload.error
@@ -62,13 +63,8 @@ async function parseFunctionError(response: Response) {
     }
   }
 
-  try {
-    const text = await response.text();
-    if (text.trim()) {
-      return text;
-    }
-  } catch {
-    // Ignore text parse failure and continue to generic error.
+  if (responseText.trim()) {
+    return responseText;
   }
 
   return `TTS request failed with status ${response.status}.`;

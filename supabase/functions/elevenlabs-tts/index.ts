@@ -58,10 +58,11 @@ async function elevenLabsFetch(path: string, init?: RequestInit) {
 
   if (!response.ok) {
     const contentType = response.headers.get("content-type") ?? "";
+    const responseText = await response.text();
     let message = "";
     if (contentType.includes("application/json")) {
       try {
-        const payload = (await response.json()) as Record<string, unknown>;
+        const payload = JSON.parse(responseText) as Record<string, unknown>;
         message =
           typeof payload.detail === "string"
             ? payload.detail
@@ -75,7 +76,7 @@ async function elevenLabsFetch(path: string, init?: RequestInit) {
       }
     }
     if (!message) {
-      message = await response.text();
+      message = responseText;
     }
     throw new Error(message || `ElevenLabs request failed with status ${response.status}.`);
   }
