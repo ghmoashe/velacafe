@@ -30,6 +30,9 @@ type OrganizerProfile = {
   city: string | null;
   country: string | null;
   language: string | null;
+  learning_languages?: string[] | null;
+  practice_languages?: string[] | null;
+  interests?: string[] | null;
   bio: string | null;
   is_organizer?: boolean | null;
   is_teacher?: boolean | null;
@@ -78,6 +81,27 @@ type ReportRow = {
   post_id: string;
 };
 
+type WatchMetricsRow = {
+  post_id: string;
+  watch_sessions: number | null;
+  unique_viewers: number | null;
+  total_watched_seconds: number | null;
+  avg_watched_seconds: number | null;
+  avg_completion_ratio: number | null;
+  completed_views: number | null;
+  completion_rate: number | null;
+};
+
+type WatchMetrics = {
+  watchSessions: number;
+  uniqueViewers: number;
+  totalWatchedSeconds: number;
+  avgWatchedSeconds: number;
+  avgCompletionRatio: number;
+  completedViews: number;
+  completionRate: number;
+};
+
 type FeedComment = {
   id: string;
   post_id: string;
@@ -97,6 +121,10 @@ type ShortsPageProps = {
   sessionUserId: string | null;
   viewerLanguage: string | null;
   viewerCity: string | null;
+  viewerCountry: string | null;
+  viewerLearningLanguages: string[];
+  viewerPracticeLanguages: string[];
+  viewerInterests: string[];
   followingOrganizerIds: string[];
   requireAuth: () => void;
   goToOrganizer: (organizerId: string) => void;
@@ -174,6 +202,68 @@ function buildCountMap(ids: string[]) {
   }, {});
 }
 
+function buildWatchMetricsMap(ids: string[]) {
+  return ids.reduce<Record<string, WatchMetrics>>((accumulator, id) => {
+    accumulator[id] = {
+      watchSessions: 0,
+      uniqueViewers: 0,
+      totalWatchedSeconds: 0,
+      avgWatchedSeconds: 0,
+      avgCompletionRatio: 0,
+      completedViews: 0,
+      completionRate: 0,
+    };
+    return accumulator;
+  }, {});
+}
+
+function normalizeValue(value: string | null | undefined) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function addNormalizedValue(target: Set<string>, value: string | null | undefined) {
+  const normalized = normalizeValue(value);
+  if (normalized) {
+    target.add(normalized);
+  }
+}
+
+function addNormalizedValues(
+  target: Set<string>,
+  values: Array<string | null | undefined> | null | undefined
+) {
+  for (const value of values ?? []) {
+    addNormalizedValue(target, value);
+  }
+}
+
+function countSharedValues(left: Set<string>, right: Set<string>) {
+  let count = 0;
+  for (const value of left) {
+    if (right.has(value)) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function profileMatchesLanguage(profile: OrganizerProfile, language: string) {
+  const normalizedLanguage = normalizeValue(language);
+  if (!normalizedLanguage) return true;
+  if (normalizeValue(profile.language) === normalizedLanguage) {
+    return true;
+  }
+  const secondaryLanguages = new Set<string>();
+  addNormalizedValues(secondaryLanguages, profile.learning_languages);
+  addNormalizedValues(secondaryLanguages, profile.practice_languages);
+  return secondaryLanguages.has(normalizedLanguage);
+}
+
+function profileMatchesAnyLanguage(profile: OrganizerProfile, languages: string[]) {
+  if (languages.length === 0) return true;
+  return languages.some((language) => profileMatchesLanguage(profile, language));
+}
+
 function getFeedViewerKey(sessionUserId: string | null) {
   if (sessionUserId) {
     return `user:${sessionUserId}`;
@@ -229,15 +319,32 @@ function persistRecentViewedAt(postId: string) {
   );
 }
 
+type VideoRankContext = {
+  viewerLanguage: string | null;
+  viewerCity: string | null;
+  viewerCountry: string | null;
+  viewerLanguagePreferences: Set<string>;
+  viewerInterests: Set<string>;
+  followingOrganizerIds: Set<string>;
+  recentViewedAt: Map<string, number>;
+};
+
 function getVideoRankScore(
   post: VideoFeedItem,
-  metrics: { likes: number; comments: number; shares: number; views: number },
-  context: {
-    viewerLanguage: string | null;
-    viewerCity: string | null;
-    followingOrganizerIds: Set<string>;
-    recentViewedAt: Map<string, number>;
-  }
+  metrics: {
+    likes: number;
+    comments: number;
+    shares: number;
+    views: number;
+    watchSessions: number;
+    uniqueViewers: number;
+    totalWatchedSeconds: number;
+    avgWatchedSeconds: number;
+    avgCompletionRatio: number;
+    completedViews: number;
+    completionRate: number;
+  },
+  context: VideoRankContext
 ) {
   const createdAt = new Date(post.created_at).getTime();
   const ageHours = Number.isNaN(createdAt)
@@ -249,18 +356,50 @@ function getVideoRankScore(
     metrics.comments * 6 +
     metrics.shares * 8 +
     Math.log10(metrics.views + 1) * 18;
-  const languageBoost =
-    context.viewerLanguage &&
-    post.author.language &&
-    context.viewerLanguage === post.author.language
+  const retentionBoost =
+    metrics.avgCompletionRatio * 52 +
+    metrics.completionRate * 68 +
+    Math.log10(metrics.totalWatchedSeconds + 1) * 14 +
+    Math.log10(metrics.watchSessions + 1) * 12;
+  const viewerPrimaryLanguage = normalizeValue(context.viewerLanguage);
+  const authorPrimaryLanguage = normalizeValue(post.author.language);
+  const authorSecondaryLanguages = new Set<string>();
+  addNormalizedValues(authorSecondaryLanguages, post.author.learning_languages);
+  addNormalizedValues(authorSecondaryLanguages, post.author.practice_languages);
+  const primaryLanguageBoost =
+    viewerPrimaryLanguage &&
+    authorPrimaryLanguage &&
+    viewerPrimaryLanguage === authorPrimaryLanguage
       ? 26
       : 0;
+  const preferenceLanguageBoost =
+    !primaryLanguageBoost &&
+    authorPrimaryLanguage &&
+    context.viewerLanguagePreferences.has(authorPrimaryLanguage)
+      ? 18
+      : 0;
+  const secondaryLanguageBoost = Math.min(
+    12,
+    countSharedValues(context.viewerLanguagePreferences, authorSecondaryLanguages) * 6
+  );
   const cityBoost =
     context.viewerCity &&
     post.author.city &&
     context.viewerCity.trim().toLowerCase() === post.author.city.trim().toLowerCase()
       ? 18
       : 0;
+  const countryBoost =
+    context.viewerCountry &&
+    post.author.country &&
+    context.viewerCountry.trim().toLowerCase() === post.author.country.trim().toLowerCase()
+      ? 10
+      : 0;
+  const authorInterests = new Set<string>();
+  addNormalizedValues(authorInterests, post.author.interests);
+  const interestBoost = Math.min(
+    18,
+    countSharedValues(context.viewerInterests, authorInterests) * 6
+  );
   const followBoost = context.followingOrganizerIds.has(post.author.id) ? 42 : 0;
   const viewedAt = context.recentViewedAt.get(post.id);
   const cooldownPenalty = viewedAt
@@ -269,7 +408,66 @@ function getVideoRankScore(
         Math.round((RECENT_VIEW_COOLDOWN_MS - (Date.now() - viewedAt)) / 3_600_000) * 10
       )
     : 0;
-  return freshnessBoost + engagementBoost + languageBoost + cityBoost + followBoost - cooldownPenalty;
+  return (
+    freshnessBoost +
+    engagementBoost +
+    retentionBoost +
+    primaryLanguageBoost +
+    preferenceLanguageBoost +
+    secondaryLanguageBoost +
+    cityBoost +
+    countryBoost +
+    interestBoost +
+    followBoost -
+    cooldownPenalty
+  );
+}
+
+function diversifyFeedVideos(
+  candidates: Array<{ item: VideoFeedItem; score: number }>,
+  requestedPostId: string | null
+) {
+  const remaining = [...candidates];
+  const authorExposure = new Map<string, number>();
+  const result: VideoFeedItem[] = [];
+
+  if (requestedPostId) {
+    const requestedIndex = remaining.findIndex((candidate) => candidate.item.id === requestedPostId);
+    if (requestedIndex >= 0) {
+      const [requestedCandidate] = remaining.splice(requestedIndex, 1);
+      result.push(requestedCandidate.item);
+      authorExposure.set(requestedCandidate.item.author.id, 1);
+    }
+  }
+
+  while (remaining.length > 0) {
+    let bestIndex = 0;
+    let bestAdjustedScore = Number.NEGATIVE_INFINITY;
+    let bestCreatedAt = Number.NEGATIVE_INFINITY;
+
+    remaining.forEach((candidate, index) => {
+      const exposurePenalty = (authorExposure.get(candidate.item.author.id) ?? 0) * 24;
+      const adjustedScore = candidate.score - exposurePenalty;
+      const createdAt = new Date(candidate.item.created_at).getTime();
+      if (
+        adjustedScore > bestAdjustedScore ||
+        (adjustedScore === bestAdjustedScore && createdAt > bestCreatedAt)
+      ) {
+        bestIndex = index;
+        bestAdjustedScore = adjustedScore;
+        bestCreatedAt = createdAt;
+      }
+    });
+
+    const [nextCandidate] = remaining.splice(bestIndex, 1);
+    result.push(nextCandidate.item);
+    authorExposure.set(
+      nextCandidate.item.author.id,
+      (authorExposure.get(nextCandidate.item.author.id) ?? 0) + 1
+    );
+  }
+
+  return result;
 }
 
 function rankFeedVideos(
@@ -278,37 +476,40 @@ function rankFeedVideos(
   commentCounts: Record<string, number>,
   shareCounts: Record<string, number>,
   viewCounts: Record<string, number>,
+  watchMetricsByPostId: Record<string, WatchMetrics>,
   requestedPostId: string | null,
-  context: {
-    viewerLanguage: string | null;
-    viewerCity: string | null;
-    followingOrganizerIds: Set<string>;
-    recentViewedAt: Map<string, number>;
-  }
+  context: VideoRankContext
 ) {
-  return [...items].sort((left, right) => {
-    if (requestedPostId) {
-      if (left.id === requestedPostId) return -1;
-      if (right.id === requestedPostId) return 1;
-    }
-    const scoreDiff =
-      getVideoRankScore(right, {
-        likes: likeCounts[right.id] ?? 0,
-        comments: commentCounts[right.id] ?? 0,
-        shares: shareCounts[right.id] ?? 0,
-        views: viewCounts[right.id] ?? 0,
-      }, context) -
-      getVideoRankScore(left, {
-        likes: likeCounts[left.id] ?? 0,
-        comments: commentCounts[left.id] ?? 0,
-        shares: shareCounts[left.id] ?? 0,
-        views: viewCounts[left.id] ?? 0,
-      }, context);
-    if (scoreDiff !== 0) {
-      return scoreDiff;
-    }
-    return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
-  });
+  const candidates = items
+    .map((item) => ({
+      item,
+      score: getVideoRankScore(
+        item,
+        {
+          likes: likeCounts[item.id] ?? 0,
+          comments: commentCounts[item.id] ?? 0,
+          shares: shareCounts[item.id] ?? 0,
+          views: viewCounts[item.id] ?? 0,
+          watchSessions: watchMetricsByPostId[item.id]?.watchSessions ?? 0,
+          uniqueViewers: watchMetricsByPostId[item.id]?.uniqueViewers ?? 0,
+          totalWatchedSeconds: watchMetricsByPostId[item.id]?.totalWatchedSeconds ?? 0,
+          avgWatchedSeconds: watchMetricsByPostId[item.id]?.avgWatchedSeconds ?? 0,
+          avgCompletionRatio: watchMetricsByPostId[item.id]?.avgCompletionRatio ?? 0,
+          completedViews: watchMetricsByPostId[item.id]?.completedViews ?? 0,
+          completionRate: watchMetricsByPostId[item.id]?.completionRate ?? 0,
+        },
+        context
+      ),
+    }))
+    .sort((left, right) => {
+      const scoreDiff = right.score - left.score;
+      if (scoreDiff !== 0) {
+        return scoreDiff;
+      }
+      return new Date(right.item.created_at).getTime() - new Date(left.item.created_at).getTime();
+    });
+
+  return diversifyFeedVideos(candidates, requestedPostId);
 }
 
 function getVideoCoverUrl(post: VideoPostRow) {
@@ -370,6 +571,10 @@ export default function ShortsPage(props: ShortsPageProps) {
     sessionUserId,
     viewerLanguage,
     viewerCity,
+    viewerCountry,
+    viewerLearningLanguages,
+    viewerPracticeLanguages,
+    viewerInterests,
     followingOrganizerIds,
     requireAuth,
     goToOrganizer,
@@ -441,7 +646,14 @@ export default function ShortsPage(props: ShortsPageProps) {
         return;
       }
       const viewerKey = getFeedViewerKey(sessionUserId);
-      const [likesResult, commentsResult, sharesResult, viewsResult, reportsResult] =
+      const [
+        likesResult,
+        commentsResult,
+        sharesResult,
+        viewsResult,
+        reportsResult,
+        watchMetricsResult,
+      ] =
         await Promise.all([
           supabase.from("post_likes").select("post_id,user_id").in("post_id", postIds),
           supabase.from("post_comments").select("post_id").in("post_id", postIds),
@@ -455,6 +667,7 @@ export default function ShortsPage(props: ShortsPageProps) {
             .select("post_id")
             .eq("viewer_key", viewerKey)
             .in("post_id", postIds),
+          supabase.rpc("get_shorts_watch_metrics", { post_ids: postIds }),
         ]);
       const interactionError =
         likesResult.error ??
@@ -490,6 +703,7 @@ export default function ShortsPage(props: ShortsPageProps) {
       const nextCommentCounts = buildCountMap(postIds);
       const nextShareCounts = buildCountMap(postIds);
       const nextViewCounts = buildCountMap(postIds);
+      const nextWatchMetrics = buildWatchMetricsMap(postIds);
       const nextLiked = new Set<string>();
 
       for (const row of (likesResult.data ?? []) as LikeRow[]) {
@@ -515,19 +729,46 @@ export default function ShortsPage(props: ShortsPageProps) {
         (row) => row.post_id
       );
 
+      if (!watchMetricsResult.error) {
+        for (const row of (watchMetricsResult.data ?? []) as WatchMetricsRow[]) {
+          if (!nextWatchMetrics[row.post_id]) continue;
+          nextWatchMetrics[row.post_id] = {
+            watchSessions: row.watch_sessions ?? 0,
+            uniqueViewers: row.unique_viewers ?? 0,
+            totalWatchedSeconds: row.total_watched_seconds ?? 0,
+            avgWatchedSeconds: row.avg_watched_seconds ?? 0,
+            avgCompletionRatio: row.avg_completion_ratio ?? 0,
+            completedViews: row.completed_views ?? 0,
+            completionRate: row.completion_rate ?? 0,
+          };
+        }
+      } else if (!isSchemaError(watchMetricsResult.error)) {
+        console.error("[shorts] Failed to load watch metrics", watchMetricsResult.error);
+      }
+
       const requestedPostId = getRequestedPostId();
       if (items?.length) {
         const recentViewedAt = getRecentViewedAtMap();
+        const viewerLanguagePreferences = new Set<string>();
+        addNormalizedValue(viewerLanguagePreferences, viewerLanguage);
+        addNormalizedValues(viewerLanguagePreferences, viewerLearningLanguages);
+        addNormalizedValues(viewerLanguagePreferences, viewerPracticeLanguages);
+        const viewerInterestSet = new Set<string>();
+        addNormalizedValues(viewerInterestSet, viewerInterests);
         const rankedItems = rankFeedVideos(
           items,
           nextLikeCounts,
           nextCommentCounts,
           nextShareCounts,
           nextViewCounts,
+          nextWatchMetrics,
           requestedPostId,
           {
             viewerLanguage,
             viewerCity,
+            viewerCountry,
+            viewerLanguagePreferences,
+            viewerInterests: viewerInterestSet,
             followingOrganizerIds: followingOrganizerIdSet,
             recentViewedAt,
           }
@@ -549,7 +790,17 @@ export default function ShortsPage(props: ShortsPageProps) {
       setLikedPostIds([...nextLiked]);
       setReportedPostIds(nextReportedPostIds);
     },
-    [followingOrganizerIdSet, sessionUserId, text.socialSetupHint, viewerCity, viewerLanguage]
+    [
+      followingOrganizerIdSet,
+      sessionUserId,
+      text.socialSetupHint,
+      viewerCity,
+      viewerCountry,
+      viewerInterests,
+      viewerLanguage,
+      viewerLearningLanguages,
+      viewerPracticeLanguages,
+    ]
   );
 
   const loadFeed = useCallback(async () => {
@@ -612,18 +863,23 @@ export default function ShortsPage(props: ShortsPageProps) {
       return;
     }
 
-      const primaryProfilesResult = await supabase
-        .from("profiles")
-        .select("id,full_name,avatar_url,city,country,language,bio,is_organizer,is_teacher")
-        .in("id", organizerIds);
-      const fallbackProfilesResult =
-        primaryProfilesResult.error &&
-        getErrorMessage(primaryProfilesResult.error).toLowerCase().includes("is_teacher")
-          ? await supabase
-              .from("profiles")
-              .select("id,full_name,avatar_url,city,country,language,bio,is_organizer")
-              .in("id", organizerIds)
-          : null;
+    const primaryProfilesResult = await supabase
+      .from("profiles")
+      .select(
+        "id,full_name,avatar_url,city,country,language,learning_languages,practice_languages,interests,bio,is_organizer,is_teacher"
+      )
+      .in("id", organizerIds);
+    const profileSelectErrorMessage = getErrorMessage(primaryProfilesResult.error).toLowerCase();
+    const fallbackProfilesResult =
+      primaryProfilesResult.error &&
+      ["is_teacher", "learning_languages", "practice_languages", "interests"].some((field) =>
+        profileSelectErrorMessage.includes(field)
+      )
+        ? await supabase
+            .from("profiles")
+            .select("id,full_name,avatar_url,city,country,language,bio,is_organizer")
+            .in("id", organizerIds)
+        : null;
       const profileRows = (fallbackProfilesResult?.data ?? primaryProfilesResult.data) as
         | OrganizerProfile[]
         | null;
@@ -641,7 +897,7 @@ export default function ShortsPage(props: ShortsPageProps) {
         .filter((profile) => profile.is_organizer || profile.is_teacher)
         .map((profile) => [profile.id, profile])
     );
-    const filteredVideos = posts
+    const visibleVideos = posts
       .filter((post): post is VideoPostRow & { user_id: string } =>
         Boolean(
           post.user_id &&
@@ -665,12 +921,31 @@ export default function ShortsPage(props: ShortsPageProps) {
         ...post,
         author: profileMap.get(post.user_id)!,
       }));
+    const preferredLearningLanguages = viewerLearningLanguages.filter((language) =>
+      Boolean(normalizeValue(language))
+    );
+    const filteredVideos =
+      preferredLearningLanguages.length > 0
+        ? visibleVideos.filter((post) =>
+            profileMatchesAnyLanguage(post.author, preferredLearningLanguages)
+          )
+        : visibleVideos;
+    const effectiveVideos =
+      filteredVideos.length > 0 || preferredLearningLanguages.length === 0
+        ? filteredVideos
+        : visibleVideos;
     setFeedStatus({ type: "idle", message: "" });
     await loadInteractionSummary(
-      filteredVideos.map((item) => item.id),
-      filteredVideos
+      effectiveVideos.map((item) => item.id),
+      effectiveVideos
     );
-  }, [followingOrganizerIdSet, loadInteractionSummary, sessionUserId, text.notConfigured]);
+  }, [
+    followingOrganizerIdSet,
+    loadInteractionSummary,
+    sessionUserId,
+    text.notConfigured,
+    viewerLearningLanguages,
+  ]);
 
   const loadComments = useCallback(
     async (postId: string) => {

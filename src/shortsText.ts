@@ -67,7 +67,7 @@ const SHORTS_TEXT: ShortsText = {
   shareDone: "Video link shared.",
   notConfigured: "Supabase is not configured.",
   socialSetupHint:
-    "Likes, comments, views, reports, watch analytics, and custom covers need the SQL in supabase/posts_social_features.sql and supabase/posts_shorts_feed_features.sql.",
+    "Likes, comments, views, reports, watch analytics, ranking metrics, and custom covers need the SQL in supabase/posts_social_features.sql, supabase/posts_shorts_feed_features.sql, and supabase/posts_shorts_watch_metrics_rpc.sql.",
   sharePrompt: "Copy this video link:",
   closeComments: "Close comments",
 };
