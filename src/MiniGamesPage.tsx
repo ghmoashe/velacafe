@@ -36,6 +36,62 @@ type MiniGamesPageProps = {
 
 type SpeechRatePreset = 0.68 | 0.8 | 1;
 const ELEVENLABS_VOICE_STORAGE_KEY = "vela-mini-games-elevenlabs-voice";
+type TtsBlockingReason =
+  | "invalid_api_key"
+  | "unusual_activity"
+  | "paid_plan"
+  | "voice_not_allowed";
+
+function getCompactVoiceName(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return "Voice";
+  const [primary] = trimmed.split(/\s+-\s+/);
+  return primary?.trim() || trimmed;
+}
+
+function getVoiceMetaText(voice: ElevenLabsVoiceOption) {
+  const trimmedName = voice.name.trim();
+  const compactName = getCompactVoiceName(trimmedName);
+  const descriptor =
+    trimmedName.startsWith(compactName) && trimmedName.length > compactName.length
+      ? trimmedName.slice(compactName.length).replace(/^\s*-\s*/, "").trim()
+      : "";
+  const parts = [descriptor, voice.category?.trim() ?? ""].filter(Boolean);
+  return parts.join(" · ");
+}
+
+function classifyTtsBlockingReason(message: string): TtsBlockingReason | null {
+  const normalizedMessage = message.trim().toLowerCase();
+  if (!normalizedMessage) return null;
+  if (
+    normalizedMessage.includes("invalid elevenlabs api key") ||
+    normalizedMessage.includes("invalid api key")
+  ) {
+    return "invalid_api_key";
+  }
+  if (
+    normalizedMessage.includes("free tier is temporarily blocked") ||
+    normalizedMessage.includes("free tier is blocked") ||
+    normalizedMessage.includes("unusual activity")
+  ) {
+    return "unusual_activity";
+  }
+  if (
+    normalizedMessage.includes("requires a paid plan") ||
+    normalizedMessage.includes("needs a paid plan") ||
+    normalizedMessage.includes("library voice access") ||
+    normalizedMessage.includes("choose another voice or upgrade")
+  ) {
+    return "paid_plan";
+  }
+  if (
+    normalizedMessage.includes("voice is not allowed") ||
+    normalizedMessage.includes("select another voice")
+  ) {
+    return "voice_not_allowed";
+  }
+  return null;
+}
 
 type GameMode =
   | "article"
@@ -998,6 +1054,7 @@ export default function MiniGamesPage({
   const elevenLabsAudioCacheRef = useRef<Map<string, string>>(new Map());
   const voicePickerRef = useRef<HTMLDivElement | null>(null);
   const previousChallengeKeyRef = useRef(todayChallengeKey);
+  const previousVoiceSelectionRef = useRef<string | null>(null);
   const [speechRate, setSpeechRate] = useState<SpeechRatePreset>(0.8);
   const [elevenLabsVoices, setElevenLabsVoices] = useState<ElevenLabsVoiceOption[]>([]);
   const [elevenLabsLoadingVoices, setElevenLabsLoadingVoices] = useState(false);
@@ -1007,6 +1064,7 @@ export default function MiniGamesPage({
     return window.localStorage.getItem(ELEVENLABS_VOICE_STORAGE_KEY) || "auto";
   });
   const [voicePickerOpen, setVoicePickerOpen] = useState(false);
+  const [ttsBlockingReason, setTtsBlockingReason] = useState<TtsBlockingReason | null>(null);
   const [ttsMessage, setTtsMessage] = useState("");
   const [mode, setMode] = useState<GameMode>("article");
   const [level, setLevel] = useState<ExerciseLevel>("A1");
@@ -1438,7 +1496,9 @@ export default function MiniGamesPage({
   ]);
   const elevenLabsVoiceOptions = useMemo(() => {
     return [...elevenLabsVoices].sort((left, right) =>
-      left.name.localeCompare(right.name, undefined, { sensitivity: "base" }),
+      getCompactVoiceName(left.name).localeCompare(getCompactVoiceName(right.name), undefined, {
+        sensitivity: "base",
+      }),
     );
   }, [elevenLabsVoices]);
   const selectedElevenLabsVoiceExists =
@@ -1456,14 +1516,16 @@ export default function MiniGamesPage({
   const selectedVoiceLabel = elevenLabsLoadingVoices
     ? text.voiceLoadingLabel ?? "Loading voices..."
     : selectedElevenLabsVoiceOption
-      ? `${selectedElevenLabsVoiceOption.name}${
-          selectedElevenLabsVoiceOption.category
-            ? ` (${selectedElevenLabsVoiceOption.category})`
-            : ""
-        }`
+      ? getCompactVoiceName(selectedElevenLabsVoiceOption.name)
       : text.voiceAutoLabel ?? "Auto";
   const canUseElevenLabs = Boolean(sessionUserId);
-  const canPronounceCurrentExercise = pronunciationText.trim().length > 0 && canUseElevenLabs;
+  const hasPronunciationText = pronunciationText.trim().length > 0;
+  const ttsHardBlocked =
+    ttsBlockingReason === "invalid_api_key" || ttsBlockingReason === "unusual_activity";
+  const ttsSoftBlocked =
+    ttsBlockingReason === "paid_plan" || ttsBlockingReason === "voice_not_allowed";
+  const canPronounceCurrentExercise = hasPronunciationText && canUseElevenLabs && !ttsHardBlocked;
+  const canPlayCurrentExerciseAudio = canPronounceCurrentExercise && !ttsSoftBlocked;
 
   const extractErrorMessage = useCallback((error: unknown) => {
     if (error && typeof error === "object" && "message" in error) {
@@ -1681,21 +1743,22 @@ export default function MiniGamesPage({
       };
 
       if (!canUseElevenLabs) {
-        setTtsMessage("Sign in to use ElevenLabs voice.");
+        setTtsMessage(text.voiceSignInLabel ?? "Sign in to use ElevenLabs voice.");
         return;
       }
 
       try {
         setTtsMessage("");
+        setTtsBlockingReason(null);
         const voiceId = activeElevenLabsVoiceId;
         if (!voiceId) {
           setTtsMessage(
             elevenLabsLoadingVoices
               ? text.voiceLoadingLabel ?? "Loading voices..."
               : elevenLabsVoiceOptions.length
-                ? "Select an ElevenLabs voice from the list."
+                ? "Choose a voice from the list."
                 : ttsMessage.trim() ||
-                  "No ElevenLabs voice is available. Check your API key and voice setup.",
+                  "No ElevenLabs voice is available right now.",
           );
           return;
         }
@@ -1720,11 +1783,12 @@ export default function MiniGamesPage({
         audio.currentTime = 0;
         await audio.play();
       } catch (error) {
-        setTtsMessage(
+        const nextMessage =
           error instanceof Error
             ? error.message
-            : "ElevenLabs voice is temporarily unavailable.",
-        );
+            : "ElevenLabs voice is temporarily unavailable.";
+        setTtsBlockingReason(classifyTtsBlockingReason(nextMessage));
+        setTtsMessage(nextMessage);
       }
     },
     [
@@ -1733,7 +1797,9 @@ export default function MiniGamesPage({
       elevenLabsLoadingVoices,
       elevenLabsVoiceOptions.length,
       speechRate,
+      setTtsBlockingReason,
       text.voiceLoadingLabel,
+      text.voiceSignInLabel,
       ttsMessage,
     ],
   );
@@ -1748,7 +1814,7 @@ export default function MiniGamesPage({
 
   const renderOptionListenButton = useCallback(
     (value: string, optionKey: string) => {
-      if (!value.trim() || !canUseElevenLabs) {
+      if (!value.trim() || !canPronounceCurrentExercise) {
         return null;
       }
       return (
@@ -1756,6 +1822,7 @@ export default function MiniGamesPage({
           key={`${optionKey}-listen`}
           className="miniGamesOptionListen"
           type="button"
+          disabled={!canPlayCurrentExerciseAudio}
           aria-label={text.listenAriaLabel ?? "Play German pronunciation"}
           title={text.listenAriaLabel ?? "Play German pronunciation"}
           onClick={(event) => {
@@ -1767,7 +1834,12 @@ export default function MiniGamesPage({
         </button>
       );
     },
-    [canUseElevenLabs, speakGermanText, text.listenAriaLabel],
+    [
+      canPlayCurrentExerciseAudio,
+      canPronounceCurrentExercise,
+      speakGermanText,
+      text.listenAriaLabel,
+    ],
   );
 
   const resetStoryEpisodeState = useCallback(() => {
@@ -2337,6 +2409,7 @@ export default function MiniGamesPage({
         if (!active) return;
         setElevenLabsVoices(payload.voices);
         setElevenLabsDefaultVoiceId(payload.defaultVoiceId);
+        setTtsBlockingReason(null);
         if (
           selectedElevenLabsVoiceId === "auto" &&
           !payload.defaultVoiceId &&
@@ -2348,17 +2421,20 @@ export default function MiniGamesPage({
         setTtsMessage(
           payload.voices.length || payload.defaultVoiceId
             ? ""
-            : "No ElevenLabs voices were returned. Check your API key and voice access.",
+            : "No ElevenLabs voices are available right now.",
         );
       })
       .catch((error) => {
         if (!active) return;
         setElevenLabsVoices([]);
         setElevenLabsDefaultVoiceId(null);
-        setTtsMessage(
+        const nextMessage =
           error instanceof Error
             ? error.message
-            : "ElevenLabs voices are temporarily unavailable.",
+            : "ElevenLabs voices are temporarily unavailable.";
+        setTtsBlockingReason(classifyTtsBlockingReason(nextMessage));
+        setTtsMessage(
+          nextMessage,
         );
       })
       .finally(() => {
@@ -2376,6 +2452,17 @@ export default function MiniGamesPage({
     if (elevenLabsVoiceOptions.some((voice) => voice.voiceId === selectedElevenLabsVoiceId)) return;
     setSelectedElevenLabsVoiceId("auto");
   }, [elevenLabsVoiceOptions, selectedElevenLabsVoiceId]);
+
+  useEffect(() => {
+    const previousVoiceSelection = previousVoiceSelectionRef.current;
+    previousVoiceSelectionRef.current = selectedElevenLabsVoiceId;
+    if (previousVoiceSelection === null || previousVoiceSelection === selectedElevenLabsVoiceId) {
+      return;
+    }
+    if (!ttsSoftBlocked) return;
+    setTtsBlockingReason(null);
+    setTtsMessage("");
+  }, [selectedElevenLabsVoiceId, ttsSoftBlocked]);
 
   useEffect(() => {
     if (!voicePickerOpen) return;
@@ -2948,6 +3035,7 @@ export default function MiniGamesPage({
                 <button
                 className="miniGamesPronounceButton"
                 type="button"
+                disabled={!canPlayCurrentExerciseAudio}
                 onClick={() => {
                   void speakGermanText(pronunciationText);
                 }}
@@ -2968,6 +3056,7 @@ export default function MiniGamesPage({
                       speechRate === preset.value ? " miniGamesSpeechSpeedButtonActive" : ""
                     }`}
                     type="button"
+                    disabled={!canPlayCurrentExerciseAudio}
                     onClick={() => setSpeechRate(preset.value)}
                     aria-pressed={speechRate === preset.value}
                   >
@@ -3040,11 +3129,11 @@ export default function MiniGamesPage({
                           }}
                         >
                           <span className="miniGamesVoicePickerOptionName">
-                            {voice.name}
+                            {getCompactVoiceName(voice.name)}
                           </span>
-                          {voice.category ? (
+                          {getVoiceMetaText(voice) ? (
                             <span className="miniGamesVoicePickerOptionMeta">
-                              {voice.category}
+                              {getVoiceMetaText(voice)}
                             </span>
                           ) : null}
                         </button>
@@ -3053,8 +3142,10 @@ export default function MiniGamesPage({
                   ) : null}
                 </div>
               </div>
-              {ttsMessage ? <p className="miniGamesTtsMessage">{ttsMessage}</p> : null}
             </>
+          ) : null}
+          {canUseElevenLabs && hasPronunciationText && ttsMessage ? (
+            <p className="miniGamesTtsMessage">{ttsMessage}</p>
           ) : null}
           </div>
 

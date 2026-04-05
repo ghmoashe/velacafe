@@ -70,13 +70,13 @@ function normalizeElevenLabsError(payload: Record<string, unknown>, responseText
   const normalizedText = combinedMessage.toLowerCase();
 
   if (status === "invalid_api_key" || normalizedText.includes("invalid api key")) {
-    return "Invalid ElevenLabs API key. Update ELEVENLABS_API_KEY in Supabase secrets and redeploy.";
+    return "ElevenLabs API key is invalid.";
   }
   if (
     status === "detected_unusual_activity" ||
     normalizedText.includes("unusual activity detected")
   ) {
-    return "ElevenLabs Free Tier is temporarily blocked for this account or network. Disable VPN/proxy or use a paid plan.";
+    return "ElevenLabs Free tier is blocked for this account or network.";
   }
   if (
     status === "paid_plan_required" ||
@@ -86,7 +86,7 @@ function normalizeElevenLabsError(payload: Record<string, unknown>, responseText
     normalizedText.includes("free users cannot use library voices") ||
     normalizedText.includes("library voices via the api")
   ) {
-    return "Selected ElevenLabs voice requires a paid plan or library voice access. Choose another voice or upgrade the plan.";
+    return "This ElevenLabs voice needs a paid plan. Choose another voice.";
   }
 
   return directMessage || detailMessage || voiceMessage || responseText;
