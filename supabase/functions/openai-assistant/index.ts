@@ -480,6 +480,38 @@ function buildInstructions(
   ].join(" ");
 }
 
+function buildUnavailableReply(locale: string) {
+  switch (locale) {
+    case "de":
+      return "Entschuldigung, ich hatte gerade ein Problem. Bitte versuche es noch einmal.";
+    case "ru":
+      return "Извините, у меня сейчас была ошибка. Пожалуйста, попробуйте ещё раз.";
+    case "uk":
+      return "Вибачте, у мене щойно сталася помилка. Будь ласка, спробуйте ще раз.";
+    case "ar":
+      return "عذرًا، حدثت مشكلة للتو. من فضلك حاول مرة أخرى.";
+    case "fa":
+      return "ببخشید، همین الان یک مشکل پیش آمد. لطفاً دوباره تلاش کنید.";
+    case "fr":
+      return "Desole, j'ai eu un probleme. Merci de reessayer.";
+    case "es":
+      return "Lo siento, acabo de tener un problema. Intentalo de nuevo.";
+    case "it":
+      return "Mi dispiace, ho avuto un problema. Per favore riprova.";
+    case "pl":
+      return "Przepraszam, wystapil problem. Sprobuj jeszcze raz.";
+    case "tr":
+      return "Uzgunum, az once bir sorun oldu. Lutfen tekrar dene.";
+    case "vi":
+      return "Xin loi, toi vua gap loi. Hay thu lai mot lan nua.";
+    case "sq":
+      return "Me fal, sapo pata nje problem. Te lutem provo perseri.";
+    case "en":
+    default:
+      return "Sorry, I had a problem just now. Please try again.";
+  }
+}
+
 function buildOpenAiRequestBody(input: {
   input: string;
   conversationId: string | null;
@@ -624,9 +656,28 @@ async function handleJsonResponse(input: {
         userId: input.userId,
       });
     }
+
+    return json(200, {
+      responseId: null,
+      conversationId: null,
+      text: buildUnavailableReply(input.locale),
+      model:
+        typeof fallbackPayload.model === "string" ? fallbackPayload.model : null,
+      userId: input.userId,
+    });
   }
 
   if (!fallbackResponse.ok) {
+    if (fallbackResponse.status >= 429) {
+      return json(200, {
+        responseId: null,
+        conversationId: null,
+        text: buildUnavailableReply(input.locale),
+        model: null,
+        userId: input.userId,
+      });
+    }
+
     return json(fallbackResponse.status, {
       error: getOpenAiErrorMessage(
         fallbackResponse.status,
@@ -636,7 +687,13 @@ async function handleJsonResponse(input: {
     });
   }
 
-  return json(500, { error: "OpenAI returned an empty response." });
+  return json(200, {
+    responseId: null,
+    conversationId: null,
+    text: buildUnavailableReply(input.locale),
+    model: null,
+    userId: input.userId,
+  });
 }
 
 async function handleStreamingResponse(req: Request, input: {
@@ -682,13 +739,24 @@ async function handleStreamingResponse(req: Request, input: {
 
           if (!response.ok) {
             const payload = (await response.json().catch(() => ({}))) as JsonRecord;
-            send("error", {
-              message: getOpenAiErrorMessage(
-                response.status,
-                payload,
-                "OpenAI request failed."
-              ),
-            });
+            if (response.status >= 429) {
+              const fallbackText = buildUnavailableReply(input.locale);
+              send("delta", { text: fallbackText });
+              send("completed", {
+                responseId: null,
+                conversationId: null,
+                model: null,
+                text: fallbackText,
+              });
+            } else {
+              send("error", {
+                message: getOpenAiErrorMessage(
+                  response.status,
+                  payload,
+                  "OpenAI request failed."
+                ),
+              });
+            }
             close();
             return;
           }
@@ -699,8 +767,13 @@ async function handleStreamingResponse(req: Request, input: {
             typeof payload.model === "string" ? payload.model : openAiModel.trim() || null;
 
           if (!finalText) {
-            send("error", {
-              message: "OpenAI returned an empty response.",
+            const fallbackText = buildUnavailableReply(input.locale);
+            send("delta", { text: fallbackText });
+            send("completed", {
+              responseId: null,
+              conversationId: null,
+              model,
+              text: fallbackText,
             });
           } else {
             send("delta", { text: finalText });

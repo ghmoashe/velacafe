@@ -10,7 +10,6 @@ import {
 import { synthesizeElevenLabsSpeech } from "./elevenLabsTts";
 import {
   createOpenAiAssistantReply,
-  streamOpenAiAssistantReply,
 } from "./openAiAssistant";
 import { getVoiceAssistantText } from "./voiceAssistantText";
 
@@ -143,23 +142,6 @@ function getSpeechLocale(locale: string) {
 function getPreferredConversationLocale(preferredLocales: string[], fallbackLocale: string) {
   const firstPreferredLocale = preferredLocales.find((value) => value.trim());
   return firstPreferredLocale ?? fallbackLocale;
-}
-
-function shouldPreferNonStreamingReplies() {
-  if (typeof navigator === "undefined") {
-    return false;
-  }
-
-  const userAgent = navigator.userAgent;
-  const platform = navigator.platform ?? "";
-  const maxTouchPoints =
-    typeof navigator.maxTouchPoints === "number" ? navigator.maxTouchPoints : 0;
-  const isAppleMobileDevice =
-    /iPhone|iPad|iPod/i.test(userAgent) || (platform === "MacIntel" && maxTouchPoints > 1);
-  const isWebKitBrowser =
-    /AppleWebKit/i.test(userAgent) && !/CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo/i.test(userAgent);
-
-  return isAppleMobileDevice && isWebKitBrowser;
 }
 
 function isConversationLevelOption(value: string): value is ConversationLevelOption {
@@ -318,17 +300,6 @@ function isAbortError(error: unknown) {
   );
 }
 
-function shouldFallbackToNonStream(error: unknown) {
-  if (!(error instanceof Error)) return false;
-  const normalized = error.message.trim().toLowerCase();
-  return (
-    normalized.includes("empty response") ||
-    normalized.includes("ended unexpectedly") ||
-    normalized.includes("stream failed") ||
-    normalized.includes("stream is unavailable")
-  );
-}
-
 export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   const {
     locale,
@@ -349,7 +320,6 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     () => getDefaultConversationLevel(profileLevel),
     [profileLevel]
   );
-  const preferNonStreamingReplies = useMemo(() => shouldPreferNonStreamingReplies(), []);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const conversationIdRef = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -641,8 +611,6 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
 
       const abortController = new AbortController();
       streamAbortRef.current = abortController;
-      let streamedText = "";
-      let completed = false;
       const finalizeReply = (
         value: string,
         responseId: string | null,
@@ -666,45 +634,13 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       };
 
       try {
-        if (preferNonStreamingReplies) {
-          const reply = await createOpenAiAssistantReply(assistantRequest);
-          streamAbortRef.current = null;
-          finalizeReply(reply.text, reply.responseId, reply.conversationId);
-          return;
-        }
-
-        await streamOpenAiAssistantReply(
-          assistantRequest,
-          {
-            signal: abortController.signal,
-            onDelta: (delta) => {
-              streamedText += delta;
-              updateMessage(assistantMessageId, (message) => ({
-                ...message,
-                text: `${message.text}${delta}`,
-                pending: true,
-              }));
-            },
-            onCompleted: (reply) => {
-              completed = true;
-              streamAbortRef.current = null;
-              finalizeReply(
-                reply.text.trim() || streamedText.trim(),
-                reply.responseId,
-                reply.conversationId
-              );
-            },
-          }
-        );
-
-        if (!completed && !abortController.signal.aborted) {
-          streamAbortRef.current = null;
-          updateMessage(assistantMessageId, (message) =>
-            message.text.trim() ? { ...message, pending: false } : null
-          );
-          setThinking(false);
-          setStatusMessage(text.idle);
-        }
+        const reply = await createOpenAiAssistantReply({
+          ...assistantRequest,
+          signal: abortController.signal,
+        });
+        streamAbortRef.current = null;
+        finalizeReply(reply.text, reply.responseId, reply.conversationId);
+        return;
       } catch (error) {
         if (isAbortError(error)) {
           streamAbortRef.current = null;
@@ -714,26 +650,6 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           setThinking(false);
           setStatusMessage(text.idle);
           return;
-        }
-
-        if (shouldFallbackToNonStream(error)) {
-          try {
-            const reply = await createOpenAiAssistantReply(assistantRequest);
-            streamAbortRef.current = null;
-            finalizeReply(reply.text, reply.responseId, reply.conversationId);
-            return;
-          } catch (fallbackError) {
-            streamAbortRef.current = null;
-            updateMessage(assistantMessageId, (message) =>
-              message.text.trim() ? { ...message, pending: false } : null
-            );
-            setThinking(false);
-            setStatusMessage(text.idle);
-            setErrorMessage(
-              fallbackError instanceof Error ? fallbackError.message : "AI request failed."
-            );
-            return;
-          }
         }
 
         streamAbortRef.current = null;
@@ -758,7 +674,6 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       canUseNativeHelp,
       nativeHelpEnabled,
       nativeLocale,
-      preferNonStreamingReplies,
       text.emptyPrompt,
       text.idle,
       text.thinking,

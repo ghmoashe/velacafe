@@ -121,6 +121,7 @@ export async function createOpenAiAssistantReply(input: {
   levelRange?: string;
   nativeHelp?: boolean;
   nativeLocale?: string;
+  signal?: AbortSignal;
 }) {
   if (!SUPABASE_ANON_KEY.trim()) {
     throw new Error("Supabase is not configured.");
@@ -142,6 +143,7 @@ export async function createOpenAiAssistantReply(input: {
       nativeHelp: input.nativeHelp,
       nativeLocale: input.nativeLocale,
     }),
+    signal: input.signal,
   });
 
   if (!response.ok) {
