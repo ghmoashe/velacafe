@@ -9,8 +9,11 @@ import {
 } from "react";
 import { synthesizeElevenLabsSpeech } from "./elevenLabsTts";
 import {
+  type CoachFeedback,
+  type CoachPracticeSummary,
   createOpenAiAssistantReply,
 } from "./openAiAssistant";
+import { getSupabaseClient } from "./supabaseClient";
 import { getVoiceAssistantText } from "./voiceAssistantText";
 
 type VoiceAssistantPageProps = {
@@ -20,6 +23,7 @@ type VoiceAssistantPageProps = {
   profileLevel?: string;
   nativeLocale?: string | null;
   nativeLanguageLabel?: string | null;
+  sessionUserId?: string | null;
   guestMode: boolean;
   requireAuth: () => void;
 };
@@ -28,7 +32,46 @@ type VoiceAssistantMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  spokenText?: string;
+  coach?: CoachFeedback | null;
   pending?: boolean;
+};
+
+type PracticeProgress = {
+  turnsCompleted: number;
+  focusAreas: string[];
+  savedPhrases: string[];
+  pronunciationTips: string[];
+  updatedAt: string | null;
+};
+
+type PracticeUserStateRow = {
+  user_id: string;
+  locale: string;
+  turns_completed: number;
+  focus_areas: string[] | null;
+  saved_phrases: string[] | null;
+  pronunciation_tips: string[] | null;
+  last_practice_mode: string | null;
+  last_practice_topic: string | null;
+  last_summary: CoachPracticeSummary | null;
+  updated_at: string | null;
+};
+
+type PracticeSessionHistoryRow = {
+  id: string;
+  locale: string;
+  level_range: string;
+  practice_mode: string;
+  practice_topic: string | null;
+  user_message: string;
+  assistant_reply: string;
+  quick_correction: string | null;
+  better_version: string | null;
+  next_question: string | null;
+  pronunciation_tip: string | null;
+  summary: CoachPracticeSummary | null;
+  created_at: string;
 };
 
 type SpeechRecognitionAlternativeLike = {
@@ -89,6 +132,16 @@ const CONVERSATION_LEVEL_OPTIONS = [
 ] as const;
 
 type ConversationLevelOption = (typeof CONVERSATION_LEVEL_OPTIONS)[number];
+const PRACTICE_MODE_OPTIONS = ["daily", "roleplay", "topic"] as const;
+type PracticeModeOption = (typeof PRACTICE_MODE_OPTIONS)[number];
+const PRACTICE_TOPIC_SUGGESTIONS = [
+  "At the cafe",
+  "Job interview",
+  "Travel",
+  "Small talk",
+  "Doctor visit",
+  "Presentation",
+] as const;
 
 function buildId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -146,6 +199,10 @@ function getPreferredConversationLocale(preferredLocales: string[], fallbackLoca
 
 function isConversationLevelOption(value: string): value is ConversationLevelOption {
   return (CONVERSATION_LEVEL_OPTIONS as readonly string[]).includes(value);
+}
+
+function isPracticeModeOption(value: string): value is PracticeModeOption {
+  return (PRACTICE_MODE_OPTIONS as readonly string[]).includes(value);
 }
 
 function getDefaultConversationLevel(profileLevel?: string) {
@@ -271,6 +328,55 @@ function trimForSpeech(text: string) {
   return `${shortened.trim()}...`;
 }
 
+function normalizeUniqueItems(values: string[], maxItems = 4) {
+  const normalized = values
+    .map((value) => value.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  return normalized.filter((value, index) => normalized.indexOf(value) === index).slice(0, maxItems);
+}
+
+function createEmptyPracticeProgress(): PracticeProgress {
+  return {
+    turnsCompleted: 0,
+    focusAreas: [],
+    savedPhrases: [],
+    pronunciationTips: [],
+    updatedAt: null,
+  };
+}
+
+function getPracticeProgressStorageKey(userId: string | null | undefined, locale: string) {
+  return `vela-ai-practice:${userId?.trim() || "guest"}:${locale}`;
+}
+
+function mergePracticeProgress(
+  previous: PracticeProgress,
+  coach: CoachFeedback | null
+): PracticeProgress {
+  if (!coach) {
+    return previous;
+  }
+
+  return {
+    turnsCompleted: previous.turnsCompleted + 1,
+    focusAreas: normalizeUniqueItems([
+      ...previous.focusAreas,
+      ...(coach.summary?.focusNext ?? []),
+      coach.quickCorrection,
+    ]),
+    savedPhrases: normalizeUniqueItems([
+      ...previous.savedPhrases,
+      ...(coach.summary?.newPhrases ?? []),
+      coach.betterVersion,
+    ], 6),
+    pronunciationTips: normalizeUniqueItems([
+      ...previous.pronunciationTips,
+      coach.pronunciationTip,
+    ]),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 function buildConversationInput(
   messages: VoiceAssistantMessage[],
   nextUserText: string
@@ -308,6 +414,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     profileLevel,
     nativeLocale,
     nativeLanguageLabel,
+    sessionUserId,
     guestMode,
     requireAuth,
   } = props;
@@ -343,6 +450,13 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   const [selectedConversationLevel, setSelectedConversationLevel] = useState<ConversationLevelOption>(
     defaultConversationLevel
   );
+  const [selectedPracticeMode, setSelectedPracticeMode] = useState<PracticeModeOption>("daily");
+  const [practiceTopic, setPracticeTopic] = useState("");
+  const [practiceSummary, setPracticeSummary] = useState<CoachPracticeSummary | null>(null);
+  const [practiceProgress, setPracticeProgress] = useState<PracticeProgress>(
+    createEmptyPracticeProgress()
+  );
+  const [recentSessions, setRecentSessions] = useState<PracticeSessionHistoryRow[]>([]);
   const [nativeHelpEnabled, setNativeHelpEnabled] = useState(
     Boolean(nativeLocale && nativeLocale !== defaultConversationLocale)
   );
@@ -368,6 +482,130 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   useEffect(() => {
     setNativeHelpEnabled(Boolean(nativeLocale && nativeLocale !== defaultConversationLocale));
   }, [defaultConversationLocale, nativeLocale]);
+
+  useEffect(() => {
+    if (sessionUserId) {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const stored = window.localStorage.getItem(
+        getPracticeProgressStorageKey(sessionUserId, selectedConversationLocale)
+      );
+      if (!stored) {
+        setPracticeProgress(createEmptyPracticeProgress());
+        return;
+      }
+
+      const parsed = JSON.parse(stored) as Partial<PracticeProgress>;
+      setPracticeProgress({
+        turnsCompleted:
+          typeof parsed.turnsCompleted === "number" && parsed.turnsCompleted >= 0
+            ? parsed.turnsCompleted
+            : 0,
+        focusAreas: Array.isArray(parsed.focusAreas)
+          ? normalizeUniqueItems(parsed.focusAreas.map((item) => String(item)))
+          : [],
+        savedPhrases: Array.isArray(parsed.savedPhrases)
+          ? normalizeUniqueItems(parsed.savedPhrases.map((item) => String(item)), 6)
+          : [],
+        pronunciationTips: Array.isArray(parsed.pronunciationTips)
+          ? normalizeUniqueItems(parsed.pronunciationTips.map((item) => String(item)))
+          : [],
+        updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : null,
+      });
+    } catch {
+      setPracticeProgress(createEmptyPracticeProgress());
+    }
+  }, [selectedConversationLocale, sessionUserId]);
+
+  useEffect(() => {
+    if (sessionUserId) {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(
+      getPracticeProgressStorageKey(sessionUserId, selectedConversationLocale),
+      JSON.stringify(practiceProgress)
+    );
+  }, [practiceProgress, selectedConversationLocale, sessionUserId]);
+
+  useEffect(() => {
+    if (!sessionUserId) {
+      setRecentSessions([]);
+      return;
+    }
+
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      return;
+    }
+
+    let active = true;
+    void (async () => {
+      try {
+        const [stateResult, sessionsResult] = await Promise.all([
+          supabase
+            .from("ai_practice_user_state")
+            .select(
+              "user_id,locale,turns_completed,focus_areas,saved_phrases,pronunciation_tips,last_practice_mode,last_practice_topic,last_summary,updated_at"
+            )
+            .eq("user_id", sessionUserId)
+            .eq("locale", selectedConversationLocale)
+            .maybeSingle(),
+          supabase
+            .from("ai_practice_session_history")
+            .select(
+              "id,locale,level_range,practice_mode,practice_topic,user_message,assistant_reply,quick_correction,better_version,next_question,pronunciation_tip,summary,created_at"
+            )
+            .eq("user_id", sessionUserId)
+            .eq("locale", selectedConversationLocale)
+            .order("created_at", { ascending: false })
+            .limit(5),
+        ]);
+
+        if (stateResult.error || sessionsResult.error) {
+          throw stateResult.error ?? sessionsResult.error;
+        }
+        if (!active) {
+          return;
+        }
+
+        const stateRow = stateResult.data as PracticeUserStateRow | null;
+        setPracticeProgress(
+          stateRow
+            ? {
+                turnsCompleted: stateRow.turns_completed ?? 0,
+                focusAreas: normalizeUniqueItems(stateRow.focus_areas ?? []),
+                savedPhrases: normalizeUniqueItems(stateRow.saved_phrases ?? [], 6),
+                pronunciationTips: normalizeUniqueItems(stateRow.pronunciation_tips ?? []),
+                updatedAt: stateRow.updated_at ?? null,
+              }
+            : createEmptyPracticeProgress()
+        );
+        setPracticeSummary((stateRow?.last_summary as CoachPracticeSummary | null) ?? null);
+        setRecentSessions((sessionsResult.data ?? []) as PracticeSessionHistoryRow[]);
+      } catch {
+        if (!active) {
+          return;
+        }
+        setPracticeProgress(createEmptyPracticeProgress());
+        setRecentSessions([]);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedConversationLocale, sessionUserId]);
 
   const canUseNativeHelp = Boolean(
     nativeLocale && nativeLocale.trim() && nativeLocale !== selectedConversationLocale
@@ -604,6 +842,8 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         conversationId: conversationIdRef.current,
         locale: replyLocale,
         levelRange: selectedConversationLevel,
+        practiceMode: selectedPracticeMode,
+        practiceTopic: practiceTopic.trim() || undefined,
         nativeHelp:
           canUseNativeHelp && nativeHelpEnabled && Boolean(nativeLocale?.trim()),
         nativeLocale: nativeLocale?.trim() || undefined,
@@ -611,23 +851,82 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
 
       const abortController = new AbortController();
       streamAbortRef.current = abortController;
-      const finalizeReply = (
-        value: string,
-        responseId: string | null,
-        conversationId: string | null
-      ) => {
-        const finalText = value.trim();
-        void responseId;
-        conversationIdRef.current = conversationId;
+      const finalizeReply = (reply: Awaited<ReturnType<typeof createOpenAiAssistantReply>>) => {
+        const spokenText = reply.text.trim();
+        const displayText = reply.coach?.assistantReply?.trim() || spokenText;
+        conversationIdRef.current = reply.conversationId;
+        let nextProgressSnapshot = createEmptyPracticeProgress();
         updateMessage(assistantMessageId, (message) => ({
           ...message,
-          text: finalText,
+          text: displayText,
+          spokenText,
+          coach: reply.coach,
           pending: false,
         }));
         setThinking(false);
         setStatusMessage(text.idle);
-        if (finalText) {
-          void speakReply(finalText, replyLocale);
+        setPracticeSummary(reply.coach?.summary ?? null);
+        setPracticeProgress((prev) => {
+          nextProgressSnapshot = mergePracticeProgress(prev, reply.coach);
+          return nextProgressSnapshot;
+        });
+        if (sessionUserId) {
+          const supabase = getSupabaseClient();
+          if (supabase) {
+            const nowIso = new Date().toISOString();
+            const practiceTopicValue = practiceTopic.trim() || null;
+            const historyRow: Omit<PracticeSessionHistoryRow, "id"> & { user_id: string } = {
+              user_id: sessionUserId,
+              locale: replyLocale,
+              level_range: selectedConversationLevel,
+              practice_mode: selectedPracticeMode,
+              practice_topic: practiceTopicValue,
+              user_message: trimmedValue,
+              assistant_reply: displayText,
+              quick_correction: reply.coach?.quickCorrection || null,
+              better_version: reply.coach?.betterVersion || null,
+              next_question: reply.coach?.nextQuestion || null,
+              pronunciation_tip: reply.coach?.pronunciationTip || null,
+              summary: reply.coach?.summary ?? null,
+              created_at: nowIso,
+            };
+            const recentHistoryRow: PracticeSessionHistoryRow = {
+              id: buildId(),
+              ...historyRow,
+            };
+            setRecentSessions((prev) => [recentHistoryRow, ...prev].slice(0, 5));
+            void (async () => {
+              const stateResult = await supabase.from("ai_practice_user_state").upsert(
+                {
+                  user_id: sessionUserId,
+                  locale: replyLocale,
+                  turns_completed: nextProgressSnapshot.turnsCompleted,
+                  focus_areas: nextProgressSnapshot.focusAreas,
+                  saved_phrases: nextProgressSnapshot.savedPhrases,
+                  pronunciation_tips: nextProgressSnapshot.pronunciationTips,
+                  last_practice_mode: selectedPracticeMode,
+                  last_practice_topic: practiceTopicValue,
+                  last_summary: reply.coach?.summary ?? null,
+                  updated_at: nowIso,
+                },
+                { onConflict: "user_id,locale" }
+              );
+              if (stateResult.error) {
+                throw stateResult.error;
+              }
+              const historyResult = await supabase
+                .from("ai_practice_session_history")
+                .insert(historyRow);
+              if (historyResult.error) {
+                throw historyResult.error;
+              }
+            })().catch(() => {
+              setErrorMessage("Practice progress sync is temporarily unavailable.");
+            });
+          }
+        }
+        if (spokenText) {
+          void speakReply(spokenText, replyLocale);
         } else {
           setErrorMessage("AI returned an empty response.");
         }
@@ -639,7 +938,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           signal: abortController.signal,
         });
         streamAbortRef.current = null;
-        finalizeReply(reply.text, reply.responseId, reply.conversationId);
+        finalizeReply(reply);
         return;
       } catch (error) {
         if (isAbortError(error)) {
@@ -671,9 +970,12 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       defaultConversationLocale,
       selectedConversationLocale,
       selectedConversationLevel,
+      selectedPracticeMode,
+      practiceTopic,
       canUseNativeHelp,
       nativeHelpEnabled,
       nativeLocale,
+      sessionUserId,
       text.emptyPrompt,
       text.idle,
       text.thinking,
@@ -845,6 +1147,15 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     [defaultConversationLevel]
   );
 
+  const handlePracticeModeChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
+    const nextMode = event.target.value.trim().toLowerCase();
+    setSelectedPracticeMode(isPracticeModeOption(nextMode) ? nextMode : "daily");
+  }, []);
+
+  const handlePracticeTopicChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setPracticeTopic(event.target.value);
+  }, []);
+
   const handleNativeHelpChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setNativeHelpEnabled(event.target.checked);
   }, []);
@@ -855,6 +1166,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     setDraft("");
     setInterimTranscript("");
     setErrorMessage("");
+    setPracticeSummary(null);
     conversationIdRef.current = null;
     conversationLocaleRef.current = selectedConversationLocale;
     lastInputSourceRef.current = "text";
@@ -932,6 +1244,50 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           <span className="voiceAssistantStatusDot" aria-hidden="true" />
           <span>{statusMessage}</span>
         </div>
+
+        {(practiceProgress.focusAreas.length ||
+          practiceProgress.savedPhrases.length ||
+          practiceProgress.pronunciationTips.length) ? (
+          <div className="voiceAssistantCoachPanel">
+            <div className="voiceAssistantCoachTitle">{text.progressTitle}</div>
+            {practiceProgress.focusAreas.length ? (
+              <div className="voiceAssistantCoachSection">
+                <div className="voiceAssistantCoachLabel">{text.progressFocus}</div>
+                <div className="voiceAssistantCoachChips">
+                  {practiceProgress.focusAreas.map((item) => (
+                    <span key={`focus-${item}`} className="voiceAssistantCoachChip">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {practiceProgress.savedPhrases.length ? (
+              <div className="voiceAssistantCoachSection">
+                <div className="voiceAssistantCoachLabel">{text.progressPhrases}</div>
+                <div className="voiceAssistantCoachChips">
+                  {practiceProgress.savedPhrases.map((item) => (
+                    <span key={`phrase-${item}`} className="voiceAssistantCoachChip">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {practiceProgress.pronunciationTips.length ? (
+              <div className="voiceAssistantCoachSection">
+                <div className="voiceAssistantCoachLabel">{text.progressPronunciation}</div>
+                <div className="voiceAssistantCoachChips">
+                  {practiceProgress.pronunciationTips.map((item) => (
+                    <span key={`pron-${item}`} className="voiceAssistantCoachChip">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div className="voiceAssistantControls">
           <button
             className={`btn voiceAssistantHoldButton${listening ? " btnActive" : ""}`}
@@ -1002,6 +1358,49 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         </select>
         <div className="muted">{text.levelHint}</div>
 
+        <label className="label" htmlFor="voiceAssistantPracticeMode">
+          {text.practiceModeLabel}
+        </label>
+        <select
+          className="input"
+          id="voiceAssistantPracticeMode"
+          value={selectedPracticeMode}
+          onChange={handlePracticeModeChange}
+          disabled={thinking || listening}
+        >
+          <option value="daily">{text.practiceModeDaily}</option>
+          <option value="roleplay">{text.practiceModeRoleplay}</option>
+          <option value="topic">{text.practiceModeTopic}</option>
+        </select>
+        <div className="muted">{text.practiceModeHint}</div>
+
+        <label className="label" htmlFor="voiceAssistantPracticeTopic">
+          {text.practiceTopicLabel}
+        </label>
+        <input
+          className="input"
+          id="voiceAssistantPracticeTopic"
+          type="text"
+          value={practiceTopic}
+          onChange={handlePracticeTopicChange}
+          placeholder={text.practiceTopicPlaceholder}
+          disabled={thinking || listening}
+        />
+        <div className="muted">{text.practiceTopicHint}</div>
+        <div className="voiceAssistantSuggestionRow">
+          {PRACTICE_TOPIC_SUGGESTIONS.map((suggestion) => (
+            <button
+              key={suggestion}
+              className="btn btnGhost voiceAssistantSuggestion"
+              type="button"
+              onClick={() => setPracticeTopic(suggestion)}
+              disabled={thinking || listening}
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+
         {nativeLocale?.trim() ? (
           <label className="voiceAssistantToggle">
             <input
@@ -1050,6 +1449,72 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         </div>
       </div>
 
+      {practiceSummary ? (
+        <div className="voiceAssistantCoachPanel">
+          <div className="voiceAssistantCoachTitle">{text.summaryTitle}</div>
+          {practiceSummary.strengths.length ? (
+            <div className="voiceAssistantCoachSection">
+              <div className="voiceAssistantCoachLabel">{text.summaryStrengths}</div>
+              <ul className="voiceAssistantCoachList">
+                {practiceSummary.strengths.map((item) => (
+                  <li key={`strength-${item}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {practiceSummary.focusNext.length ? (
+            <div className="voiceAssistantCoachSection">
+              <div className="voiceAssistantCoachLabel">{text.summaryFocus}</div>
+              <ul className="voiceAssistantCoachList">
+                {practiceSummary.focusNext.map((item) => (
+                  <li key={`focus-next-${item}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {practiceSummary.newPhrases.length ? (
+            <div className="voiceAssistantCoachSection">
+              <div className="voiceAssistantCoachLabel">{text.summaryPhrases}</div>
+              <ul className="voiceAssistantCoachList">
+                {practiceSummary.newPhrases.map((item) => (
+                  <li key={`new-phrase-${item}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {practiceSummary.homework.length ? (
+            <div className="voiceAssistantCoachSection">
+              <div className="voiceAssistantCoachLabel">{text.summaryHomework}</div>
+              <ul className="voiceAssistantCoachList">
+                {practiceSummary.homework.map((item) => (
+                  <li key={`homework-${item}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="voiceAssistantCoachPanel">
+        <div className="voiceAssistantCoachTitle">{text.recentSessionsTitle}</div>
+        {recentSessions.length ? (
+          <div className="voiceAssistantRecentSessions">
+            {recentSessions.map((session) => (
+              <div key={session.id} className="voiceAssistantRecentSession">
+                <div className="voiceAssistantRecentSessionMeta">
+                  <span>{session.practice_mode}</span>
+                  <span>{session.level_range}</span>
+                  {session.practice_topic ? <span>{session.practice_topic}</span> : null}
+                </div>
+                <div className="voiceAssistantRecentSessionReply">{session.assistant_reply}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="voiceAssistantEmpty">{text.recentSessionsEmpty}</div>
+        )}
+      </div>
+
       <div className="voiceAssistantMessages">
         {messages.length === 0 ? (
           <div className="voiceAssistantEmpty">{text.empty}</div>
@@ -1065,6 +1530,34 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
                 {message.role === "user" ? "You" : "AI"}
               </div>
               <div>{message.text || (message.pending ? text.thinking : "")}</div>
+              {message.role === "assistant" && message.coach ? (
+                <div className="voiceAssistantCoachGrid">
+                  {message.coach.quickCorrection ? (
+                    <div className="voiceAssistantCoachCard">
+                      <div className="voiceAssistantCoachLabel">{text.coachCorrection}</div>
+                      <div>{message.coach.quickCorrection}</div>
+                    </div>
+                  ) : null}
+                  {message.coach.betterVersion ? (
+                    <div className="voiceAssistantCoachCard">
+                      <div className="voiceAssistantCoachLabel">{text.coachBetterVersion}</div>
+                      <div>{message.coach.betterVersion}</div>
+                    </div>
+                  ) : null}
+                  {message.coach.nextQuestion ? (
+                    <div className="voiceAssistantCoachCard">
+                      <div className="voiceAssistantCoachLabel">{text.coachNextQuestion}</div>
+                      <div>{message.coach.nextQuestion}</div>
+                    </div>
+                  ) : null}
+                  {message.coach.pronunciationTip ? (
+                    <div className="voiceAssistantCoachCard">
+                      <div className="voiceAssistantCoachLabel">{text.coachPronunciation}</div>
+                      <div>{message.coach.pronunciationTip}</div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ))
         )}

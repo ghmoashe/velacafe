@@ -17,6 +17,20 @@ const OPENAI_RETRY_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504]);
 const OPENAI_MAX_RETRIES = 3;
 
 type JsonRecord = Record<string, unknown>;
+type CoachPracticeSummary = {
+  strengths: string[];
+  focusNext: string[];
+  newPhrases: string[];
+  homework: string[];
+};
+type CoachFeedback = {
+  assistantReply: string;
+  quickCorrection: string;
+  betterVersion: string;
+  nextQuestion: string;
+  pronunciationTip: string;
+  summary: CoachPracticeSummary | null;
+};
 
 function json(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -293,6 +307,78 @@ function extractChatCompletionText(payload: JsonRecord) {
   return "";
 }
 
+function extractChatCompletionContent(payload: JsonRecord) {
+  const choices = Array.isArray(payload.choices) ? payload.choices : [];
+  for (const choice of choices) {
+    if (!choice || typeof choice !== "object") continue;
+    const message = (choice as JsonRecord).message;
+    if (!message || typeof message !== "object") continue;
+    const content = (message as JsonRecord).content;
+    const text = extractTextValue(content);
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function normalizeCoachList(value: unknown, maxItems = 3) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => (typeof item === "string" ? item.replace(/\s+/g, " ").trim() : ""))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function parseCoachFeedback(text: string): CoachFeedback | null {
+  const normalized = text.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const withoutFence = normalized
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  try {
+    const payload = JSON.parse(withoutFence) as JsonRecord;
+    const summary =
+      payload.summary && typeof payload.summary === "object"
+        ? (payload.summary as JsonRecord)
+        : null;
+
+    return {
+      assistantReply: extractTextValue(payload.assistant_reply),
+      quickCorrection: extractTextValue(payload.quick_correction),
+      betterVersion: extractTextValue(payload.better_version),
+      nextQuestion: extractTextValue(payload.next_question),
+      pronunciationTip: extractTextValue(payload.pronunciation_tip),
+      summary: summary
+        ? {
+            strengths: normalizeCoachList(summary.strengths),
+            focusNext: normalizeCoachList(summary.focus_next),
+            newPhrases: normalizeCoachList(summary.new_phrases),
+            homework: normalizeCoachList(summary.homework),
+          }
+        : null,
+    };
+  } catch {
+    return {
+      assistantReply: normalized,
+      quickCorrection: "",
+      betterVersion: "",
+      nextQuestion: "",
+      pronunciationTip: "",
+      summary: null,
+    };
+  }
+}
+
 function extractConversationMessageText(item: unknown) {
   if (!item || typeof item !== "object") {
     return "";
@@ -466,20 +552,59 @@ function buildNativeHelpInstruction(nativeHelp: boolean, nativeLocale: string) {
   )} only for brief translations or short clarifications when truly useful.`;
 }
 
+function buildPracticeModeInstruction(practiceMode: string, practiceTopic: string) {
+  const normalizedMode = practiceMode.trim().toLowerCase();
+  const normalizedTopic = practiceTopic.trim();
+
+  const topicInstruction = normalizedTopic
+    ? `Focus the session on this scenario or topic: ${normalizedTopic}.`
+    : "If no topic is given, choose a simple real-life topic that matches the learner level.";
+
+  switch (normalizedMode) {
+    case "roleplay":
+      return [
+        "Run the session as a role-play speaking lesson.",
+        topicInstruction,
+        "Stay inside the scenario and keep the interaction realistic.",
+      ].join(" ");
+    case "topic":
+      return [
+        "Run the session as guided topic-based speaking practice.",
+        topicInstruction,
+        "Ask questions that help the learner explain opinions, preferences, or experiences.",
+      ].join(" ");
+    case "daily":
+    default:
+      return [
+        "Run the session as everyday speaking practice.",
+        topicInstruction,
+        "Prefer natural daily-life topics, small talk, plans, routines, shopping, travel, or social situations.",
+      ].join(" ");
+  }
+}
+
 function buildInstructions(
   locale: string,
   levelRange: string,
+  practiceMode: string,
+  practiceTopic: string,
   nativeHelp: boolean,
   nativeLocale: string
 ) {
   return [
-    "You are the Vela Language Cafe AI voice assistant.",
-    "Help with language learning, speaking practice, the app, events, organizers, and general conversation.",
+    "You are the Vela AI Practice speaking coach.",
+    "Your main job is to run a spoken practice lesson, not to act like a generic chatbot.",
     `Reply only in ${getLanguageName(locale)} unless the user explicitly asks to switch the conversation language.`,
     "Treat the selected conversation language as the active learning language for this chat.",
     buildLevelInstruction(levelRange),
+    buildPracticeModeInstruction(practiceMode, practiceTopic),
     buildNativeHelpInstruction(nativeHelp, nativeLocale),
-    "Keep replies natural for speech, plain text only, and usually under two short sentences.",
+    "After the learner speaks, do three things in one compact reply when useful: acknowledge, lightly correct or reformulate one key mistake, then continue the conversation.",
+    "Ask one short follow-up question at a time so the learner keeps speaking.",
+    "Keep replies natural for speech and short enough for voice playback.",
+    "Return valid JSON only with these keys: assistant_reply, quick_correction, better_version, next_question, pronunciation_tip, summary.",
+    "The summary object must contain arrays named strengths, focus_next, new_phrases, homework.",
+    "If a field is not needed, return an empty string or an empty array.",
   ].join(" ");
 }
 
@@ -520,6 +645,8 @@ function buildOpenAiRequestBody(input: {
   conversationId: string | null;
   locale: string;
   levelRange: string;
+  practiceMode: string;
+  practiceTopic: string;
   nativeHelp: boolean;
   nativeLocale: string;
   stream?: boolean;
@@ -530,6 +657,8 @@ function buildOpenAiRequestBody(input: {
     instructions: buildInstructions(
       input.locale,
       input.levelRange,
+      input.practiceMode,
+      input.practiceTopic,
       input.nativeHelp,
       input.nativeLocale
     ),
@@ -545,6 +674,8 @@ async function createOpenAiResponse(input: {
   conversationId: string | null;
   locale: string;
   levelRange: string;
+  practiceMode: string;
+  practiceTopic: string;
   nativeHelp: boolean;
   nativeLocale: string;
   signal?: AbortSignal;
@@ -599,6 +730,8 @@ async function createOpenAiChatCompletion(input: {
   input: string;
   locale: string;
   levelRange: string;
+  practiceMode: string;
+  practiceTopic: string;
   nativeHelp: boolean;
   nativeLocale: string;
 }) {
@@ -616,6 +749,8 @@ async function createOpenAiChatCompletion(input: {
           content: buildInstructions(
             input.locale,
             input.levelRange,
+            input.practiceMode,
+            input.practiceTopic,
             input.nativeHelp,
             input.nativeLocale
           ),
@@ -625,6 +760,7 @@ async function createOpenAiChatCompletion(input: {
           content: input.input,
         },
       ],
+      response_format: { type: "json_object" },
       max_tokens: 180,
     }),
   });
@@ -635,6 +771,8 @@ async function handleJsonResponse(input: {
   conversationId: string | null;
   locale: string;
   levelRange: string;
+  practiceMode: string;
+  practiceTopic: string;
   nativeHelp: boolean;
   nativeLocale: string;
   userId: string;
@@ -643,12 +781,19 @@ async function handleJsonResponse(input: {
     input: input.input,
     locale: input.locale,
     levelRange: input.levelRange,
+    practiceMode: input.practiceMode,
+    practiceTopic: input.practiceTopic,
     nativeHelp: input.nativeHelp,
     nativeLocale: input.nativeLocale,
   });
   const fallbackPayload = (await fallbackResponse.json().catch(() => ({}))) as JsonRecord;
   if (fallbackResponse.ok) {
-    const fallbackText = extractChatCompletionText(fallbackPayload);
+    const rawContent = extractChatCompletionContent(fallbackPayload);
+    const coach = parseCoachFeedback(rawContent);
+    const fallbackText =
+      coach && (coach.assistantReply || coach.nextQuestion)
+        ? [coach.assistantReply, coach.nextQuestion].filter(Boolean).join(" ").trim()
+        : extractChatCompletionText(fallbackPayload);
     if (fallbackText) {
       return json(200, {
         responseId: null,
@@ -656,6 +801,7 @@ async function handleJsonResponse(input: {
         text: fallbackText,
         model:
           typeof fallbackPayload.model === "string" ? fallbackPayload.model : null,
+        coach,
         userId: input.userId,
       });
     }
@@ -666,6 +812,7 @@ async function handleJsonResponse(input: {
       text: buildUnavailableReply(input.locale),
       model:
         typeof fallbackPayload.model === "string" ? fallbackPayload.model : null,
+      coach: null,
       userId: input.userId,
     });
   }
@@ -677,6 +824,7 @@ async function handleJsonResponse(input: {
         conversationId: null,
         text: buildUnavailableReply(input.locale),
         model: null,
+        coach: null,
         userId: input.userId,
       });
     }
@@ -695,6 +843,7 @@ async function handleJsonResponse(input: {
     conversationId: null,
     text: buildUnavailableReply(input.locale),
     model: null,
+    coach: null,
     userId: input.userId,
   });
 }
@@ -704,6 +853,8 @@ async function handleStreamingResponse(req: Request, input: {
   conversationId: string | null;
   locale: string;
   levelRange: string;
+  practiceMode: string;
+  practiceTopic: string;
   nativeHelp: boolean;
   nativeLocale: string;
   userId: string;
@@ -736,6 +887,8 @@ async function handleStreamingResponse(req: Request, input: {
             input: input.input,
             locale: input.locale,
             levelRange: input.levelRange,
+            practiceMode: input.practiceMode,
+            practiceTopic: input.practiceTopic,
             nativeHelp: input.nativeHelp,
             nativeLocale: input.nativeLocale,
           });
@@ -765,7 +918,12 @@ async function handleStreamingResponse(req: Request, input: {
           }
 
           const payload = (await response.json().catch(() => ({}))) as JsonRecord;
-          const finalText = extractChatCompletionText(payload);
+          const rawContent = extractChatCompletionContent(payload);
+          const coach = parseCoachFeedback(rawContent);
+          const finalText =
+            coach && (coach.assistantReply || coach.nextQuestion)
+              ? [coach.assistantReply, coach.nextQuestion].filter(Boolean).join(" ").trim()
+              : extractChatCompletionText(payload);
           const model =
             typeof payload.model === "string" ? payload.model : openAiModel.trim() || null;
 
@@ -777,6 +935,7 @@ async function handleStreamingResponse(req: Request, input: {
               conversationId: null,
               model,
               text: fallbackText,
+              coach: null,
             });
           } else {
             send("delta", { text: finalText });
@@ -785,6 +944,7 @@ async function handleStreamingResponse(req: Request, input: {
               conversationId: null,
               model,
               text: finalText,
+              coach,
             });
           }
         } catch (error) {
@@ -847,6 +1007,14 @@ Deno.serve(async (req) => {
       typeof body.levelRange === "string" && body.levelRange.trim()
         ? body.levelRange.trim().toUpperCase()
         : "A1-A2";
+    const practiceMode =
+      typeof body.practiceMode === "string" && body.practiceMode.trim()
+        ? body.practiceMode.trim().toLowerCase()
+        : "daily";
+    const practiceTopic =
+      typeof body.practiceTopic === "string" && body.practiceTopic.trim()
+        ? body.practiceTopic.trim()
+        : "";
     const nativeHelp = body.nativeHelp === true;
     const nativeLocale =
       typeof body.nativeLocale === "string" && body.nativeLocale.trim()
@@ -863,6 +1031,8 @@ Deno.serve(async (req) => {
         conversationId,
         locale,
         levelRange,
+        practiceMode,
+        practiceTopic,
         nativeHelp,
         nativeLocale,
         userId: user.id,
@@ -874,6 +1044,8 @@ Deno.serve(async (req) => {
       conversationId,
       locale,
       levelRange,
+      practiceMode,
+      practiceTopic,
       nativeHelp,
       nativeLocale,
       userId: user.id,

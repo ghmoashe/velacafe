@@ -6293,6 +6293,93 @@ button:focus-visible {
   line-height: 1.5;
 }
 
+.voiceAssistantCoachPanel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(234, 222, 211, 0.92);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.voiceAssistantCoachTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #6f2f12;
+}
+
+.voiceAssistantCoachSection {
+  display: grid;
+  gap: 8px;
+}
+
+.voiceAssistantCoachLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8b5d46;
+}
+
+.voiceAssistantCoachChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.voiceAssistantCoachChip {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(248, 239, 228, 0.95);
+  color: #6f2f12;
+  font-size: 13px;
+}
+
+.voiceAssistantCoachList {
+  margin: 0;
+  padding-inline-start: 18px;
+  color: #4d3526;
+}
+
+.voiceAssistantRecentSessions {
+  display: grid;
+  gap: 10px;
+}
+
+.voiceAssistantRecentSession {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(234, 222, 211, 0.92);
+  background: rgba(255, 249, 242, 0.76);
+}
+
+.voiceAssistantRecentSessionMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #8b5d46;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.voiceAssistantRecentSessionReply {
+  color: #4d3526;
+  line-height: 1.5;
+}
+
+.voiceAssistantSuggestionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.voiceAssistantSuggestion {
+  padding-inline: 12px;
+}
+
 .voiceAssistantToggle {
   display: flex;
   align-items: flex-start;
@@ -6372,6 +6459,20 @@ button:focus-visible {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #8b5d46;
+}
+
+.voiceAssistantCoachGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.voiceAssistantCoachCard {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(248, 239, 228, 0.72);
+  border: 1px solid rgba(200, 106, 59, 0.14);
 }
 
 @media (max-width: 640px) {

@@ -10,6 +10,23 @@ export type OpenAiAssistantReply = {
   conversationId: string | null;
   text: string;
   model: string | null;
+  coach: CoachFeedback | null;
+};
+
+export type CoachPracticeSummary = {
+  strengths: string[];
+  focusNext: string[];
+  newPhrases: string[];
+  homework: string[];
+};
+
+export type CoachFeedback = {
+  assistantReply: string;
+  quickCorrection: string;
+  betterVersion: string;
+  nextQuestion: string;
+  pronunciationTip: string;
+  summary: CoachPracticeSummary | null;
 };
 
 type StreamEventPayload = Record<string, unknown>;
@@ -119,6 +136,8 @@ export async function createOpenAiAssistantReply(input: {
   conversationId?: string | null;
   locale?: string;
   levelRange?: string;
+  practiceMode?: string;
+  practiceTopic?: string;
   nativeHelp?: boolean;
   nativeLocale?: string;
   signal?: AbortSignal;
@@ -140,6 +159,8 @@ export async function createOpenAiAssistantReply(input: {
       conversationId: input.conversationId,
       locale: input.locale,
       levelRange: input.levelRange,
+      practiceMode: input.practiceMode,
+      practiceTopic: input.practiceTopic,
       nativeHelp: input.nativeHelp,
       nativeLocale: input.nativeLocale,
     }),
@@ -226,6 +247,10 @@ export async function streamOpenAiAssistantReply(
           typeof payload.conversationId === "string" ? payload.conversationId : null,
         text: typeof payload.text === "string" ? payload.text : "",
         model: typeof payload.model === "string" ? payload.model : null,
+        coach:
+          payload.coach && typeof payload.coach === "object"
+            ? (payload.coach as CoachFeedback)
+            : null,
       });
       return;
     }

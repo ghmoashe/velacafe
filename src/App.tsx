@@ -6920,6 +6920,7 @@ export default function App() {
           LANGUAGE_LIST.find((lang) => lang.locale === profileLanguage)?.label ??
           profileLanguage)) ||
       null,
+    sessionUserId: sessionUser?.id ?? null,
     guestMode,
     requireAuth: () => redirectToLoginWithIntent({ route: "voice" }),
   };
