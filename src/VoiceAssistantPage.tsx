@@ -66,7 +66,11 @@ type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
 type SpeechWindow = Window & {
   SpeechRecognition?: BrowserSpeechRecognitionConstructor;
   webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+  webkitAudioContext?: typeof AudioContext;
 };
+
+const SILENT_WAV_DATA_URI =
+  "data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YS4AAAAA";
 
 function buildId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -76,6 +80,12 @@ function getRecognitionConstructor() {
   if (typeof window === "undefined") return null;
   const speechWindow = window as SpeechWindow;
   return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition ?? null;
+}
+
+function getAudioContextConstructor() {
+  if (typeof window === "undefined") return null;
+  const speechWindow = window as SpeechWindow;
+  return window.AudioContext ?? speechWindow.webkitAudioContext ?? null;
 }
 
 function getSpeechLocale(locale: string) {
@@ -256,6 +266,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   const previousResponseIdRef = useRef<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  const audioUnlockAttemptedRef = useRef(false);
   const streamAbortRef = useRef<AbortController | null>(null);
   const conversationLocaleRef = useRef<string | null>(null);
   const lastInputSourceRef = useRef<"text" | "speech">("text");
@@ -309,6 +320,50 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     }
   }, []);
 
+  const getOrCreateAudioElement = useCallback(() => {
+    const audio = audioRef.current ?? new Audio();
+    audioRef.current = audio;
+    audio.preload = "auto";
+    (audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
+    return audio;
+  }, []);
+
+  const unlockAudioPlayback = useCallback(async () => {
+    if (audioUnlockAttemptedRef.current || typeof window === "undefined") {
+      return;
+    }
+    audioUnlockAttemptedRef.current = true;
+
+    const AudioContextCtor = getAudioContextConstructor();
+    if (AudioContextCtor) {
+      try {
+        const context = new AudioContextCtor();
+        if (context.state === "suspended") {
+          await context.resume();
+        }
+        await context.close();
+      } catch {
+        // Ignore unlock failures and continue with media-element unlock attempt.
+      }
+    }
+
+    try {
+      const audio = getOrCreateAudioElement();
+      const previousSrc = audio.src;
+      const previousMuted = audio.muted;
+      audio.muted = true;
+      audio.src = SILENT_WAV_DATA_URI;
+      audio.currentTime = 0;
+      await audio.play();
+      audio.pause();
+      audio.currentTime = 0;
+      audio.src = previousSrc;
+      audio.muted = previousMuted;
+    } catch {
+      // iOS may still refuse here; real playback will surface the final error if needed.
+    }
+  }, [getOrCreateAudioElement]);
+
   const stopAudioPlayback = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -350,8 +405,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         });
         const objectUrl = URL.createObjectURL(audioBlob);
         audioUrlRef.current = objectUrl;
-        const audio = audioRef.current ?? new Audio();
-        audioRef.current = audio;
+        const audio = getOrCreateAudioElement();
         audio.onended = () => {
           clearAudioUrl();
           setSpeaking(false);
@@ -373,7 +427,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         setErrorMessage(error instanceof Error ? error.message : "Voice playback failed.");
       }
     },
-    [clearAudioUrl, stopAudioPlayback, text.idle, text.speaking]
+    [clearAudioUrl, getOrCreateAudioElement, stopAudioPlayback, text.idle, text.speaking]
   );
 
   const sendPrompt = useCallback(
@@ -388,6 +442,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         return;
       }
 
+      await unlockAudioPlayback();
       stopAudioPlayback();
       stopReplyStream();
       setErrorMessage("");
@@ -513,6 +568,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     },
     [
       guestMode,
+      unlockAudioPlayback,
       requireAuth,
       speakReply,
       stopAudioPlayback,
@@ -675,7 +731,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   }, [stopAudioPlayback, stopListening, stopReplyStream, text.idle]);
 
   const handlePushToTalkStart = useCallback(
-    (event: PointerEvent<HTMLButtonElement>) => {
+    async (event: PointerEvent<HTMLButtonElement>) => {
       if (event.pointerType !== "touch" && event.button !== 0) return;
       event.preventDefault();
       activePointerIdRef.current = event.pointerId;
@@ -684,9 +740,10 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       } catch {
         // Ignore browsers that do not support pointer capture on buttons.
       }
+      await unlockAudioPlayback();
       startListening();
     },
-    [startListening]
+    [startListening, unlockAudioPlayback]
   );
 
   const handlePushToTalkEnd = useCallback(
@@ -746,6 +803,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
             onPointerDown={handlePushToTalkStart}
             onPointerUp={handlePushToTalkEnd}
             onPointerCancel={handlePushToTalkEnd}
+            onContextMenu={(event) => event.preventDefault()}
             disabled={!recognitionSupported || thinking}
           >
             {listening ? text.releaseToSend : text.holdToTalk}
