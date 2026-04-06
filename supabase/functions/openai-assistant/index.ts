@@ -196,6 +196,68 @@ function extractChatCompletionText(payload: JsonRecord) {
   return "";
 }
 
+function extractConversationMessageText(item: unknown) {
+  if (!item || typeof item !== "object") {
+    return "";
+  }
+
+  const record = item as JsonRecord;
+  if (record.type !== "message" || record.role !== "assistant") {
+    return "";
+  }
+
+  const content = Array.isArray(record.content) ? record.content : [];
+  const chunks: string[] = [];
+  for (const contentItem of content) {
+    if (!contentItem || typeof contentItem !== "object") continue;
+    const part = contentItem as JsonRecord;
+    const text =
+      part.type === "output_text" || part.type === "text" || part.type === "input_text"
+        ? extractTextValue(part.text)
+        : "";
+    if (text) {
+      chunks.push(text);
+    }
+  }
+
+  return chunks.join("\n").trim();
+}
+
+async function getLatestConversationAssistantText(conversationId: string) {
+  const response = await fetch(
+    `https://api.openai.com/v1/conversations/${encodeURIComponent(conversationId)}/items`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${openAiApiKey.trim()}`,
+      },
+    }
+  );
+
+  const payload = (await response.json().catch(() => ({}))) as JsonRecord;
+  if (!response.ok) {
+    throw new Error(
+      extractErrorMessage(payload) || "OpenAI conversation items request failed."
+    );
+  }
+
+  const items = Array.isArray(payload.data)
+    ? payload.data
+    : Array.isArray(payload.items)
+      ? payload.items
+      : [];
+
+  let latestAssistantText = "";
+  for (const item of items) {
+    const text = extractConversationMessageText(item);
+    if (text) {
+      latestAssistantText = text;
+    }
+  }
+
+  return latestAssistantText.trim();
+}
+
 function extractErrorMessage(payload: JsonRecord) {
   if (typeof payload.error === "string" && payload.error.trim()) {
     return payload.error.trim();
@@ -475,7 +537,17 @@ async function handleJsonResponse(input: {
       continue;
     }
 
-    const replyText = extractResponseText(payload);
+    let replyText = extractResponseText(payload);
+    if (!replyText && conversationId) {
+      try {
+        replyText = await getLatestConversationAssistantText(conversationId);
+      } catch (error) {
+        console.error("[openai-assistant] Failed to read conversation items", {
+          conversationId,
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
     if (!replyText) {
       lastStatus = 500;
       lastErrorMessage = "OpenAI returned an empty response.";
@@ -593,6 +665,7 @@ async function handleStreamingResponse(req: Request, input: {
           let responseId: string | null = null;
           let model: string | null = null;
           let completed = false;
+          let sawCompletedEvent = false;
 
           const handleBlock = (block: string) => {
             const parsed = parseStreamEventBlock(block);
@@ -637,15 +710,12 @@ async function handleStreamingResponse(req: Request, input: {
             }
 
             if (eventType === "response.completed") {
+              sawCompletedEvent = true;
               const finalText = meta.response
                 ? extractResponseText(meta.response) || accumulatedText.trim()
                 : accumulatedText.trim();
-              completed = true;
-              if (!finalText) {
-                send("error", {
-                  message: "OpenAI returned an empty response.",
-                });
-              } else {
+              if (finalText) {
+                completed = true;
                 send("completed", {
                   responseId,
                   conversationId,
@@ -676,7 +746,17 @@ async function handleStreamingResponse(req: Request, input: {
           }
 
           if (!completed && !upstreamAbortController.signal.aborted) {
-            const finalText = accumulatedText.trim();
+            let finalText = accumulatedText.trim();
+            if (!finalText && (sawCompletedEvent || conversationId)) {
+              try {
+                finalText = await getLatestConversationAssistantText(conversationId);
+              } catch (error) {
+                console.error("[openai-assistant] Failed to read conversation items", {
+                  conversationId,
+                  message: error instanceof Error ? error.message : "Unknown error",
+                });
+              }
+            }
             if (!finalText) {
               send("error", {
                 message: "OpenAI returned an empty response.",
