@@ -6886,6 +6886,12 @@ export default function App() {
   };
   const voiceAssistantPageProps = {
     locale,
+    preferredInputLocales: [
+      ...profileLearningLanguages,
+      ...profilePracticeLanguages,
+      ...(profileLanguage ? [profileLanguage] : []),
+      locale,
+    ].filter((value, index, array) => array.indexOf(value) === index),
     guestMode,
     requireAuth: () => redirectToLoginWithIntent({ route: "voice" }),
   };

@@ -13,6 +13,7 @@ import { getVoiceAssistantText } from "./voiceAssistantText";
 
 type VoiceAssistantPageProps = {
   locale: string;
+  preferredInputLocales: string[];
   guestMode: boolean;
   requireAuth: () => void;
 };
@@ -106,6 +107,100 @@ function getSpeechLocale(locale: string) {
   }
 }
 
+function getPreferredConversationLocale(preferredLocales: string[], fallbackLocale: string) {
+  const firstPreferredLocale = preferredLocales.find((value) => value.trim());
+  return firstPreferredLocale ?? fallbackLocale;
+}
+
+function hasAnyMatch(value: string, patterns: string[]) {
+  return patterns.some((pattern) => value.includes(pattern));
+}
+
+function detectConversationLocale(text: string, fallbackLocale: string) {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) return fallbackLocale;
+
+  if (/[іїєґ]/i.test(normalized)) return "uk";
+  if (/[а-яё]/i.test(normalized)) return "ru";
+
+  if (/[\u0600-\u06FF]/u.test(normalized)) {
+    if (/[پچژگکی]/u.test(normalized)) return "fa";
+    return "ar";
+  }
+
+  if (
+    /[ğışçöü]/i.test(normalized) ||
+    hasAnyMatch(normalized, ["merhaba", "tesekkur", "teşekkür", "nasilsin", "nasılsın"])
+  ) {
+    return "tr";
+  }
+
+  if (
+    /[äöüß]/i.test(normalized) ||
+    hasAnyMatch(normalized, ["hallo", "danke", "bitte", "guten", "tschuss", "tschüss"])
+  ) {
+    return "de";
+  }
+
+  if (
+    /[àâçéèêëîïôùûüÿœæ]/i.test(normalized) ||
+    hasAnyMatch(normalized, ["bonjour", "merci", "salut", "comment", "s'il", "ca va", "ça va"])
+  ) {
+    return "fr";
+  }
+
+  if (
+    /[ñáéíóú¿¡]/i.test(normalized) ||
+    hasAnyMatch(normalized, ["hola", "gracias", "buenos", "como estas", "cómo estás"])
+  ) {
+    return "es";
+  }
+
+  if (
+    /[àèéìíîòóù]/i.test(normalized) ||
+    hasAnyMatch(normalized, ["ciao", "grazie", "buongiorno", "come stai"])
+  ) {
+    return "it";
+  }
+
+  if (
+    /[ąćęłńóśźż]/i.test(normalized) ||
+    hasAnyMatch(normalized, ["czesc", "cześć", "dziekuje", "dziękuję", "dzien dobry", "dzień dobry"])
+  ) {
+    return "pl";
+  }
+
+  if (
+    /[ăâđêôơư]/i.test(normalized) ||
+    hasAnyMatch(normalized, ["xin chao", "xin chào", "cam on", "cảm ơn"])
+  ) {
+    return "vi";
+  }
+
+  if (
+    /[çë]/i.test(normalized) ||
+    hasAnyMatch(normalized, ["pershendetje", "përshëndetje", "faleminderit"])
+  ) {
+    return "sq";
+  }
+
+  if (
+    hasAnyMatch(normalized, [
+      "hello",
+      "hi ",
+      "thanks",
+      "thank you",
+      "please",
+      "good morning",
+      "how are you",
+    ])
+  ) {
+    return "en";
+  }
+
+  return fallbackLocale;
+}
+
 function trimForSpeech(text: string) {
   const normalized = text.replace(/\s+/g, " ").trim();
   if (normalized.length <= 300) return normalized;
@@ -130,13 +225,14 @@ function isAbortError(error: unknown) {
 }
 
 export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
-  const { locale, guestMode, requireAuth } = props;
+  const { locale, preferredInputLocales, guestMode, requireAuth } = props;
   const text = useMemo(() => getVoiceAssistantText(locale), [locale]);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const previousResponseIdRef = useRef<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
+  const conversationLocaleRef = useRef<string | null>(null);
   const finalTranscriptRef = useRef("");
   const interimTranscriptRef = useRef("");
   const shouldSubmitSpeechRef = useRef(false);
@@ -208,7 +304,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   }, [text.idle]);
 
   const speakReply = useCallback(
-    async (value: string) => {
+    async (value: string, languageCode: string) => {
       const textForSpeech = trimForSpeech(value);
       if (!textForSpeech) return;
       try {
@@ -216,7 +312,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         setStatusMessage(text.speaking);
         const audioBlob = await synthesizeElevenLabsSpeech({
           text: textForSpeech,
-          languageCode: locale,
+          languageCode,
         });
         const objectUrl = URL.createObjectURL(audioBlob);
         audioUrlRef.current = objectUrl;
@@ -243,7 +339,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         setErrorMessage(error instanceof Error ? error.message : "Voice playback failed.");
       }
     },
-    [clearAudioUrl, locale, stopAudioPlayback, text.idle, text.speaking]
+    [clearAudioUrl, stopAudioPlayback, text.idle, text.speaking]
   );
 
   const sendPrompt = useCallback(
@@ -267,6 +363,12 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       setInterimTranscript("");
       finalTranscriptRef.current = "";
       interimTranscriptRef.current = "";
+      const replyLocale = detectConversationLocale(
+        trimmedValue,
+        conversationLocaleRef.current ??
+          getPreferredConversationLocale(preferredInputLocales, locale)
+      );
+      conversationLocaleRef.current = replyLocale;
 
       const assistantMessageId = buildId();
       setMessages((prev) => [
@@ -285,7 +387,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           {
             text: trimmedValue,
             previousResponseId: previousResponseIdRef.current,
-            locale,
+            locale: replyLocale,
           },
           {
             signal: abortController.signal,
@@ -310,7 +412,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
               setThinking(false);
               setStatusMessage(text.idle);
               if (finalText) {
-                void speakReply(finalText);
+                void speakReply(finalText, replyLocale);
               } else {
                 setErrorMessage("AI returned an empty response.");
               }
@@ -388,7 +490,10 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     recognitionRef.current = recognition;
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = getSpeechLocale(locale);
+    recognition.lang = getSpeechLocale(
+      conversationLocaleRef.current ??
+        getPreferredConversationLocale(preferredInputLocales, locale)
+    );
     recognition.maxAlternatives = 1;
     recognition.onstart = () => {
       setListening(true);
@@ -449,6 +554,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     guestMode,
     listening,
     locale,
+    preferredInputLocales,
     requireAuth,
     sendPrompt,
     text.idle,
@@ -484,6 +590,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     setInterimTranscript("");
     setErrorMessage("");
     previousResponseIdRef.current = null;
+    conversationLocaleRef.current = null;
     finalTranscriptRef.current = "";
     interimTranscriptRef.current = "";
     shouldSubmitSpeechRef.current = false;
