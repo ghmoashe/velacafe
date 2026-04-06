@@ -264,6 +264,8 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   );
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const previousResponseIdRef = useRef<string | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const audioUnlockAttemptedRef = useRef(false);
@@ -329,23 +331,31 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   }, []);
 
   const unlockAudioPlayback = useCallback(async () => {
-    if (audioUnlockAttemptedRef.current || typeof window === "undefined") {
+    if (typeof window === "undefined") {
       return;
     }
-    audioUnlockAttemptedRef.current = true;
 
     const AudioContextCtor = getAudioContextConstructor();
     if (AudioContextCtor) {
       try {
-        const context = new AudioContextCtor();
+        const existingContext = audioContextRef.current;
+        const context =
+          !existingContext || existingContext.state === "closed"
+            ? new AudioContextCtor()
+            : existingContext;
+        audioContextRef.current = context;
         if (context.state === "suspended") {
           await context.resume();
         }
-        await context.close();
       } catch {
         // Ignore unlock failures and continue with media-element unlock attempt.
       }
     }
+
+    if (audioUnlockAttemptedRef.current) {
+      return;
+    }
+    audioUnlockAttemptedRef.current = true;
 
     try {
       const audio = getOrCreateAudioElement();
@@ -365,10 +375,22 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   }, [getOrCreateAudioElement]);
 
   const stopAudioPlayback = useCallback(() => {
+    if (audioSourceRef.current) {
+      const source = audioSourceRef.current;
+      audioSourceRef.current = null;
+      source.onended = null;
+      try {
+        source.stop(0);
+      } catch {
+        // Ignore if the source already ended.
+      }
+      source.disconnect();
+    }
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
-      audioRef.current.src = "";
+      audioRef.current.removeAttribute("src");
+      audioRef.current.load();
     }
     clearAudioUrl();
     setSpeaking(false);
@@ -403,6 +425,41 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           text: textForSpeech,
           languageCode,
         });
+        const AudioContextCtor = getAudioContextConstructor();
+        if (AudioContextCtor) {
+          try {
+            const existingContext = audioContextRef.current;
+            const context =
+              !existingContext || existingContext.state === "closed"
+                ? new AudioContextCtor()
+                : existingContext;
+            audioContextRef.current = context;
+            if (context.state === "suspended") {
+              await context.resume();
+            }
+
+            const encodedAudio = await audioBlob.arrayBuffer();
+            const decodedAudio = await context.decodeAudioData(encodedAudio.slice(0));
+            const source = context.createBufferSource();
+            source.buffer = decodedAudio;
+            source.connect(context.destination);
+            source.onended = () => {
+              if (audioSourceRef.current === source) {
+                audioSourceRef.current = null;
+              }
+              source.disconnect();
+              setSpeaking(false);
+              setStatusMessage(text.idle);
+            };
+            audioSourceRef.current = source;
+            setSpeaking(true);
+            source.start(0);
+            return;
+          } catch {
+            // Fall back to HTMLAudioElement playback when AudioContext decoding fails.
+          }
+        }
+
         const objectUrl = URL.createObjectURL(audioBlob);
         audioUrlRef.current = objectUrl;
         const audio = getOrCreateAudioElement();
@@ -692,9 +749,28 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     return () => {
       recognitionRef.current?.abort();
       streamAbortRef.current?.abort();
+      if (audioSourceRef.current) {
+        const source = audioSourceRef.current;
+        audioSourceRef.current = null;
+        source.onended = null;
+        try {
+          source.stop(0);
+        } catch {
+          // Ignore if the source already ended.
+        }
+        source.disconnect();
+      }
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.src = "";
+        audioRef.current.removeAttribute("src");
+        audioRef.current.load();
+      }
+      if (audioContextRef.current) {
+        const context = audioContextRef.current;
+        audioContextRef.current = null;
+        void context.close().catch(() => {
+          // Ignore close failures during unmount.
+        });
       }
       clearAudioUrl();
     };

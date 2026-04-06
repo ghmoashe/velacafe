@@ -81,6 +81,17 @@ function getLanguageName(locale: string) {
 }
 
 function extractResponseText(payload: JsonRecord) {
+  if (typeof payload.output_text === "string" && payload.output_text.trim()) {
+    return payload.output_text.trim();
+  }
+
+  if (payload.response && typeof payload.response === "object") {
+    const nestedText = extractResponseText(payload.response as JsonRecord);
+    if (nestedText) {
+      return nestedText;
+    }
+  }
+
   const output = Array.isArray(payload.output) ? payload.output : [];
   const chunks: string[] = [];
   for (const item of output) {
@@ -287,20 +298,35 @@ async function handleJsonResponse(input: {
   locale: string;
   userId: string;
 }) {
-  const response = await createOpenAiResponse({
+  let response = await createOpenAiResponse({
     input: input.input,
     previousResponseId: input.previousResponseId,
     locale: input.locale,
   });
 
-  const payload = (await response.json().catch(() => ({}))) as JsonRecord;
+  let payload = (await response.json().catch(() => ({}))) as JsonRecord;
   if (!response.ok) {
     return json(response.status, {
       error: extractErrorMessage(payload) || "OpenAI request failed.",
     });
   }
 
-  const replyText = extractResponseText(payload);
+  let replyText = extractResponseText(payload);
+  if (!replyText && input.previousResponseId) {
+    response = await createOpenAiResponse({
+      input: input.input,
+      previousResponseId: null,
+      locale: input.locale,
+    });
+    payload = (await response.json().catch(() => ({}))) as JsonRecord;
+    if (!response.ok) {
+      return json(response.status, {
+        error: extractErrorMessage(payload) || "OpenAI request failed.",
+      });
+    }
+    replyText = extractResponseText(payload);
+  }
+
   if (!replyText) {
     return json(500, { error: "OpenAI returned an empty response." });
   }
