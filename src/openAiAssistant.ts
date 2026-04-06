@@ -7,6 +7,7 @@ const ASSISTANT_FUNCTION_NAME =
 
 export type OpenAiAssistantReply = {
   responseId: string | null;
+  conversationId: string | null;
   text: string;
   model: string | null;
 };
@@ -115,7 +116,7 @@ function consumeSseBuffer(
 
 export async function createOpenAiAssistantReply(input: {
   text: string;
-  previousResponseId?: string | null;
+  conversationId?: string | null;
   locale?: string;
   levelRange?: string;
   nativeHelp?: boolean;
@@ -135,7 +136,7 @@ export async function createOpenAiAssistantReply(input: {
     body: JSON.stringify({
       action: "respond",
       input: input.text,
-      previousResponseId: input.previousResponseId,
+      conversationId: input.conversationId,
       locale: input.locale,
       levelRange: input.levelRange,
       nativeHelp: input.nativeHelp,
@@ -153,7 +154,7 @@ export async function createOpenAiAssistantReply(input: {
 export async function streamOpenAiAssistantReply(
   input: {
     text: string;
-    previousResponseId?: string | null;
+    conversationId?: string | null;
     locale?: string;
     levelRange?: string;
     nativeHelp?: boolean;
@@ -180,7 +181,7 @@ export async function streamOpenAiAssistantReply(
     body: JSON.stringify({
       action: "stream",
       input: input.text,
-      previousResponseId: input.previousResponseId,
+      conversationId: input.conversationId,
       locale: input.locale,
       levelRange: input.levelRange,
       nativeHelp: input.nativeHelp,
@@ -219,6 +220,8 @@ export async function streamOpenAiAssistantReply(
       handlers.onCompleted?.({
         responseId:
           typeof payload.responseId === "string" ? payload.responseId : null,
+        conversationId:
+          typeof payload.conversationId === "string" ? payload.conversationId : null,
         text: typeof payload.text === "string" ? payload.text : "",
         model: typeof payload.model === "string" ? payload.model : null,
       });

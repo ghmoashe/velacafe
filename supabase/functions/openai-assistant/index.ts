@@ -324,7 +324,7 @@ function buildInstructions(
 
 function buildOpenAiRequestBody(input: {
   input: string;
-  previousResponseId: string | null;
+  conversationId: string | null;
   locale: string;
   levelRange: string;
   nativeHelp: boolean;
@@ -340,7 +340,7 @@ function buildOpenAiRequestBody(input: {
       input.nativeHelp,
       input.nativeLocale
     ),
-    previous_response_id: input.previousResponseId ?? undefined,
+    conversation: input.conversationId ?? undefined,
     max_output_tokens: 180,
     store: true,
     stream: input.stream === true ? true : undefined,
@@ -349,7 +349,7 @@ function buildOpenAiRequestBody(input: {
 
 async function createOpenAiResponse(input: {
   input: string;
-  previousResponseId: string | null;
+  conversationId: string | null;
   locale: string;
   levelRange: string;
   nativeHelp: boolean;
@@ -366,6 +366,38 @@ async function createOpenAiResponse(input: {
     body: JSON.stringify(buildOpenAiRequestBody(input)),
     signal: input.signal,
   });
+}
+
+async function createConversation(input: {
+  userId: string;
+  locale: string;
+}) {
+  const response = await fetch("https://api.openai.com/v1/conversations", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${openAiApiKey.trim()}`,
+    },
+    body: JSON.stringify({
+      metadata: {
+        topic: "vela-voice",
+        user_id: input.userId,
+        locale: input.locale,
+      },
+    }),
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as JsonRecord;
+  if (!response.ok) {
+    throw new Error(extractErrorMessage(payload) || "OpenAI conversation creation failed.");
+  }
+
+  const conversationId = typeof payload.id === "string" ? payload.id.trim() : "";
+  if (!conversationId) {
+    throw new Error("OpenAI conversation creation returned no id.");
+  }
+
+  return conversationId;
 }
 
 async function createOpenAiChatCompletion(input: {
@@ -405,24 +437,31 @@ async function createOpenAiChatCompletion(input: {
 
 async function handleJsonResponse(input: {
   input: string;
-  previousResponseId: string | null;
+  conversationId: string | null;
   locale: string;
   levelRange: string;
   nativeHelp: boolean;
   nativeLocale: string;
   userId: string;
 }) {
-  const attempts = input.previousResponseId
-    ? [input.previousResponseId, null]
+  const attempts = input.conversationId
+    ? [input.conversationId, null]
     : [null];
 
   let lastStatus = 500;
   let lastErrorMessage = "OpenAI returned an empty response.";
+  let resolvedConversationId: string | null = null;
 
-  for (const previousResponseId of attempts) {
+  for (const conversationIdCandidate of attempts) {
+    const conversationId =
+      conversationIdCandidate ?? (await createConversation({
+        userId: input.userId,
+        locale: input.locale,
+      }));
+    resolvedConversationId = conversationId;
     const response = await createOpenAiResponse({
       input: input.input,
-      previousResponseId,
+      conversationId,
       locale: input.locale,
       levelRange: input.levelRange,
       nativeHelp: input.nativeHelp,
@@ -446,6 +485,7 @@ async function handleJsonResponse(input: {
     const meta = extractResponseMeta(payload);
     return json(200, {
       responseId: meta.responseId,
+      conversationId,
       text: replyText,
       model: meta.model,
       userId: input.userId,
@@ -465,6 +505,7 @@ async function handleJsonResponse(input: {
     if (fallbackText) {
       return json(200, {
         responseId: null,
+        conversationId: resolvedConversationId,
         text: fallbackText,
         model:
           typeof fallbackPayload.model === "string" ? fallbackPayload.model : null,
@@ -482,11 +523,12 @@ async function handleJsonResponse(input: {
 
 async function handleStreamingResponse(req: Request, input: {
   input: string;
-  previousResponseId: string | null;
+  conversationId: string | null;
   locale: string;
   levelRange: string;
   nativeHelp: boolean;
   nativeLocale: string;
+  userId: string;
 }) {
   const upstreamAbortController = new AbortController();
   req.signal.addEventListener("abort", () => upstreamAbortController.abort(), {
@@ -512,9 +554,15 @@ async function handleStreamingResponse(req: Request, input: {
         };
 
         try {
+          const conversationId =
+            input.conversationId ??
+            (await createConversation({
+              userId: input.userId,
+              locale: input.locale,
+            }));
           const response = await createOpenAiResponse({
             input: input.input,
-            previousResponseId: input.previousResponseId,
+            conversationId,
             locale: input.locale,
             levelRange: input.levelRange,
             nativeHelp: input.nativeHelp,
@@ -600,6 +648,7 @@ async function handleStreamingResponse(req: Request, input: {
               } else {
                 send("completed", {
                   responseId,
+                  conversationId,
                   model,
                   text: finalText,
                 });
@@ -635,6 +684,7 @@ async function handleStreamingResponse(req: Request, input: {
             } else {
               send("completed", {
                 responseId,
+                conversationId,
                 model,
                 text: finalText,
               });
@@ -690,9 +740,9 @@ Deno.serve(async (req) => {
     }
 
     const input = typeof body.input === "string" ? body.input.trim() : "";
-    const previousResponseId =
-      typeof body.previousResponseId === "string" && body.previousResponseId.trim()
-        ? body.previousResponseId.trim()
+    const conversationId =
+      typeof body.conversationId === "string" && body.conversationId.trim()
+        ? body.conversationId.trim()
         : null;
     const locale =
       typeof body.locale === "string" && body.locale.trim() ? body.locale.trim() : "en";
@@ -713,17 +763,18 @@ Deno.serve(async (req) => {
     if (action === "stream") {
       return handleStreamingResponse(req, {
         input,
-        previousResponseId,
+        conversationId,
         locale,
         levelRange,
         nativeHelp,
         nativeLocale,
+        userId: user.id,
       });
     }
 
     return handleJsonResponse({
       input,
-      previousResponseId,
+      conversationId,
       locale,
       levelRange,
       nativeHelp,

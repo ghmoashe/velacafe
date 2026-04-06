@@ -309,6 +309,7 @@ function buildConversationInput(
     "Reply to the latest user message.",
   ].join("\n");
 }
+void buildConversationInput;
 
 function isAbortError(error: unknown) {
   return (
@@ -351,7 +352,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   );
   const preferNonStreamingReplies = useMemo(() => shouldPreferNonStreamingReplies(), []);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
-  const previousResponseIdRef = useRef<string | null>(null);
+  const conversationIdRef = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -620,7 +621,6 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       const replyLocale = selectedLocale;
       conversationLocaleRef.current = replyLocale;
       lastInputSourceRef.current = inputSource;
-      const useClientSideConversationContext = true;
 
       const assistantMessageId = buildId();
       setMessages((prev) => [
@@ -630,12 +630,8 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       ]);
 
       const assistantRequest = {
-        text: useClientSideConversationContext
-          ? buildConversationInput(messages, trimmedValue)
-          : trimmedValue,
-        previousResponseId: useClientSideConversationContext
-          ? null
-          : previousResponseIdRef.current,
+        text: trimmedValue,
+        conversationId: conversationIdRef.current,
         locale: replyLocale,
         levelRange: selectedConversationLevel,
         nativeHelp:
@@ -647,9 +643,14 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       streamAbortRef.current = abortController;
       let streamedText = "";
       let completed = false;
-      const finalizeReply = (value: string, responseId: string | null) => {
+      const finalizeReply = (
+        value: string,
+        responseId: string | null,
+        conversationId: string | null
+      ) => {
         const finalText = value.trim();
-        previousResponseIdRef.current = useClientSideConversationContext ? null : responseId;
+        void responseId;
+        conversationIdRef.current = conversationId;
         updateMessage(assistantMessageId, (message) => ({
           ...message,
           text: finalText,
@@ -668,7 +669,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         if (preferNonStreamingReplies) {
           const reply = await createOpenAiAssistantReply(assistantRequest);
           streamAbortRef.current = null;
-          finalizeReply(reply.text, reply.responseId);
+          finalizeReply(reply.text, reply.responseId, reply.conversationId);
           return;
         }
 
@@ -687,7 +688,11 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
             onCompleted: (reply) => {
               completed = true;
               streamAbortRef.current = null;
-              finalizeReply(reply.text.trim() || streamedText.trim(), reply.responseId);
+              finalizeReply(
+                reply.text.trim() || streamedText.trim(),
+                reply.responseId,
+                reply.conversationId
+              );
             },
           }
         );
@@ -715,7 +720,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           try {
             const reply = await createOpenAiAssistantReply(assistantRequest);
             streamAbortRef.current = null;
-            finalizeReply(reply.text, reply.responseId);
+            finalizeReply(reply.text, reply.responseId, reply.conversationId);
             return;
           } catch (fallbackError) {
             streamAbortRef.current = null;
@@ -754,7 +759,6 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       nativeHelpEnabled,
       nativeLocale,
       preferNonStreamingReplies,
-      messages,
       text.emptyPrompt,
       text.idle,
       text.thinking,
@@ -935,7 +939,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     setDraft("");
     setInterimTranscript("");
     setErrorMessage("");
-    previousResponseIdRef.current = null;
+    conversationIdRef.current = null;
     conversationLocaleRef.current = selectedConversationLocale;
     lastInputSourceRef.current = "text";
     finalTranscriptRef.current = "";
