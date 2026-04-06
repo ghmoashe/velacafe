@@ -32,6 +32,7 @@ type OrganizerProfile = {
   language: string | null;
   learning_languages?: string[] | null;
   practice_languages?: string[] | null;
+  teaches_languages?: string[] | null;
   interests?: string[] | null;
   bio: string | null;
   is_organizer?: boolean | null;
@@ -250,6 +251,11 @@ function countSharedValues(left: Set<string>, right: Set<string>) {
 function profileMatchesLanguage(profile: OrganizerProfile, language: string) {
   const normalizedLanguage = normalizeValue(language);
   if (!normalizedLanguage) return true;
+  const taughtLanguages = new Set<string>();
+  addNormalizedValues(taughtLanguages, profile.teaches_languages);
+  if (taughtLanguages.size > 0) {
+    return taughtLanguages.has(normalizedLanguage);
+  }
   if (normalizeValue(profile.language) === normalizedLanguage) {
     return true;
   }
@@ -626,6 +632,10 @@ export default function ShortsPage(props: ShortsPageProps) {
     () => new Set(followingOrganizerIds),
     [followingOrganizerIds]
   );
+  const hasLearningLanguageFilter = useMemo(
+    () => viewerLearningLanguages.some((language) => Boolean(normalizeValue(language))),
+    [viewerLearningLanguages]
+  );
   const likedPostIdSet = useMemo(() => new Set(likedPostIds), [likedPostIds]);
   const reportedPostIdSet = useMemo(() => new Set(reportedPostIds), [reportedPostIds]);
 
@@ -866,15 +876,19 @@ export default function ShortsPage(props: ShortsPageProps) {
     const primaryProfilesResult = await supabase
       .from("profiles")
       .select(
-        "id,full_name,avatar_url,city,country,language,learning_languages,practice_languages,interests,bio,is_organizer,is_teacher"
+        "id,full_name,avatar_url,city,country,language,learning_languages,practice_languages,teaches_languages,interests,bio,is_organizer,is_teacher"
       )
       .in("id", organizerIds);
     const profileSelectErrorMessage = getErrorMessage(primaryProfilesResult.error).toLowerCase();
     const fallbackProfilesResult =
       primaryProfilesResult.error &&
-      ["is_teacher", "learning_languages", "practice_languages", "interests"].some((field) =>
-        profileSelectErrorMessage.includes(field)
-      )
+      [
+        "is_teacher",
+        "learning_languages",
+        "practice_languages",
+        "teaches_languages",
+        "interests",
+      ].some((field) => profileSelectErrorMessage.includes(field))
         ? await supabase
             .from("profiles")
             .select("id,full_name,avatar_url,city,country,language,bio,is_organizer")
@@ -930,14 +944,10 @@ export default function ShortsPage(props: ShortsPageProps) {
             profileMatchesAnyLanguage(post.author, preferredLearningLanguages)
           )
         : visibleVideos;
-    const effectiveVideos =
-      filteredVideos.length > 0 || preferredLearningLanguages.length === 0
-        ? filteredVideos
-        : visibleVideos;
     setFeedStatus({ type: "idle", message: "" });
     await loadInteractionSummary(
-      effectiveVideos.map((item) => item.id),
-      effectiveVideos
+      filteredVideos.map((item) => item.id),
+      filteredVideos
     );
   }, [
     followingOrganizerIdSet,
@@ -1555,7 +1565,9 @@ export default function ShortsPage(props: ShortsPageProps) {
         </div>
       ) : videos.length === 0 ? (
         <div className="shortsFeedState">
-          <div className="shortsEmptyCard shortsEmptyCard--viewport">{text.empty}</div>
+          <div className="shortsEmptyCard shortsEmptyCard--viewport">
+            {hasLearningLanguageFilter ? text.filteredEmpty : text.empty}
+          </div>
         </div>
       ) : (
         <div className="shortsFeed" ref={feedRef}>

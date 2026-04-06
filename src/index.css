@@ -6186,3 +6186,193 @@ button:focus-visible {
     align-items: flex-start;
   }
 }
+
+.voiceAssistantPage {
+  display: grid;
+  gap: 16px;
+}
+
+.voiceAssistantHeader {
+  display: grid;
+  gap: 6px;
+}
+
+.voiceAssistantTitle {
+  font-family: "Playfair Display", "Noto Sans Arabic", serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.voiceAssistantSubtitle {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.voiceAssistantNotice {
+  border-radius: 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(200, 106, 59, 0.18);
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.voiceAssistantNotice--warning {
+  border-color: rgba(200, 106, 59, 0.36);
+  background: rgba(255, 240, 232, 0.9);
+}
+
+.voiceAssistantNotice--ghost {
+  border-style: dashed;
+}
+
+.voiceAssistantCard {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(234, 222, 211, 0.92);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 249, 242, 0.94));
+  box-shadow: 0 18px 38px rgba(31, 27, 22, 0.08);
+}
+
+.voiceAssistantStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(248, 239, 228, 0.95);
+  color: #6f2f12;
+  font-size: 14px;
+  font-weight: 600;
+  justify-self: flex-start;
+}
+
+.voiceAssistantStatusDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 6px rgba(200, 106, 59, 0.14);
+}
+
+.voiceAssistantControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.voiceAssistantHoldButton {
+  min-width: 160px;
+  background: rgba(200, 106, 59, 0.1);
+  border-color: rgba(200, 106, 59, 0.28);
+}
+
+.voiceAssistantInterim {
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px dashed rgba(200, 106, 59, 0.34);
+  background: rgba(255, 248, 240, 0.95);
+  color: #6f2f12;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.voiceAssistantSendRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.voiceAssistantMessages {
+  display: grid;
+  gap: 12px;
+}
+
+.voiceAssistantEmpty {
+  padding: 22px 18px;
+  border-radius: 22px;
+  border: 1px dashed rgba(200, 106, 59, 0.28);
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--muted);
+  text-align: center;
+}
+
+.voiceAssistantBubble {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 24px;
+  line-height: 1.6;
+  border: 1px solid rgba(234, 222, 211, 0.92);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.voiceAssistantBubble--pending {
+  position: relative;
+  overflow: hidden;
+}
+
+.voiceAssistantBubble--pending::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(200, 106, 59, 0.08) 45%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translateX(-100%);
+  animation: voiceAssistantPulse 1.2s linear infinite;
+}
+
+.voiceAssistantBubble--user {
+  margin-inline-start: 36px;
+  background: rgba(255, 244, 236, 0.96);
+}
+
+.voiceAssistantBubble--assistant {
+  margin-inline-end: 36px;
+}
+
+.voiceAssistantBubbleRole {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8b5d46;
+}
+
+@media (max-width: 640px) {
+  .voiceAssistantCard {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .voiceAssistantControls {
+    flex-direction: column;
+  }
+
+  .voiceAssistantControls .btn {
+    width: 100%;
+  }
+
+  .voiceAssistantBubble--user,
+  .voiceAssistantBubble--assistant {
+    margin-inline: 0;
+  }
+}
+
+@keyframes voiceAssistantPulse {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}

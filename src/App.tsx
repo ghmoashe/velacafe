@@ -30,6 +30,7 @@ import { openKlaroSettings, setupKlaro } from "./klaro";
 import { getMiniGamesText } from "./miniGamesText";
 import { getShortsText } from "./shortsText";
 import { getSupabaseClient } from "./supabaseClient";
+import { getVoiceAssistantText } from "./voiceAssistantText";
 
 const LANGUAGE_LIST = [
   { label: "Deutsch", locale: "de", codes: ["DE"] },
@@ -241,6 +242,7 @@ type Route =
   | "forgot"
   | "search"
   | "games"
+  | "voice"
   | "shorts"
   | "events"
   | "event"
@@ -365,6 +367,7 @@ type ProfileRecord = {
   language_level?: string | null;
   learning_languages?: string[] | null;
   practice_languages?: string[] | null;
+  teaches_languages?: string[] | null;
   bio?: string | null;
   interests?: string[] | null;
   telegram?: string | null;
@@ -1410,6 +1413,10 @@ function isMissingPremiumColumnError(error: unknown) {
   return isMissingColumnError(error, "is_premium");
 }
 
+function isMissingTeachesLanguagesColumnError(error: unknown) {
+  return isMissingColumnError(error, "teaches_languages");
+}
+
 function parsePositiveInteger(value: string): number | null {
   const normalized = value.trim();
   if (!normalized) return null;
@@ -1496,6 +1503,9 @@ function resolveRoute(slug: string): Route | null {
     case "games":
     case "practice":
       return "games";
+    case "voice":
+    case "assistant":
+      return "voice";
     case "shorts":
       return "shorts";
     case "events":
@@ -1557,6 +1567,7 @@ const ROUTE_PATHS: Record<Route, string> = {
   forgot: "/forgot",
   search: "/search",
   games: "/games",
+  voice: "/voice",
   shorts: "/shorts",
   events: "/events",
   event: "/event",
@@ -1690,6 +1701,7 @@ const OrganizerPage = lazy(() => import("./OrganizerPage"));
 const ProfilePage = lazy(() => import("./ProfilePage"));
 const SearchPage = lazy(() => import("./SearchPage"));
 const MiniGamesPage = lazy(() => import("./MiniGamesPage"));
+const VoiceAssistantPage = lazy(() => import("./VoiceAssistantPage"));
 const ShortsPage = lazy(() => import("./ShortsPage"));
 const UserPage = lazy(() => import("./UserPage"));
 
@@ -1901,6 +1913,7 @@ export default function App() {
   const [profileLevel, setProfileLevel] = useState<LanguageLevel>("");
   const [profileLearningLanguages, setProfileLearningLanguages] = useState<Locale[]>([]);
   const [profilePracticeLanguages, setProfilePracticeLanguages] = useState<Locale[]>([]);
+  const [profileTeachesLanguages, setProfileTeachesLanguages] = useState<Locale[]>([]);
   const [profileBio, setProfileBio] = useState("");
   const [profileInterests, setProfileInterests] = useState<string[]>([]);
   const [profileInterestInput, setProfileInterestInput] = useState("");
@@ -1993,6 +2006,7 @@ export default function App() {
   } as Record<MessageKey, string>;
   const miniGamesText = getMiniGamesText(locale);
   const shortsText = getShortsText(locale);
+  const voiceAssistantText = getVoiceAssistantText(locale);
   const eventPricingText = getEventPricingText(locale);
   const eventCheckInText = getEventCheckInText(locale);
   const eventScheduleText = getEventScheduleText(locale);
@@ -2696,7 +2710,7 @@ export default function App() {
         const primaryProfileResult = await supabase
           .from("profiles")
           .select(
-            "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,bio,interests,telegram,instagram,is_organizer,is_teacher,is_admin,is_premium,pinned_short_post_id"
+            "full_name,birth_date,gender,country,city,language,avatar_url,cover_url,language_level,learning_languages,practice_languages,teaches_languages,bio,interests,telegram,instagram,is_organizer,is_teacher,is_admin,is_premium,pinned_short_post_id"
           )
           .eq("id", user.id)
           .maybeSingle();
@@ -2704,7 +2718,8 @@ export default function App() {
           primaryProfileResult.error &&
           (isMissingPinnedShortColumnError(primaryProfileResult.error) ||
             isMissingTeacherColumnError(primaryProfileResult.error) ||
-            isMissingPremiumColumnError(primaryProfileResult.error))
+            isMissingPremiumColumnError(primaryProfileResult.error) ||
+            isMissingTeachesLanguagesColumnError(primaryProfileResult.error))
             ? await supabase
                 .from("profiles")
                 .select(
@@ -2760,8 +2775,16 @@ export default function App() {
                 !LEARN_PRACTICE_EXCLUDED.has(lang)
             )
           : [];
+        const teachesLanguages = Array.isArray(data.teaches_languages)
+          ? data.teaches_languages.filter(
+              (lang) =>
+                isSupportedLocale(lang) &&
+                !LEARN_PRACTICE_EXCLUDED.has(lang)
+            )
+          : [];
         setProfileLearningLanguages(learningLanguages as Locale[]);
         setProfilePracticeLanguages(practiceLanguages as Locale[]);
+        setProfileTeachesLanguages(teachesLanguages as Locale[]);
         setProfileBio(data.bio ?? "");
         setProfileInterests(
           Array.isArray(data.interests)
@@ -2794,6 +2817,7 @@ export default function App() {
           setProfileIsTeacher(false);
           setProfileIsAdmin(false);
           setProfilePinnedShortPostId(null);
+          setProfileTeachesLanguages([]);
         }
       profileLoaded.current = true;
     })();
@@ -3695,6 +3719,16 @@ export default function App() {
 
   function toggleProfilePracticeLanguage(value: Locale) {
     setProfilePracticeLanguages((prev) => {
+      if (prev.includes(value)) {
+        return prev.filter((item) => item !== value);
+      }
+      return [...prev, value];
+    });
+    resetProfileStatus();
+  }
+
+  function toggleProfileTeachingLanguage(value: Locale) {
+    setProfileTeachesLanguages((prev) => {
       if (prev.includes(value)) {
         return prev.filter((item) => item !== value);
       }
@@ -6415,6 +6449,10 @@ export default function App() {
         practice_languages: profilePracticeLanguages.length
           ? profilePracticeLanguages
           : null,
+        teaches_languages:
+          (profileIsOrganizer || profileIsTeacher) && profileTeachesLanguages.length
+            ? profileTeachesLanguages
+            : null,
         bio: profileBio.trim() || null,
         interests: profileInterests.length ? profileInterests : null,
         telegram: profileTelegram.trim() || null,
@@ -6428,9 +6466,17 @@ export default function App() {
       if (coverUrl) {
         payload.cover_url = coverUrl;
       }
-      const { error } = await supabase
+      let { error } = await supabase
         .from("profiles")
         .upsert(payload, { onConflict: "id" });
+      if (error && isMissingTeachesLanguagesColumnError(error)) {
+        const fallbackPayload = { ...payload };
+        delete fallbackPayload.teaches_languages;
+        const fallbackResult = await supabase
+          .from("profiles")
+          .upsert(fallbackPayload, { onConflict: "id" });
+        error = fallbackResult.error;
+      }
       if (error) throw error;
       if (avatarUrl) {
         setProfileAvatarUrl(avatarUrl);
@@ -6464,6 +6510,7 @@ export default function App() {
   const isTermsRoute = route === "terms";
   const isSearchRoute = route === "search";
   const isGamesRoute = route === "games";
+  const isVoiceRoute = route === "voice";
   const isShortsRoute = route === "shorts";
   const isEventsRoute = route === "events";
   const isEventRoute = route === "event";
@@ -6477,6 +6524,7 @@ export default function App() {
   const showBackButton = !isAuthRoute;
   const showSearchButton = !isAuthRoute;
   const showGamesButton = !isAuthRoute;
+  const showVoiceButton = !isAuthRoute;
   const showShortsButton = !isAuthRoute;
   const showEventsButton = !isAuthRoute;
   const showLogoutButton = !isAuthRoute && !guestMode && Boolean(sessionUser?.id);
@@ -6836,6 +6884,11 @@ export default function App() {
     goToOrganizer,
     sharePath: ROUTE_PATHS.shorts,
   };
+  const voiceAssistantPageProps = {
+    locale,
+    guestMode,
+    requireAuth: () => redirectToLoginWithIntent({ route: "voice" }),
+  };
   const userPageProps = {
     strings,
     profileCoverDisplay,
@@ -6921,6 +6974,9 @@ export default function App() {
     toggleProfileLearningLanguage,
     profilePracticeLanguages,
     toggleProfilePracticeLanguage,
+    showTeachingLanguages: profileIsOrganizer || profileIsTeacher,
+    profileTeachingLanguages: profileTeachesLanguages,
+    toggleProfileTeachingLanguage,
     profileLevel,
     updateProfileLevel,
     languageLevels: LANGUAGE_LEVELS,
@@ -7036,6 +7092,15 @@ export default function App() {
                     onClick={() => navigate("games")}
                   >
                     {miniGamesText.navLabel}
+                  </button>
+                ) : null}
+                {showVoiceButton ? (
+                  <button
+                    className={`btn${isVoiceRoute ? " btnActive" : ""}`}
+                    type="button"
+                    onClick={() => navigate("voice")}
+                  >
+                    {voiceAssistantText.navLabel}
                   </button>
                 ) : null}
                 {showShortsButton ? (
@@ -7849,6 +7914,10 @@ export default function App() {
                   sessionUserId={sessionUser?.id ?? null}
                   isPremium={profileIsPremium}
                 />
+              </Suspense>
+            ) : isVoiceRoute ? (
+              <Suspense fallback={<div className="voiceAssistantPage" />}>
+                <VoiceAssistantPage {...voiceAssistantPageProps} />
               </Suspense>
             ) : isShortsRoute ? (
               <Suspense fallback={<div className="shortsPage" />}>

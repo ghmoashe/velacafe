@@ -3,6 +3,7 @@ export type ShortsText = {
   title: string;
   subtitle: string;
   empty: string;
+  filteredEmpty: string;
   loading: string;
   retry: string;
   likeLabel: string;
@@ -40,6 +41,7 @@ const SHORTS_TEXT: ShortsText = {
   subtitle:
     "A vertical stream of organizer and teacher videos with likes, comments, and sharing.",
   empty: "No organizer videos yet. Published video posts will appear here.",
+  filteredEmpty: "No videos yet for your learning languages.",
   loading: "Loading videos...",
   retry: "Try again",
   likeLabel: "Like",

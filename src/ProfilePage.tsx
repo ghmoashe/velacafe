@@ -60,6 +60,9 @@ type ProfilePageProps = {
   toggleProfileLearningLanguage: (value: Locale) => void;
   profilePracticeLanguages: Locale[];
   toggleProfilePracticeLanguage: (value: Locale) => void;
+  showTeachingLanguages: boolean;
+  profileTeachingLanguages: Locale[];
+  toggleProfileTeachingLanguage: (value: Locale) => void;
   profileLevel: LanguageLevel;
   updateProfileLevel: (value: Exclude<LanguageLevel, "">) => void;
   languageLevels: readonly Exclude<LanguageLevel, "">[];
@@ -127,6 +130,9 @@ export default function ProfilePage(props: ProfilePageProps) {
     toggleProfileLearningLanguage,
     profilePracticeLanguages,
     toggleProfilePracticeLanguage,
+    showTeachingLanguages,
+    profileTeachingLanguages,
+    toggleProfileTeachingLanguage,
     profileLevel,
     updateProfileLevel,
     languageLevels,
@@ -342,6 +348,27 @@ export default function ProfilePage(props: ProfilePageProps) {
             })}
           </div>
         </div>
+        {showTeachingLanguages ? (
+          <div className="field">
+            <span className="label">{strings.organizerApplyLanguagesLabel}</span>
+            <div className="tagGrid">
+              {learnPracticeLanguages.map((lang) => {
+                const translatedLabel = languageLabels[lang.locale] ?? lang.label;
+                const isActive = profileTeachingLanguages.includes(lang.locale);
+                return (
+                  <button
+                    key={`teach-${lang.locale}`}
+                    className={`tagButton${isActive ? " tagButton--active" : ""}`}
+                    type="button"
+                    onClick={() => toggleProfileTeachingLanguage(lang.locale)}
+                  >
+                    {translatedLabel}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
         <div className="field">
           <span className="label">{strings.profileLevelLabel}</span>
           <div className="levelGrid">
