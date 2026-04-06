@@ -309,7 +309,6 @@ function buildConversationInput(
     "Reply to the latest user message.",
   ].join("\n");
 }
-void buildConversationInput;
 
 function isAbortError(error: unknown) {
   return (
@@ -621,6 +620,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       const replyLocale = selectedLocale;
       conversationLocaleRef.current = replyLocale;
       lastInputSourceRef.current = inputSource;
+      const assistantInput = buildConversationInput(messages, trimmedValue);
 
       const assistantMessageId = buildId();
       setMessages((prev) => [
@@ -630,7 +630,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       ]);
 
       const assistantRequest = {
-        text: trimmedValue,
+        text: assistantInput,
         conversationId: conversationIdRef.current,
         locale: replyLocale,
         levelRange: selectedConversationLevel,
@@ -763,6 +763,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       text.idle,
       text.thinking,
       updateMessage,
+      messages,
     ]
   );
 

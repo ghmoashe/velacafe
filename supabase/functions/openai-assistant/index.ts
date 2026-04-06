@@ -604,68 +604,6 @@ async function handleJsonResponse(input: {
   nativeLocale: string;
   userId: string;
 }) {
-  const attempts = input.conversationId
-    ? [input.conversationId, null]
-    : [null];
-
-  let lastStatus = 500;
-  let lastErrorMessage = "OpenAI returned an empty response.";
-  let resolvedConversationId: string | null = null;
-
-  for (const conversationIdCandidate of attempts) {
-    const conversationId =
-      conversationIdCandidate ?? (await createConversation({
-        userId: input.userId,
-        locale: input.locale,
-      }));
-    resolvedConversationId = conversationId;
-    const response = await createOpenAiResponse({
-      input: input.input,
-      conversationId,
-      locale: input.locale,
-      levelRange: input.levelRange,
-      nativeHelp: input.nativeHelp,
-      nativeLocale: input.nativeLocale,
-    });
-
-    const payload = (await response.json().catch(() => ({}))) as JsonRecord;
-    if (!response.ok) {
-      lastStatus = response.status;
-      lastErrorMessage = getOpenAiErrorMessage(
-        response.status,
-        payload,
-        "OpenAI request failed."
-      );
-      continue;
-    }
-
-    let replyText = extractResponseText(payload);
-    if (!replyText && conversationId) {
-      try {
-        replyText = await getLatestConversationAssistantText(conversationId);
-      } catch (error) {
-        console.error("[openai-assistant] Failed to read conversation items", {
-          conversationId,
-          message: error instanceof Error ? error.message : "Unknown error",
-        });
-      }
-    }
-    if (!replyText) {
-      lastStatus = 500;
-      lastErrorMessage = "OpenAI returned an empty response.";
-      continue;
-    }
-
-    const meta = extractResponseMeta(payload);
-    return json(200, {
-      responseId: meta.responseId,
-      conversationId,
-      text: replyText,
-      model: meta.model,
-      userId: input.userId,
-    });
-  }
-
   const fallbackResponse = await createOpenAiChatCompletion({
     input: input.input,
     locale: input.locale,
@@ -679,23 +617,26 @@ async function handleJsonResponse(input: {
     if (fallbackText) {
       return json(200, {
         responseId: null,
-        conversationId: resolvedConversationId,
+        conversationId: null,
         text: fallbackText,
         model:
           typeof fallbackPayload.model === "string" ? fallbackPayload.model : null,
         userId: input.userId,
       });
     }
-  } else {
-    lastStatus = fallbackResponse.status;
-    lastErrorMessage = getOpenAiErrorMessage(
-      fallbackResponse.status,
-      fallbackPayload,
-      "OpenAI chat completion failed."
-    );
   }
 
-  return json(lastStatus, { error: lastErrorMessage });
+  if (!fallbackResponse.ok) {
+    return json(fallbackResponse.status, {
+      error: getOpenAiErrorMessage(
+        fallbackResponse.status,
+        fallbackPayload,
+        "OpenAI chat completion failed."
+      ),
+    });
+  }
+
+  return json(500, { error: "OpenAI returned an empty response." });
 }
 
 async function handleStreamingResponse(req: Request, input: {
@@ -731,21 +672,12 @@ async function handleStreamingResponse(req: Request, input: {
         };
 
         try {
-          const conversationId =
-            input.conversationId ??
-            (await createConversation({
-              userId: input.userId,
-              locale: input.locale,
-            }));
-          const response = await createOpenAiResponse({
+          const response = await createOpenAiChatCompletion({
             input: input.input,
-            conversationId,
             locale: input.locale,
             levelRange: input.levelRange,
             nativeHelp: input.nativeHelp,
             nativeLocale: input.nativeLocale,
-            signal: upstreamAbortController.signal,
-            stream: true,
           });
 
           if (!response.ok) {
@@ -761,123 +693,23 @@ async function handleStreamingResponse(req: Request, input: {
             return;
           }
 
-          if (!response.body) {
-            send("error", { message: "OpenAI stream is unavailable." });
-            close();
-            return;
-          }
+          const payload = (await response.json().catch(() => ({}))) as JsonRecord;
+          const finalText = extractChatCompletionText(payload);
+          const model =
+            typeof payload.model === "string" ? payload.model : openAiModel.trim() || null;
 
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let accumulatedText = "";
-          let responseId: string | null = null;
-          let model: string | null = null;
-          let completed = false;
-          let sawCompletedEvent = false;
-
-          const handleBlock = (block: string) => {
-            const parsed = parseStreamEventBlock(block);
-            if (!parsed) return;
-
-            const { eventType, payload } = parsed;
-            const meta = extractResponseMeta(payload);
-            responseId = meta.responseId ?? responseId;
-            model = meta.model ?? model;
-
-            if (eventType === "response.output_text.delta") {
-              const delta = typeof payload.delta === "string" ? payload.delta : "";
-              if (delta) {
-                accumulatedText += delta;
-                send("delta", { text: delta });
-              }
-              return;
-            }
-
-            if (eventType === "response.output_text.done") {
-              const text = typeof payload.text === "string" ? payload.text.trim() : "";
-              if (text && text.length > accumulatedText.length) {
-                accumulatedText = text;
-              }
-              return;
-            }
-
-            if (eventType === "response.content_part.done") {
-              const text = extractContentPartText(payload.part);
-              if (text && text.length > accumulatedText.length) {
-                accumulatedText = text;
-              }
-              return;
-            }
-
-            if (eventType === "response.output_item.done") {
-              const text = extractMessageTextFromItem(payload.item);
-              if (text && text.length > accumulatedText.length) {
-                accumulatedText = text;
-              }
-              return;
-            }
-
-            if (eventType === "response.completed") {
-              sawCompletedEvent = true;
-              const finalText = meta.response
-                ? extractResponseText(meta.response) || accumulatedText.trim()
-                : accumulatedText.trim();
-              if (finalText) {
-                completed = true;
-                send("completed", {
-                  responseId,
-                  conversationId,
-                  model,
-                  text: finalText,
-                });
-              }
-              return;
-            }
-
-            if (eventType === "error") {
-              send("error", {
-                message: extractErrorMessage(payload) || "OpenAI request failed.",
-              });
-            }
-          };
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            buffer = consumeStreamBuffer(buffer, handleBlock);
-          }
-
-          buffer += decoder.decode();
-          if (buffer.trim()) {
-            consumeStreamBuffer(`${buffer}\n\n`, handleBlock);
-          }
-
-          if (!completed && !upstreamAbortController.signal.aborted) {
-            let finalText = accumulatedText.trim();
-            if (!finalText && (sawCompletedEvent || conversationId)) {
-              try {
-                finalText = await getLatestConversationAssistantText(conversationId);
-              } catch (error) {
-                console.error("[openai-assistant] Failed to read conversation items", {
-                  conversationId,
-                  message: error instanceof Error ? error.message : "Unknown error",
-                });
-              }
-            }
-            if (!finalText) {
-              send("error", {
-                message: "OpenAI returned an empty response.",
-              });
-            } else {
-              send("completed", {
-                responseId,
-                conversationId,
-                model,
-                text: finalText,
-              });
-            }
+          if (!finalText) {
+            send("error", {
+              message: "OpenAI returned an empty response.",
+            });
+          } else {
+            send("delta", { text: finalText });
+            send("completed", {
+              responseId: null,
+              conversationId: null,
+              model,
+              text: finalText,
+            });
           }
         } catch (error) {
           if (!upstreamAbortController.signal.aborted) {
