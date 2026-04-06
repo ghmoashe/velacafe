@@ -104,6 +104,49 @@ function extractResponseText(payload: JsonRecord) {
   return chunks.join("\n").trim();
 }
 
+function extractMessageTextFromItem(item: unknown) {
+  if (!item || typeof item !== "object") {
+    return "";
+  }
+
+  const record = item as JsonRecord;
+  if (record.type !== "message" || !Array.isArray(record.content)) {
+    return "";
+  }
+
+  const chunks: string[] = [];
+  for (const contentItem of record.content) {
+    if (!contentItem || typeof contentItem !== "object") continue;
+    const part = contentItem as JsonRecord;
+    if (
+      (part.type === "output_text" || part.type === "text") &&
+      typeof part.text === "string" &&
+      part.text.trim()
+    ) {
+      chunks.push(part.text.trim());
+    }
+  }
+
+  return chunks.join("\n").trim();
+}
+
+function extractContentPartText(part: unknown) {
+  if (!part || typeof part !== "object") {
+    return "";
+  }
+
+  const record = part as JsonRecord;
+  if (
+    (record.type === "output_text" || record.type === "text") &&
+    typeof record.text === "string" &&
+    record.text.trim()
+  ) {
+    return record.text.trim();
+  }
+
+  return "";
+}
+
 function extractErrorMessage(payload: JsonRecord) {
   if (typeof payload.error === "string" && payload.error.trim()) {
     return payload.error.trim();
@@ -356,16 +399,38 @@ async function handleStreamingResponse(req: Request, input: {
               return;
             }
 
+            if (eventType === "response.content_part.done") {
+              const text = extractContentPartText(payload.part);
+              if (text && text.length > accumulatedText.length) {
+                accumulatedText = text;
+              }
+              return;
+            }
+
+            if (eventType === "response.output_item.done") {
+              const text = extractMessageTextFromItem(payload.item);
+              if (text && text.length > accumulatedText.length) {
+                accumulatedText = text;
+              }
+              return;
+            }
+
             if (eventType === "response.completed") {
               const finalText = meta.response
                 ? extractResponseText(meta.response) || accumulatedText.trim()
                 : accumulatedText.trim();
               completed = true;
-              send("completed", {
-                responseId,
-                model,
-                text: finalText,
-              });
+              if (!finalText) {
+                send("error", {
+                  message: "OpenAI returned an empty response.",
+                });
+              } else {
+                send("completed", {
+                  responseId,
+                  model,
+                  text: finalText,
+                });
+              }
               return;
             }
 
@@ -389,11 +454,18 @@ async function handleStreamingResponse(req: Request, input: {
           }
 
           if (!completed && !upstreamAbortController.signal.aborted) {
-            send("completed", {
-              responseId,
-              model,
-              text: accumulatedText.trim(),
-            });
+            const finalText = accumulatedText.trim();
+            if (!finalText) {
+              send("error", {
+                message: "OpenAI returned an empty response.",
+              });
+            } else {
+              send("completed", {
+                responseId,
+                model,
+                text: finalText,
+              });
+            }
           }
         } catch (error) {
           if (!upstreamAbortController.signal.aborted) {

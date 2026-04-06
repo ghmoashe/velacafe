@@ -8,7 +8,10 @@ import {
   type PointerEvent,
 } from "react";
 import { synthesizeElevenLabsSpeech } from "./elevenLabsTts";
-import { streamOpenAiAssistantReply } from "./openAiAssistant";
+import {
+  createOpenAiAssistantReply,
+  streamOpenAiAssistantReply,
+} from "./openAiAssistant";
 import { getVoiceAssistantText } from "./voiceAssistantText";
 
 type VoiceAssistantPageProps = {
@@ -225,6 +228,17 @@ function isAbortError(error: unknown) {
   );
 }
 
+function shouldFallbackToNonStream(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const normalized = error.message.trim().toLowerCase();
+  return (
+    normalized.includes("empty response") ||
+    normalized.includes("ended unexpectedly") ||
+    normalized.includes("stream failed") ||
+    normalized.includes("stream is unavailable")
+  );
+}
+
 export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   const {
     locale,
@@ -403,6 +417,22 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       streamAbortRef.current = abortController;
       let streamedText = "";
       let completed = false;
+      const finalizeReply = (value: string, responseId: string | null) => {
+        const finalText = value.trim();
+        previousResponseIdRef.current = responseId;
+        updateMessage(assistantMessageId, (message) => ({
+          ...message,
+          text: finalText,
+          pending: false,
+        }));
+        setThinking(false);
+        setStatusMessage(text.idle);
+        if (finalText) {
+          void speakReply(finalText, replyLocale);
+        } else {
+          setErrorMessage("AI returned an empty response.");
+        }
+      };
 
       try {
         await streamOpenAiAssistantReply(
@@ -424,20 +454,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
             onCompleted: (reply) => {
               completed = true;
               streamAbortRef.current = null;
-              previousResponseIdRef.current = reply.responseId;
-              const finalText = reply.text.trim() || streamedText.trim();
-              updateMessage(assistantMessageId, (message) => ({
-                ...message,
-                text: finalText,
-                pending: false,
-              }));
-              setThinking(false);
-              setStatusMessage(text.idle);
-              if (finalText) {
-                void speakReply(finalText, replyLocale);
-              } else {
-                setErrorMessage("AI returned an empty response.");
-              }
+              finalizeReply(reply.text.trim() || streamedText.trim(), reply.responseId);
             },
           }
         );
@@ -451,15 +468,44 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           setStatusMessage(text.idle);
         }
       } catch (error) {
-        streamAbortRef.current = null;
-        updateMessage(assistantMessageId, (message) =>
-          message.text.trim() ? { ...message, pending: false } : null
-        );
         if (isAbortError(error)) {
+          streamAbortRef.current = null;
+          updateMessage(assistantMessageId, (message) =>
+            message.text.trim() ? { ...message, pending: false } : null
+          );
           setThinking(false);
           setStatusMessage(text.idle);
           return;
         }
+
+        if (shouldFallbackToNonStream(error)) {
+          try {
+            const reply = await createOpenAiAssistantReply({
+              text: trimmedValue,
+              previousResponseId: previousResponseIdRef.current,
+              locale: replyLocale,
+            });
+            streamAbortRef.current = null;
+            finalizeReply(reply.text, reply.responseId);
+            return;
+          } catch (fallbackError) {
+            streamAbortRef.current = null;
+            updateMessage(assistantMessageId, (message) =>
+              message.text.trim() ? { ...message, pending: false } : null
+            );
+            setThinking(false);
+            setStatusMessage(text.idle);
+            setErrorMessage(
+              fallbackError instanceof Error ? fallbackError.message : "AI request failed."
+            );
+            return;
+          }
+        }
+
+        streamAbortRef.current = null;
+        updateMessage(assistantMessageId, (message) =>
+          message.text.trim() ? { ...message, pending: false } : null
+        );
         setThinking(false);
         setStatusMessage(text.idle);
         setErrorMessage(error instanceof Error ? error.message : "AI request failed.");
