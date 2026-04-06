@@ -13,6 +13,7 @@ import { getVoiceAssistantText } from "./voiceAssistantText";
 
 type VoiceAssistantPageProps = {
   locale: string;
+  languageOptions: Array<{ locale: string; label: string }>;
   preferredInputLocales: string[];
   guestMode: boolean;
   requireAuth: () => void;
@@ -225,14 +226,25 @@ function isAbortError(error: unknown) {
 }
 
 export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
-  const { locale, preferredInputLocales, guestMode, requireAuth } = props;
+  const {
+    locale,
+    languageOptions,
+    preferredInputLocales,
+    guestMode,
+    requireAuth,
+  } = props;
   const text = useMemo(() => getVoiceAssistantText(locale), [locale]);
+  const defaultConversationLocale = useMemo(
+    () => getPreferredConversationLocale(preferredInputLocales, locale),
+    [locale, preferredInputLocales]
+  );
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const previousResponseIdRef = useRef<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
   const conversationLocaleRef = useRef<string | null>(null);
+  const lastInputSourceRef = useRef<"text" | "speech">("text");
   const finalTranscriptRef = useRef("");
   const interimTranscriptRef = useRef("");
   const shouldSubmitSpeechRef = useRef(false);
@@ -240,6 +252,9 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   const [messages, setMessages] = useState<VoiceAssistantMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [interimTranscript, setInterimTranscript] = useState("");
+  const [selectedConversationLocale, setSelectedConversationLocale] = useState(
+    defaultConversationLocale
+  );
   const [statusMessage, setStatusMessage] = useState(text.idle);
   const [errorMessage, setErrorMessage] = useState("");
   const [listening, setListening] = useState(false);
@@ -249,6 +264,11 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     () => Boolean(getRecognitionConstructor()),
     []
   );
+
+  useEffect(() => {
+    setSelectedConversationLocale(defaultConversationLocale);
+    conversationLocaleRef.current = defaultConversationLocale;
+  }, [defaultConversationLocale]);
 
   const updateMessage = useCallback(
     (
@@ -343,7 +363,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   );
 
   const sendPrompt = useCallback(
-    async (rawValue: string) => {
+    async (rawValue: string, inputSource: "text" | "speech" = "text") => {
       const trimmedValue = rawValue.trim();
       if (!trimmedValue) {
         setErrorMessage(text.emptyPrompt);
@@ -363,12 +383,14 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       setInterimTranscript("");
       finalTranscriptRef.current = "";
       interimTranscriptRef.current = "";
-      const replyLocale = detectConversationLocale(
-        trimmedValue,
-        conversationLocaleRef.current ??
-          getPreferredConversationLocale(preferredInputLocales, locale)
-      );
+      const selectedLocale =
+        conversationLocaleRef.current ?? selectedConversationLocale ?? defaultConversationLocale;
+      const replyLocale =
+        inputSource === "speech"
+          ? selectedLocale
+          : detectConversationLocale(trimmedValue, selectedLocale);
       conversationLocaleRef.current = replyLocale;
+      lastInputSourceRef.current = inputSource;
 
       const assistantMessageId = buildId();
       setMessages((prev) => [
@@ -445,11 +467,12 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     },
     [
       guestMode,
-      locale,
       requireAuth,
       speakReply,
       stopAudioPlayback,
       stopReplyStream,
+      defaultConversationLocale,
+      selectedConversationLocale,
       text.emptyPrompt,
       text.idle,
       text.thinking,
@@ -490,10 +513,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     recognitionRef.current = recognition;
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = getSpeechLocale(
-      conversationLocaleRef.current ??
-        getPreferredConversationLocale(preferredInputLocales, locale)
-    );
+    recognition.lang = getSpeechLocale(selectedConversationLocale);
     recognition.maxAlternatives = 1;
     recognition.onstart = () => {
       setListening(true);
@@ -543,7 +563,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
 
       if (shouldSubmit && transcript) {
         setDraft(transcript);
-        void sendPrompt(transcript);
+        void sendPrompt(transcript, "speech");
         return;
       }
 
@@ -553,10 +573,9 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   }, [
     guestMode,
     listening,
-    locale,
-    preferredInputLocales,
     requireAuth,
     sendPrompt,
+    selectedConversationLocale,
     text.idle,
     text.releaseToSend,
     text.unsupportedBrowser,
@@ -583,6 +602,15 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     setDraft(event.target.value);
   }, []);
 
+  const handleConversationLocaleChange = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      const nextLocale = event.target.value.trim() || defaultConversationLocale;
+      setSelectedConversationLocale(nextLocale);
+      conversationLocaleRef.current = nextLocale;
+    },
+    [defaultConversationLocale]
+  );
+
   const handleClearConversation = useCallback(() => {
     stopReplyStream();
     setMessages([]);
@@ -590,7 +618,8 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     setInterimTranscript("");
     setErrorMessage("");
     previousResponseIdRef.current = null;
-    conversationLocaleRef.current = null;
+    conversationLocaleRef.current = selectedConversationLocale;
+    lastInputSourceRef.current = "text";
     finalTranscriptRef.current = "";
     interimTranscriptRef.current = "";
     shouldSubmitSpeechRef.current = false;
@@ -697,6 +726,24 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           <div className="voiceAssistantInterim">{interimTranscript}</div>
         ) : null}
 
+        <label className="label" htmlFor="voiceAssistantLocale">
+          {text.languageLabel}
+        </label>
+        <select
+          className="input"
+          id="voiceAssistantLocale"
+          value={selectedConversationLocale}
+          onChange={handleConversationLocaleChange}
+          disabled={thinking || listening}
+        >
+          {languageOptions.map((option) => (
+            <option key={option.locale} value={option.locale}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <div className="muted">{text.languageHint}</div>
+
         <label className="label" htmlFor="voiceAssistantDraft">
           {text.inputLabel}
         </label>
@@ -713,7 +760,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           <button
             className="btn"
             type="button"
-            onClick={() => void sendPrompt(draft)}
+            onClick={() => void sendPrompt(draft, "text")}
             disabled={thinking || listening}
           >
             {text.send}

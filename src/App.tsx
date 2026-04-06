@@ -6886,6 +6886,10 @@ export default function App() {
   };
   const voiceAssistantPageProps = {
     locale,
+    languageOptions: LANGUAGE_LIST.map((lang) => ({
+      locale: lang.locale,
+      label: languageLabels[lang.locale] ?? lang.label,
+    })),
     preferredInputLocales: [
       ...profileLearningLanguages,
       ...profilePracticeLanguages,

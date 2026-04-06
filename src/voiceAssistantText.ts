@@ -4,6 +4,8 @@ export type VoiceAssistantText = {
   subtitle: string;
   signInHint: string;
   unsupportedBrowser: string;
+  languageLabel: string;
+  languageHint: string;
   inputLabel: string;
   inputPlaceholder: string;
   holdToTalk: string;
@@ -26,6 +28,8 @@ const VOICE_ASSISTANT_TEXT: VoiceAssistantText = {
   signInHint: "Sign in to use the AI voice assistant.",
   unsupportedBrowser:
     "Speech recognition is available in supported browsers such as Chrome or Edge.",
+  languageLabel: "Conversation language",
+  languageHint: "Use the same language for microphone recognition, AI replies, and voice playback.",
   inputLabel: "Message",
   inputPlaceholder: "Type a message or use the microphone...",
   holdToTalk: "Hold to talk",
