@@ -3,6 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const openAiApiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
 const openAiModel = Deno.env.get("OPENAI_MODEL") ?? "gpt-5-mini";
+const openAiChatModel =
+  Deno.env.get("OPENAI_CHAT_MODEL") ??
+  (openAiModel.trim().toLowerCase().startsWith("gpt-5") ? "gpt-4.1-mini" : openAiModel);
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const corsHeaders = {
@@ -606,10 +609,10 @@ async function createOpenAiChatCompletion(input: {
       Authorization: `Bearer ${openAiApiKey.trim()}`,
     },
     body: JSON.stringify({
-      model: openAiModel.trim() || "gpt-5-mini",
+      model: openAiChatModel.trim() || "gpt-4.1-mini",
       messages: [
         {
-          role: "developer",
+          role: "system",
           content: buildInstructions(
             input.locale,
             input.levelRange,
@@ -622,7 +625,7 @@ async function createOpenAiChatCompletion(input: {
           content: input.input,
         },
       ],
-      max_completion_tokens: 180,
+      max_tokens: 180,
     }),
   });
 }
