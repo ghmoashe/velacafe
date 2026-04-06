@@ -620,7 +620,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       const replyLocale = selectedLocale;
       conversationLocaleRef.current = replyLocale;
       lastInputSourceRef.current = inputSource;
-      const useClientSideConversationContext = preferNonStreamingReplies;
+      const useClientSideConversationContext = true;
 
       const assistantMessageId = buildId();
       setMessages((prev) => [
