@@ -145,6 +145,23 @@ function getPreferredConversationLocale(preferredLocales: string[], fallbackLoca
   return firstPreferredLocale ?? fallbackLocale;
 }
 
+function shouldPreferNonStreamingReplies() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  const userAgent = navigator.userAgent;
+  const platform = navigator.platform ?? "";
+  const maxTouchPoints =
+    typeof navigator.maxTouchPoints === "number" ? navigator.maxTouchPoints : 0;
+  const isAppleMobileDevice =
+    /iPhone|iPad|iPod/i.test(userAgent) || (platform === "MacIntel" && maxTouchPoints > 1);
+  const isWebKitBrowser =
+    /AppleWebKit/i.test(userAgent) && !/CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo/i.test(userAgent);
+
+  return isAppleMobileDevice && isWebKitBrowser;
+}
+
 function isConversationLevelOption(value: string): value is ConversationLevelOption {
   return (CONVERSATION_LEVEL_OPTIONS as readonly string[]).includes(value);
 }
@@ -311,6 +328,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     () => getDefaultConversationLevel(profileLevel),
     [profileLevel]
   );
+  const preferNonStreamingReplies = useMemo(() => shouldPreferNonStreamingReplies(), []);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const previousResponseIdRef = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -589,6 +607,16 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         { id: assistantMessageId, role: "assistant", text: "", pending: true },
       ]);
 
+      const assistantRequest = {
+        text: trimmedValue,
+        previousResponseId: previousResponseIdRef.current,
+        locale: replyLocale,
+        levelRange: selectedConversationLevel,
+        nativeHelp:
+          canUseNativeHelp && nativeHelpEnabled && Boolean(nativeLocale?.trim()),
+        nativeLocale: nativeLocale?.trim() || undefined,
+      };
+
       const abortController = new AbortController();
       streamAbortRef.current = abortController;
       let streamedText = "";
@@ -611,16 +639,15 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       };
 
       try {
+        if (preferNonStreamingReplies) {
+          const reply = await createOpenAiAssistantReply(assistantRequest);
+          streamAbortRef.current = null;
+          finalizeReply(reply.text, reply.responseId);
+          return;
+        }
+
         await streamOpenAiAssistantReply(
-          {
-            text: trimmedValue,
-            previousResponseId: previousResponseIdRef.current,
-            locale: replyLocale,
-            levelRange: selectedConversationLevel,
-            nativeHelp:
-              canUseNativeHelp && nativeHelpEnabled && Boolean(nativeLocale?.trim()),
-            nativeLocale: nativeLocale?.trim() || undefined,
-          },
+          assistantRequest,
           {
             signal: abortController.signal,
             onDelta: (delta) => {
@@ -660,15 +687,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
 
         if (shouldFallbackToNonStream(error)) {
           try {
-            const reply = await createOpenAiAssistantReply({
-              text: trimmedValue,
-              previousResponseId: previousResponseIdRef.current,
-              locale: replyLocale,
-              levelRange: selectedConversationLevel,
-              nativeHelp:
-                canUseNativeHelp && nativeHelpEnabled && Boolean(nativeLocale?.trim()),
-              nativeLocale: nativeLocale?.trim() || undefined,
-            });
+            const reply = await createOpenAiAssistantReply(assistantRequest);
             streamAbortRef.current = null;
             finalizeReply(reply.text, reply.responseId);
             return;
@@ -708,6 +727,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       canUseNativeHelp,
       nativeHelpEnabled,
       nativeLocale,
+      preferNonStreamingReplies,
       text.emptyPrompt,
       text.idle,
       text.thinking,
