@@ -10,6 +10,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 const textEncoder = new TextEncoder();
+const OPENAI_RETRY_STATUSES = new Set([408, 409, 429, 500, 502, 503, 504]);
+const OPENAI_MAX_RETRIES = 3;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -22,6 +24,98 @@ function json(status: number, body: unknown) {
 
 function sse(eventType: string, payload: unknown) {
   return textEncoder.encode(`event: ${eventType}\ndata: ${JSON.stringify(payload)}\n\n`);
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException
+    ? error.name === "AbortError"
+    : error instanceof Error && error.name === "AbortError";
+}
+
+function shouldRetryOpenAiStatus(status: number) {
+  return OPENAI_RETRY_STATUSES.has(status);
+}
+
+function parseRetryDelayMs(retryAfterHeader: string | null, attemptIndex: number) {
+  const retryAfter = retryAfterHeader?.trim() ?? "";
+  const asSeconds = Number(retryAfter);
+  if (Number.isFinite(asSeconds) && asSeconds > 0) {
+    return Math.min(asSeconds * 1000, 5000);
+  }
+
+  return Math.min(300 * 2 ** attemptIndex, 2000);
+}
+
+async function waitBeforeRetry(delayMs: number, signal?: AbortSignal) {
+  if (delayMs <= 0) return;
+
+  await new Promise<void>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      signal?.removeEventListener("abort", handleAbort);
+      resolve();
+    }, delayMs);
+
+    const handleAbort = () => {
+      clearTimeout(timeoutId);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+
+    if (signal?.aborted) {
+      handleAbort();
+      return;
+    }
+
+    signal?.addEventListener("abort", handleAbort, { once: true });
+  });
+}
+
+function getOpenAiErrorMessage(status: number, payload: JsonRecord, fallback: string) {
+  const message = extractErrorMessage(payload);
+  if (message && status < 500 && status !== 429) {
+    return message;
+  }
+
+  if (status === 429) {
+    return "OpenAI rate limit was reached. Please try again in a moment.";
+  }
+
+  if (status >= 500) {
+    return "OpenAI is temporarily unavailable. Please try again.";
+  }
+
+  return message || fallback;
+}
+
+async function fetchOpenAiWithRetry(
+  url: string,
+  init: RequestInit & { signal?: AbortSignal }
+) {
+  let lastError: unknown = null;
+
+  for (let attemptIndex = 0; attemptIndex < OPENAI_MAX_RETRIES; attemptIndex += 1) {
+    try {
+      const response = await fetch(url, init);
+      if (
+        !shouldRetryOpenAiStatus(response.status) ||
+        attemptIndex === OPENAI_MAX_RETRIES - 1
+      ) {
+        return response;
+      }
+
+      await waitBeforeRetry(
+        parseRetryDelayMs(response.headers.get("retry-after"), attemptIndex),
+        init.signal
+      );
+    } catch (error) {
+      if (isAbortError(error) || attemptIndex === OPENAI_MAX_RETRIES - 1) {
+        throw error;
+      }
+      lastError = error;
+      await waitBeforeRetry(parseRetryDelayMs(null, attemptIndex), init.signal);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("OpenAI request failed.");
 }
 
 async function requireUser(req: Request) {
@@ -224,7 +318,7 @@ function extractConversationMessageText(item: unknown) {
 }
 
 async function getLatestConversationAssistantText(conversationId: string) {
-  const response = await fetch(
+  const response = await fetchOpenAiWithRetry(
     `https://api.openai.com/v1/conversations/${encodeURIComponent(conversationId)}/items`,
     {
       method: "GET",
@@ -236,9 +330,11 @@ async function getLatestConversationAssistantText(conversationId: string) {
 
   const payload = (await response.json().catch(() => ({}))) as JsonRecord;
   if (!response.ok) {
-    throw new Error(
-      extractErrorMessage(payload) || "OpenAI conversation items request failed."
-    );
+    throw new Error(getOpenAiErrorMessage(
+      response.status,
+      payload,
+      "OpenAI conversation items request failed."
+    ));
   }
 
   const items = Array.isArray(payload.data)
@@ -419,7 +515,7 @@ async function createOpenAiResponse(input: {
   signal?: AbortSignal;
   stream?: boolean;
 }) {
-  return fetch("https://api.openai.com/v1/responses", {
+  return fetchOpenAiWithRetry("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -434,7 +530,7 @@ async function createConversation(input: {
   userId: string;
   locale: string;
 }) {
-  const response = await fetch("https://api.openai.com/v1/conversations", {
+  const response = await fetchOpenAiWithRetry("https://api.openai.com/v1/conversations", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -451,7 +547,9 @@ async function createConversation(input: {
 
   const payload = (await response.json().catch(() => ({}))) as JsonRecord;
   if (!response.ok) {
-    throw new Error(extractErrorMessage(payload) || "OpenAI conversation creation failed.");
+    throw new Error(
+      getOpenAiErrorMessage(response.status, payload, "OpenAI conversation creation failed.")
+    );
   }
 
   const conversationId = typeof payload.id === "string" ? payload.id.trim() : "";
@@ -469,7 +567,7 @@ async function createOpenAiChatCompletion(input: {
   nativeHelp: boolean;
   nativeLocale: string;
 }) {
-  return fetch("https://api.openai.com/v1/chat/completions", {
+  return fetchOpenAiWithRetry("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -533,7 +631,11 @@ async function handleJsonResponse(input: {
     const payload = (await response.json().catch(() => ({}))) as JsonRecord;
     if (!response.ok) {
       lastStatus = response.status;
-      lastErrorMessage = extractErrorMessage(payload) || "OpenAI request failed.";
+      lastErrorMessage = getOpenAiErrorMessage(
+        response.status,
+        payload,
+        "OpenAI request failed."
+      );
       continue;
     }
 
@@ -586,8 +688,11 @@ async function handleJsonResponse(input: {
     }
   } else {
     lastStatus = fallbackResponse.status;
-    lastErrorMessage =
-      extractErrorMessage(fallbackPayload) || "OpenAI chat completion failed.";
+    lastErrorMessage = getOpenAiErrorMessage(
+      fallbackResponse.status,
+      fallbackPayload,
+      "OpenAI chat completion failed."
+    );
   }
 
   return json(lastStatus, { error: lastErrorMessage });
@@ -646,7 +751,11 @@ async function handleStreamingResponse(req: Request, input: {
           if (!response.ok) {
             const payload = (await response.json().catch(() => ({}))) as JsonRecord;
             send("error", {
-              message: extractErrorMessage(payload) || "OpenAI request failed.",
+              message: getOpenAiErrorMessage(
+                response.status,
+                payload,
+                "OpenAI request failed."
+              ),
             });
             close();
             return;
