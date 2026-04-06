@@ -81,8 +81,9 @@ function getLanguageName(locale: string) {
 }
 
 function extractResponseText(payload: JsonRecord) {
-  if (typeof payload.output_text === "string" && payload.output_text.trim()) {
-    return payload.output_text.trim();
+  const directOutputText = extractTextValue(payload.output_text);
+  if (directOutputText) {
+    return directOutputText;
   }
 
   if (payload.response && typeof payload.response === "object") {
@@ -102,13 +103,14 @@ function extractResponseText(payload: JsonRecord) {
     };
     if (candidate.type !== "message" || !Array.isArray(candidate.content)) continue;
     for (const contentItem of candidate.content) {
+      if (!contentItem) continue;
+      const text = extractTextValue((contentItem as JsonRecord).text);
       if (
-        contentItem &&
-        (contentItem.type === "output_text" || contentItem.type === "text") &&
-        typeof contentItem.text === "string" &&
-        contentItem.text.trim()
+        ((contentItem as JsonRecord).type === "output_text" ||
+          (contentItem as JsonRecord).type === "text") &&
+        text
       ) {
-        chunks.push(contentItem.text.trim());
+        chunks.push(text);
       }
     }
   }
@@ -129,12 +131,9 @@ function extractMessageTextFromItem(item: unknown) {
   for (const contentItem of record.content) {
     if (!contentItem || typeof contentItem !== "object") continue;
     const part = contentItem as JsonRecord;
-    if (
-      (part.type === "output_text" || part.type === "text") &&
-      typeof part.text === "string" &&
-      part.text.trim()
-    ) {
-      chunks.push(part.text.trim());
+    const text = extractTextValue(part.text);
+    if ((part.type === "output_text" || part.type === "text") && text) {
+      chunks.push(text);
     }
   }
 
@@ -147,14 +146,53 @@ function extractContentPartText(part: unknown) {
   }
 
   const record = part as JsonRecord;
-  if (
-    (record.type === "output_text" || record.type === "text") &&
-    typeof record.text === "string" &&
-    record.text.trim()
-  ) {
+  const text = extractTextValue(record.text);
+  if ((record.type === "output_text" || record.type === "text") && text) {
+    return text;
+  }
+
+  return "";
+}
+
+function extractTextValue(value: unknown): string {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  if (Array.isArray(value)) {
+    const chunks = value
+      .map((item) => extractTextValue(item))
+      .filter(Boolean);
+    return chunks.join("\n").trim();
+  }
+
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+
+  const record = value as JsonRecord;
+  if (typeof record.value === "string" && record.value.trim()) {
+    return record.value.trim();
+  }
+  if (typeof record.text === "string" && record.text.trim()) {
     return record.text.trim();
   }
 
+  return "";
+}
+
+function extractChatCompletionText(payload: JsonRecord) {
+  const choices = Array.isArray(payload.choices) ? payload.choices : [];
+  for (const choice of choices) {
+    if (!choice || typeof choice !== "object") continue;
+    const message = (choice as JsonRecord).message;
+    if (!message || typeof message !== "object") continue;
+    const content = (message as JsonRecord).content;
+    const text = extractTextValue(content);
+    if (text) {
+      return text;
+    }
+  }
   return "";
 }
 
@@ -330,6 +368,41 @@ async function createOpenAiResponse(input: {
   });
 }
 
+async function createOpenAiChatCompletion(input: {
+  input: string;
+  locale: string;
+  levelRange: string;
+  nativeHelp: boolean;
+  nativeLocale: string;
+}) {
+  return fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${openAiApiKey.trim()}`,
+    },
+    body: JSON.stringify({
+      model: openAiModel.trim() || "gpt-5-mini",
+      messages: [
+        {
+          role: "developer",
+          content: buildInstructions(
+            input.locale,
+            input.levelRange,
+            input.nativeHelp,
+            input.nativeLocale
+          ),
+        },
+        {
+          role: "user",
+          content: input.input,
+        },
+      ],
+      max_completion_tokens: 180,
+    }),
+  });
+}
+
 async function handleJsonResponse(input: {
   input: string;
   previousResponseId: string | null;
@@ -377,6 +450,31 @@ async function handleJsonResponse(input: {
       model: meta.model,
       userId: input.userId,
     });
+  }
+
+  const fallbackResponse = await createOpenAiChatCompletion({
+    input: input.input,
+    locale: input.locale,
+    levelRange: input.levelRange,
+    nativeHelp: input.nativeHelp,
+    nativeLocale: input.nativeLocale,
+  });
+  const fallbackPayload = (await fallbackResponse.json().catch(() => ({}))) as JsonRecord;
+  if (fallbackResponse.ok) {
+    const fallbackText = extractChatCompletionText(fallbackPayload);
+    if (fallbackText) {
+      return json(200, {
+        responseId: null,
+        text: fallbackText,
+        model:
+          typeof fallbackPayload.model === "string" ? fallbackPayload.model : null,
+        userId: input.userId,
+      });
+    }
+  } else {
+    lastStatus = fallbackResponse.status;
+    lastErrorMessage =
+      extractErrorMessage(fallbackPayload) || "OpenAI chat completion failed.";
   }
 
   return json(lastStatus, { error: lastErrorMessage });
