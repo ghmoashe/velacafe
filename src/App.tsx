@@ -6884,18 +6884,36 @@ export default function App() {
     goToOrganizer,
     sharePath: ROUTE_PATHS.shorts,
   };
+  const voiceConversationLocales = [
+    ...profileLearningLanguages.slice(0, 2),
+    ...(profileLanguage ? [profileLanguage] : []),
+  ].filter((value, index, array) => array.indexOf(value) === index);
   const voiceAssistantPageProps = {
     locale,
-    languageOptions: LANGUAGE_LIST.map((lang) => ({
-      locale: lang.locale,
-      label: languageLabels[lang.locale] ?? lang.label,
-    })),
-    preferredInputLocales: [
-      ...profileLearningLanguages,
-      ...profilePracticeLanguages,
-      ...(profileLanguage ? [profileLanguage] : []),
-      locale,
-    ].filter((value, index, array) => array.indexOf(value) === index),
+    languageOptions: (voiceConversationLocales.length
+      ? voiceConversationLocales
+      : [profileLanguage || locale]
+    ).map((voiceLocale) => {
+      const matchingLanguage = LANGUAGE_LIST.find((lang) => lang.locale === voiceLocale);
+      return {
+        locale: voiceLocale,
+        label:
+          languageLabels[voiceLocale] ??
+          matchingLanguage?.label ??
+          voiceLocale,
+      };
+    }),
+    preferredInputLocales: voiceConversationLocales.length
+      ? voiceConversationLocales
+      : [profileLanguage || locale],
+    profileLevel,
+    nativeLocale: profileLanguage || null,
+    nativeLanguageLabel:
+      (profileLanguage &&
+        (languageLabels[profileLanguage] ??
+          LANGUAGE_LIST.find((lang) => lang.locale === profileLanguage)?.label ??
+          profileLanguage)) ||
+      null,
     guestMode,
     requireAuth: () => redirectToLoginWithIntent({ route: "voice" }),
   };

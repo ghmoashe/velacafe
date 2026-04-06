@@ -18,6 +18,9 @@ type VoiceAssistantPageProps = {
   locale: string;
   languageOptions: Array<{ locale: string; label: string }>;
   preferredInputLocales: string[];
+  profileLevel?: string;
+  nativeLocale?: string | null;
+  nativeLanguageLabel?: string | null;
   guestMode: boolean;
   requireAuth: () => void;
 };
@@ -72,6 +75,22 @@ type SpeechWindow = Window & {
 const SILENT_WAV_DATA_URI =
   "data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YS4AAAAA";
 
+const CONVERSATION_LEVEL_OPTIONS = [
+  "A1-A2",
+  "A2-B1",
+  "B1-B2",
+  "B2-C1",
+  "C1-C2",
+  "A1",
+  "A2",
+  "B1",
+  "B2",
+  "C1",
+  "C2",
+] as const;
+
+type ConversationLevelOption = (typeof CONVERSATION_LEVEL_OPTIONS)[number];
+
 function buildId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -124,6 +143,28 @@ function getSpeechLocale(locale: string) {
 function getPreferredConversationLocale(preferredLocales: string[], fallbackLocale: string) {
   const firstPreferredLocale = preferredLocales.find((value) => value.trim());
   return firstPreferredLocale ?? fallbackLocale;
+}
+
+function isConversationLevelOption(value: string): value is ConversationLevelOption {
+  return (CONVERSATION_LEVEL_OPTIONS as readonly string[]).includes(value);
+}
+
+function getDefaultConversationLevel(profileLevel?: string) {
+  switch (profileLevel?.trim().toUpperCase()) {
+    case "A1":
+    case "A2":
+      return "A1-A2";
+    case "B1":
+      return "A2-B1";
+    case "B2":
+      return "B1-B2";
+    case "C1":
+      return "B2-C1";
+    case "C2":
+      return "C1-C2";
+    default:
+      return "A1-A2";
+  }
 }
 
 function hasAnyMatch(value: string, patterns: string[]) {
@@ -214,6 +255,7 @@ function detectConversationLocale(text: string, fallbackLocale: string) {
 
   return fallbackLocale;
 }
+void detectConversationLocale;
 
 function trimForSpeech(text: string) {
   const normalized = text.replace(/\s+/g, " ").trim();
@@ -254,6 +296,9 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     locale,
     languageOptions,
     preferredInputLocales,
+    profileLevel,
+    nativeLocale,
+    nativeLanguageLabel,
     guestMode,
     requireAuth,
   } = props;
@@ -261,6 +306,10 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   const defaultConversationLocale = useMemo(
     () => getPreferredConversationLocale(preferredInputLocales, locale),
     [locale, preferredInputLocales]
+  );
+  const defaultConversationLevel = useMemo(
+    () => getDefaultConversationLevel(profileLevel),
+    [profileLevel]
   );
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const previousResponseIdRef = useRef<string | null>(null);
@@ -282,6 +331,12 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   const [selectedConversationLocale, setSelectedConversationLocale] = useState(
     defaultConversationLocale
   );
+  const [selectedConversationLevel, setSelectedConversationLevel] = useState<ConversationLevelOption>(
+    defaultConversationLevel
+  );
+  const [nativeHelpEnabled, setNativeHelpEnabled] = useState(
+    Boolean(nativeLocale && nativeLocale !== defaultConversationLocale)
+  );
   const [statusMessage, setStatusMessage] = useState(text.idle);
   const [errorMessage, setErrorMessage] = useState("");
   const [listening, setListening] = useState(false);
@@ -296,6 +351,18 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     setSelectedConversationLocale(defaultConversationLocale);
     conversationLocaleRef.current = defaultConversationLocale;
   }, [defaultConversationLocale]);
+
+  useEffect(() => {
+    setSelectedConversationLevel(defaultConversationLevel);
+  }, [defaultConversationLevel]);
+
+  useEffect(() => {
+    setNativeHelpEnabled(Boolean(nativeLocale && nativeLocale !== defaultConversationLocale));
+  }, [defaultConversationLocale, nativeLocale]);
+
+  const canUseNativeHelp = Boolean(
+    nativeLocale && nativeLocale.trim() && nativeLocale !== selectedConversationLocale
+  );
 
   const updateMessage = useCallback(
     (
@@ -511,10 +578,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       interimTranscriptRef.current = "";
       const selectedLocale =
         conversationLocaleRef.current ?? selectedConversationLocale ?? defaultConversationLocale;
-      const replyLocale =
-        inputSource === "speech"
-          ? selectedLocale
-          : detectConversationLocale(trimmedValue, selectedLocale);
+      const replyLocale = selectedLocale;
       conversationLocaleRef.current = replyLocale;
       lastInputSourceRef.current = inputSource;
 
@@ -552,6 +616,10 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
             text: trimmedValue,
             previousResponseId: previousResponseIdRef.current,
             locale: replyLocale,
+            levelRange: selectedConversationLevel,
+            nativeHelp:
+              canUseNativeHelp && nativeHelpEnabled && Boolean(nativeLocale?.trim()),
+            nativeLocale: nativeLocale?.trim() || undefined,
           },
           {
             signal: abortController.signal,
@@ -596,6 +664,10 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
               text: trimmedValue,
               previousResponseId: previousResponseIdRef.current,
               locale: replyLocale,
+              levelRange: selectedConversationLevel,
+              nativeHelp:
+                canUseNativeHelp && nativeHelpEnabled && Boolean(nativeLocale?.trim()),
+              nativeLocale: nativeLocale?.trim() || undefined,
             });
             streamAbortRef.current = null;
             finalizeReply(reply.text, reply.responseId);
@@ -632,6 +704,10 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       stopReplyStream,
       defaultConversationLocale,
       selectedConversationLocale,
+      selectedConversationLevel,
+      canUseNativeHelp,
+      nativeHelpEnabled,
+      nativeLocale,
       text.emptyPrompt,
       text.idle,
       text.thinking,
@@ -785,9 +861,26 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       const nextLocale = event.target.value.trim() || defaultConversationLocale;
       setSelectedConversationLocale(nextLocale);
       conversationLocaleRef.current = nextLocale;
+      if (nativeLocale && nextLocale === nativeLocale) {
+        setNativeHelpEnabled(false);
+      }
     },
-    [defaultConversationLocale]
+    [defaultConversationLocale, nativeLocale]
   );
+
+  const handleConversationLevelChange = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      const nextLevel = event.target.value.trim().toUpperCase();
+      setSelectedConversationLevel(
+        isConversationLevelOption(nextLevel) ? nextLevel : defaultConversationLevel
+      );
+    },
+    [defaultConversationLevel]
+  );
+
+  const handleNativeHelpChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setNativeHelpEnabled(event.target.checked);
+  }, []);
 
   const handleClearConversation = useCallback(() => {
     stopReplyStream();
@@ -923,6 +1016,48 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           ))}
         </select>
         <div className="muted">{text.languageHint}</div>
+
+        <label className="label" htmlFor="voiceAssistantLevel">
+          {text.levelLabel}
+        </label>
+        <select
+          className="input"
+          id="voiceAssistantLevel"
+          value={selectedConversationLevel}
+          onChange={handleConversationLevelChange}
+          disabled={thinking || listening}
+        >
+          {CONVERSATION_LEVEL_OPTIONS.map((levelOption) => (
+            <option key={levelOption} value={levelOption}>
+              {levelOption}
+            </option>
+          ))}
+        </select>
+        <div className="muted">{text.levelHint}</div>
+
+        {nativeLocale?.trim() ? (
+          <label className="voiceAssistantToggle">
+            <input
+              type="checkbox"
+              checked={canUseNativeHelp && nativeHelpEnabled}
+              onChange={handleNativeHelpChange}
+              disabled={!canUseNativeHelp || thinking || listening}
+            />
+            <span>
+              {text.nativeHelpLabel.replace(
+                "{language}",
+                nativeLanguageLabel?.trim() || nativeLocale
+              )}
+            </span>
+          </label>
+        ) : null}
+        {nativeLocale?.trim() ? (
+          <div className="muted">
+            {canUseNativeHelp
+              ? text.nativeHelpHint
+              : text.nativeHelpUnavailable}
+          </div>
+        ) : null}
 
         <label className="label" htmlFor="voiceAssistantDraft">
           {text.inputLabel}

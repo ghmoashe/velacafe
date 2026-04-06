@@ -247,13 +247,39 @@ function extractResponseMeta(payload: JsonRecord) {
   };
 }
 
-function buildInstructions(locale: string) {
+function buildLevelInstruction(levelRange: string) {
+  const normalizedLevelRange = levelRange.trim().toUpperCase();
+  if (!normalizedLevelRange) {
+    return "Use simple, learner-friendly language.";
+  }
+  if (normalizedLevelRange.includes("-")) {
+    return `Keep the reply within CEFR ${normalizedLevelRange}. Use vocabulary and grammar that fit this learner range, and avoid jumping above it.`;
+  }
+  return `Keep the reply within CEFR ${normalizedLevelRange}. Use vocabulary and grammar that fit this level, and avoid going above it.`;
+}
+
+function buildNativeHelpInstruction(nativeHelp: boolean, nativeLocale: string) {
+  if (!nativeHelp || !nativeLocale.trim()) {
+    return "Do not switch away from the selected learning language unless the user explicitly requests it.";
+  }
+  return `Keep the main reply in the selected learning language. Use ${getLanguageName(
+    nativeLocale
+  )} only for brief translations or short clarifications when truly useful.`;
+}
+
+function buildInstructions(
+  locale: string,
+  levelRange: string,
+  nativeHelp: boolean,
+  nativeLocale: string
+) {
   return [
     "You are the Vela Language Cafe AI voice assistant.",
     "Help with language learning, speaking practice, the app, events, organizers, and general conversation.",
-    "Reply in the same language as the latest user message.",
-    "If the latest user message is very short or ambiguous, continue in the established conversation language.",
-    `Use ${getLanguageName(locale)} only as a fallback when the conversation language is still unclear.`,
+    `Reply only in ${getLanguageName(locale)} unless the user explicitly asks to switch the conversation language.`,
+    "Treat the selected conversation language as the active learning language for this chat.",
+    buildLevelInstruction(levelRange),
+    buildNativeHelpInstruction(nativeHelp, nativeLocale),
     "Keep replies natural for speech, plain text only, and usually under two short sentences.",
   ].join(" ");
 }
@@ -262,14 +288,23 @@ function buildOpenAiRequestBody(input: {
   input: string;
   previousResponseId: string | null;
   locale: string;
+  levelRange: string;
+  nativeHelp: boolean;
+  nativeLocale: string;
   stream?: boolean;
 }) {
   return {
     model: openAiModel.trim() || "gpt-5-mini",
     input: input.input,
-    instructions: buildInstructions(input.locale),
+    instructions: buildInstructions(
+      input.locale,
+      input.levelRange,
+      input.nativeHelp,
+      input.nativeLocale
+    ),
     previous_response_id: input.previousResponseId ?? undefined,
     max_output_tokens: 180,
+    store: true,
     stream: input.stream === true ? true : undefined,
   };
 }
@@ -278,6 +313,9 @@ async function createOpenAiResponse(input: {
   input: string;
   previousResponseId: string | null;
   locale: string;
+  levelRange: string;
+  nativeHelp: boolean;
+  nativeLocale: string;
   signal?: AbortSignal;
   stream?: boolean;
 }) {
@@ -296,53 +334,61 @@ async function handleJsonResponse(input: {
   input: string;
   previousResponseId: string | null;
   locale: string;
+  levelRange: string;
+  nativeHelp: boolean;
+  nativeLocale: string;
   userId: string;
 }) {
-  let response = await createOpenAiResponse({
-    input: input.input,
-    previousResponseId: input.previousResponseId,
-    locale: input.locale,
-  });
+  const attempts = input.previousResponseId
+    ? [input.previousResponseId, null]
+    : [null];
 
-  let payload = (await response.json().catch(() => ({}))) as JsonRecord;
-  if (!response.ok) {
-    return json(response.status, {
-      error: extractErrorMessage(payload) || "OpenAI request failed.",
-    });
-  }
+  let lastStatus = 500;
+  let lastErrorMessage = "OpenAI returned an empty response.";
 
-  let replyText = extractResponseText(payload);
-  if (!replyText && input.previousResponseId) {
-    response = await createOpenAiResponse({
+  for (const previousResponseId of attempts) {
+    const response = await createOpenAiResponse({
       input: input.input,
-      previousResponseId: null,
+      previousResponseId,
       locale: input.locale,
+      levelRange: input.levelRange,
+      nativeHelp: input.nativeHelp,
+      nativeLocale: input.nativeLocale,
     });
-    payload = (await response.json().catch(() => ({}))) as JsonRecord;
+
+    const payload = (await response.json().catch(() => ({}))) as JsonRecord;
     if (!response.ok) {
-      return json(response.status, {
-        error: extractErrorMessage(payload) || "OpenAI request failed.",
-      });
+      lastStatus = response.status;
+      lastErrorMessage = extractErrorMessage(payload) || "OpenAI request failed.";
+      continue;
     }
-    replyText = extractResponseText(payload);
+
+    const replyText = extractResponseText(payload);
+    if (!replyText) {
+      lastStatus = 500;
+      lastErrorMessage = "OpenAI returned an empty response.";
+      continue;
+    }
+
+    const meta = extractResponseMeta(payload);
+    return json(200, {
+      responseId: meta.responseId,
+      text: replyText,
+      model: meta.model,
+      userId: input.userId,
+    });
   }
 
-  if (!replyText) {
-    return json(500, { error: "OpenAI returned an empty response." });
-  }
-
-  return json(200, {
-    responseId: typeof payload.id === "string" ? payload.id : null,
-    text: replyText,
-    model: typeof payload.model === "string" ? payload.model : null,
-    userId: input.userId,
-  });
+  return json(lastStatus, { error: lastErrorMessage });
 }
 
 async function handleStreamingResponse(req: Request, input: {
   input: string;
   previousResponseId: string | null;
   locale: string;
+  levelRange: string;
+  nativeHelp: boolean;
+  nativeLocale: string;
 }) {
   const upstreamAbortController = new AbortController();
   req.signal.addEventListener("abort", () => upstreamAbortController.abort(), {
@@ -372,6 +418,9 @@ async function handleStreamingResponse(req: Request, input: {
             input: input.input,
             previousResponseId: input.previousResponseId,
             locale: input.locale,
+            levelRange: input.levelRange,
+            nativeHelp: input.nativeHelp,
+            nativeLocale: input.nativeLocale,
             signal: upstreamAbortController.signal,
             stream: true,
           });
@@ -549,6 +598,15 @@ Deno.serve(async (req) => {
         : null;
     const locale =
       typeof body.locale === "string" && body.locale.trim() ? body.locale.trim() : "en";
+    const levelRange =
+      typeof body.levelRange === "string" && body.levelRange.trim()
+        ? body.levelRange.trim().toUpperCase()
+        : "A1-A2";
+    const nativeHelp = body.nativeHelp === true;
+    const nativeLocale =
+      typeof body.nativeLocale === "string" && body.nativeLocale.trim()
+        ? body.nativeLocale.trim()
+        : "";
 
     if (!input) {
       return json(400, { error: "Input text is required." });
@@ -559,6 +617,9 @@ Deno.serve(async (req) => {
         input,
         previousResponseId,
         locale,
+        levelRange,
+        nativeHelp,
+        nativeLocale,
       });
     }
 
@@ -566,6 +627,9 @@ Deno.serve(async (req) => {
       input,
       previousResponseId,
       locale,
+      levelRange,
+      nativeHelp,
+      nativeLocale,
       userId: user.id,
     });
   } catch (error) {

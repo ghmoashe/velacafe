@@ -6293,6 +6293,22 @@ button:focus-visible {
   line-height: 1.5;
 }
 
+.voiceAssistantToggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(234, 222, 211, 0.92);
+  background: rgba(255, 255, 255, 0.78);
+  color: #4d3526;
+  line-height: 1.5;
+}
+
+.voiceAssistantToggle input {
+  margin-top: 3px;
+}
+
 .voiceAssistantSendRow {
   display: flex;
   justify-content: flex-end;

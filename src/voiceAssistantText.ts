@@ -6,6 +6,11 @@ export type VoiceAssistantText = {
   unsupportedBrowser: string;
   languageLabel: string;
   languageHint: string;
+  levelLabel: string;
+  levelHint: string;
+  nativeHelpLabel: string;
+  nativeHelpHint: string;
+  nativeHelpUnavailable: string;
   inputLabel: string;
   inputPlaceholder: string;
   holdToTalk: string;
@@ -29,7 +34,16 @@ const VOICE_ASSISTANT_TEXT: VoiceAssistantText = {
   unsupportedBrowser:
     "Speech recognition is available in supported browsers such as Chrome or Edge.",
   languageLabel: "Conversation language",
-  languageHint: "Use the same language for microphone recognition, AI replies, and voice playback.",
+  languageHint:
+    "Only your learning language and native language appear here, with a maximum of three choices.",
+  levelLabel: "Conversation level",
+  levelHint:
+    "Choose one level or a close CEFR range such as A1-A2 or A2-B1. AI replies will stay on that level.",
+  nativeHelpLabel: "Native help ({language})",
+  nativeHelpHint:
+    "The main conversation stays in your learning language. AI may add short explanations in your native language when useful.",
+  nativeHelpUnavailable:
+    "Native help is unavailable when the conversation language is the same as your native language.",
   inputLabel: "Message",
   inputPlaceholder: "Type a message or use the microphone...",
   holdToTalk: "Hold to talk",

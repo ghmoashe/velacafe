@@ -117,6 +117,9 @@ export async function createOpenAiAssistantReply(input: {
   text: string;
   previousResponseId?: string | null;
   locale?: string;
+  levelRange?: string;
+  nativeHelp?: boolean;
+  nativeLocale?: string;
 }) {
   if (!SUPABASE_ANON_KEY.trim()) {
     throw new Error("Supabase is not configured.");
@@ -134,6 +137,9 @@ export async function createOpenAiAssistantReply(input: {
       input: input.text,
       previousResponseId: input.previousResponseId,
       locale: input.locale,
+      levelRange: input.levelRange,
+      nativeHelp: input.nativeHelp,
+      nativeLocale: input.nativeLocale,
     }),
   });
 
@@ -149,6 +155,9 @@ export async function streamOpenAiAssistantReply(
     text: string;
     previousResponseId?: string | null;
     locale?: string;
+    levelRange?: string;
+    nativeHelp?: boolean;
+    nativeLocale?: string;
   },
   handlers: {
     signal?: AbortSignal;
@@ -173,6 +182,9 @@ export async function streamOpenAiAssistantReply(
       input: input.text,
       previousResponseId: input.previousResponseId,
       locale: input.locale,
+      levelRange: input.levelRange,
+      nativeHelp: input.nativeHelp,
+      nativeLocale: input.nativeLocale,
     }),
     signal: handlers.signal,
   });
