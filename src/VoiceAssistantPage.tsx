@@ -289,6 +289,27 @@ function trimForSpeech(text: string) {
   return `${shortened.trim()}...`;
 }
 
+function buildConversationInput(
+  messages: VoiceAssistantMessage[],
+  nextUserText: string
+) {
+  const recentMessages = messages
+    .filter((message) => !message.pending && message.text.trim())
+    .slice(-6)
+    .map((message) => `${message.role === "user" ? "User" : "Assistant"}: ${message.text.trim()}`);
+
+  if (!recentMessages.length) {
+    return nextUserText.trim();
+  }
+
+  return [
+    "Conversation so far:",
+    ...recentMessages,
+    `User: ${nextUserText.trim()}`,
+    "Reply to the latest user message.",
+  ].join("\n");
+}
+
 function isAbortError(error: unknown) {
   return (
     error instanceof DOMException
@@ -599,6 +620,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       const replyLocale = selectedLocale;
       conversationLocaleRef.current = replyLocale;
       lastInputSourceRef.current = inputSource;
+      const useClientSideConversationContext = preferNonStreamingReplies;
 
       const assistantMessageId = buildId();
       setMessages((prev) => [
@@ -608,8 +630,12 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       ]);
 
       const assistantRequest = {
-        text: trimmedValue,
-        previousResponseId: previousResponseIdRef.current,
+        text: useClientSideConversationContext
+          ? buildConversationInput(messages, trimmedValue)
+          : trimmedValue,
+        previousResponseId: useClientSideConversationContext
+          ? null
+          : previousResponseIdRef.current,
         locale: replyLocale,
         levelRange: selectedConversationLevel,
         nativeHelp:
@@ -623,7 +649,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       let completed = false;
       const finalizeReply = (value: string, responseId: string | null) => {
         const finalText = value.trim();
-        previousResponseIdRef.current = responseId;
+        previousResponseIdRef.current = useClientSideConversationContext ? null : responseId;
         updateMessage(assistantMessageId, (message) => ({
           ...message,
           text: finalText,
@@ -728,6 +754,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       nativeHelpEnabled,
       nativeLocale,
       preferNonStreamingReplies,
+      messages,
       text.emptyPrompt,
       text.idle,
       text.thinking,

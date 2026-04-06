@@ -2686,7 +2686,13 @@ export default function App() {
   }, [guestMode, navigate, route]);
 
   useEffect(() => {
-    if (route !== "profile" && route !== "me" && route !== "admin") {
+    if (
+      route !== "profile" &&
+      route !== "me" &&
+      route !== "admin" &&
+      route !== "voice" &&
+      route !== "shorts"
+    ) {
       profileLoaded.current = false;
       return;
     }
