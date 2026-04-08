@@ -1,3 +1,9 @@
+import {
+  EXTRA_LESSON_TEMPLATE_TEXT,
+  EXTRA_PRACTICE_TOPICS,
+  EXTRA_VOICE_ASSISTANT_OVERRIDES,
+} from "./voiceAssistantTextPlatformLocales";
+
 export type VoiceAssistantText = {
   navLabel: string;
   title: string;
@@ -117,7 +123,20 @@ export type VoiceAssistantText = {
   difficultyNoteStretch: string;
 };
 
-type SupportedLocale = "en" | "de" | "ru" | "ar" | "fa";
+type SupportedLocale =
+  | "en"
+  | "de"
+  | "vi"
+  | "ru"
+  | "uk"
+  | "fa"
+  | "ar"
+  | "sq"
+  | "tr"
+  | "fr"
+  | "es"
+  | "it"
+  | "pl";
 type PracticeTopicId =
   | "cafe"
   | "job"
@@ -143,9 +162,17 @@ export type LocalizedLessonTemplateText = {
 function normalizeLocale(locale: string): SupportedLocale {
   const normalized = locale.trim().toLowerCase();
   if (normalized.startsWith("de")) return "de";
+  if (normalized.startsWith("vi")) return "vi";
   if (normalized.startsWith("ru")) return "ru";
+  if (normalized.startsWith("uk")) return "uk";
   if (normalized.startsWith("ar")) return "ar";
   if (normalized.startsWith("fa")) return "fa";
+  if (normalized.startsWith("sq")) return "sq";
+  if (normalized.startsWith("tr")) return "tr";
+  if (normalized.startsWith("fr")) return "fr";
+  if (normalized.startsWith("es")) return "es";
+  if (normalized.startsWith("it")) return "it";
+  if (normalized.startsWith("pl")) return "pl";
   return "en";
 }
 
@@ -878,21 +905,37 @@ const PERSIAN_OVERRIDES: Partial<VoiceAssistantText> = {
 };
 
 const PRACTICE_TOPICS: Record<PracticeTopicId, Record<SupportedLocale, string>> = {
-  cafe: { en: "At the cafe", de: "Im Café", ru: "В кафе", ar: "في المقهى", fa: "در کافه" },
+  cafe: {
+    en: "At the cafe",
+    de: "Im Café",
+    ru: "В кафе",
+    ar: "في المقهى",
+    fa: "در کافه",
+    ...EXTRA_PRACTICE_TOPICS.cafe,
+  },
   job: {
     en: "Job interview",
     de: "Vorstellungsgespräch",
     ru: "Собеседование",
     ar: "مقابلة عمل",
     fa: "مصاحبه شغلی",
+    ...EXTRA_PRACTICE_TOPICS.job,
   },
-  travel: { en: "Travel", de: "Reise", ru: "Путешествие", ar: "السفر", fa: "سفر" },
+  travel: {
+    en: "Travel",
+    de: "Reise",
+    ru: "Путешествие",
+    ar: "السفر",
+    fa: "سفر",
+    ...EXTRA_PRACTICE_TOPICS.travel,
+  },
   smallTalk: {
     en: "Small talk",
     de: "Small Talk",
     ru: "Небольшой разговор",
     ar: "حديث قصير",
     fa: "گفت‌وگوی کوتاه",
+    ...EXTRA_PRACTICE_TOPICS.smallTalk,
   },
   doctor: {
     en: "Doctor visit",
@@ -900,6 +943,7 @@ const PRACTICE_TOPICS: Record<PracticeTopicId, Record<SupportedLocale, string>> 
     ru: "Визит к врачу",
     ar: "زيارة طبيب",
     fa: "ویزیت پزشک",
+    ...EXTRA_PRACTICE_TOPICS.doctor,
   },
   presentation: {
     en: "Presentation",
@@ -907,6 +951,7 @@ const PRACTICE_TOPICS: Record<PracticeTopicId, Record<SupportedLocale, string>> 
     ru: "Презентация",
     ar: "عرض تقديمي",
     fa: "ارائه",
+    ...EXTRA_PRACTICE_TOPICS.presentation,
   },
 };
 
@@ -923,9 +968,9 @@ const LESSON_TEMPLATE_TEXT: Record<
   LessonTemplateId,
   {
     topic: PracticeTopicId;
-    title: Record<SupportedLocale, string>;
-    description: Record<SupportedLocale, string>;
-    goal: Record<SupportedLocale, string>;
+    title: Partial<Record<SupportedLocale, string>>;
+    description: Partial<Record<SupportedLocale, string>>;
+    goal: Partial<Record<SupportedLocale, string>>;
   }
 > = {
   "small-talk-loop": {
@@ -1076,19 +1121,18 @@ const LESSON_TEMPLATE_TEXT: Record<
 
 export function getVoiceAssistantText(locale: string): VoiceAssistantText {
   const normalized = normalizeLocale(locale);
-  if (normalized === "de") {
-    return { ...ENGLISH_TEXT, ...GERMAN_OVERRIDES };
-  }
-  if (normalized === "ru") {
-    return { ...ENGLISH_TEXT, ...RUSSIAN_OVERRIDES };
-  }
-  if (normalized === "ar") {
-    return { ...ENGLISH_TEXT, ...ARABIC_OVERRIDES };
-  }
-  if (normalized === "fa") {
-    return { ...ENGLISH_TEXT, ...PERSIAN_OVERRIDES };
-  }
-  return ENGLISH_TEXT;
+  const builtInOverrides: Partial<Record<SupportedLocale, Partial<VoiceAssistantText>>> = {
+    de: GERMAN_OVERRIDES,
+    ru: RUSSIAN_OVERRIDES,
+    ar: ARABIC_OVERRIDES,
+    fa: PERSIAN_OVERRIDES,
+  };
+  const overrides =
+    builtInOverrides[normalized] ??
+    (EXTRA_VOICE_ASSISTANT_OVERRIDES[
+      normalized as keyof typeof EXTRA_VOICE_ASSISTANT_OVERRIDES
+    ] as Partial<VoiceAssistantText> | undefined);
+  return overrides ? { ...ENGLISH_TEXT, ...overrides } : ENGLISH_TEXT;
 }
 
 export function getPracticeTopicSuggestions(locale: string) {
@@ -1120,11 +1164,33 @@ export function getLocalizedLessonTemplateText(
   const entry = LESSON_TEMPLATE_TEXT[templateId as LessonTemplateId];
   if (!entry) return null;
   const normalized = normalizeLocale(locale);
+  const extraEntry =
+    EXTRA_LESSON_TEMPLATE_TEXT[
+      templateId as keyof typeof EXTRA_LESSON_TEMPLATE_TEXT
+    ];
   return {
-    title: entry.title[normalized],
-    description: entry.description[normalized],
+    title:
+      (extraEntry?.title?.[
+        normalized as keyof typeof extraEntry.title
+      ] as string | undefined) ??
+      entry.title[normalized] ??
+      entry.title.en ??
+      "",
+    description:
+      (extraEntry?.description?.[
+        normalized as keyof typeof extraEntry.description
+      ] as string | undefined) ??
+      entry.description[normalized] ??
+      entry.description.en ??
+      "",
     topic: PRACTICE_TOPICS[entry.topic][normalized],
-    goal: entry.goal[normalized],
+    goal:
+      (extraEntry?.goal?.[
+        normalized as keyof typeof extraEntry.goal
+      ] as string | undefined) ??
+      entry.goal[normalized] ??
+      entry.goal.en ??
+      "",
   };
 }
 
