@@ -117,7 +117,7 @@ export type VoiceAssistantText = {
   difficultyNoteStretch: string;
 };
 
-type SupportedLocale = "en" | "de" | "ru";
+type SupportedLocale = "en" | "de" | "ru" | "ar";
 type PracticeTopicId =
   | "cafe"
   | "job"
@@ -144,6 +144,7 @@ function normalizeLocale(locale: string): SupportedLocale {
   const normalized = locale.trim().toLowerCase();
   if (normalized.startsWith("de")) return "de";
   if (normalized.startsWith("ru")) return "ru";
+  if (normalized.startsWith("ar")) return "ar";
   return "en";
 }
 
@@ -589,13 +590,156 @@ const RUSSIAN_OVERRIDES: Partial<VoiceAssistantText> = {
     "Оставайтесь в выбранном диапазоне CEFR, но используйте его верхнюю границу: более богатый словарь, меньше опоры и чуть менее предсказуемые уточняющие вопросы.",
 };
 
+const ARABIC_OVERRIDES: Partial<VoiceAssistantText> = {
+  navLabel: "تدريب الذكاء الاصطناعي",
+  title: "تدريب الذكاء الاصطناعي",
+  subtitle: "تحدث، واحصل على تدريب، وواصل المحادثة.",
+  signInHint: "سجل الدخول لاستخدام تدريب الذكاء الاصطناعي.",
+  unsupportedBrowser: "التعرّف على الكلام متاح في المتصفحات المدعومة مثل Chrome وEdge.",
+  languageLabel: "لغة المحادثة",
+  languageHint: "هنا تظهر فقط لغة التعلّم واللغة الأم، وبحد أقصى ثلاثة خيارات.",
+  levelLabel: "مستوى المحادثة",
+  levelHint:
+    "اختر مستوى واحدًا أو نطاق CEFR قريبًا مثل A1-A2 أو A2-B1. ستبقى ردود الذكاء الاصطناعي ضمن هذا المستوى.",
+  practiceModeLabel: "وضع التمرين",
+  practiceModeHint:
+    "استخدم وضع التمرين لكي يتصرف الذكاء الاصطناعي كمدرب محادثة لا كروبوت دردشة عام.",
+  practiceModeDaily: "محادثة يومية",
+  practiceModeRoleplay: "تمثيل أدوار",
+  practiceModeTopic: "حديث حول موضوع",
+  practiceTopicLabel: "سيناريو أو موضوع",
+  practiceTopicHint:
+    "أمثلة: في المقهى، مقابلة عمل، حديث قصير، سفر، عرض تقديمي، زيارة طبيب.",
+  practiceTopicPlaceholder: "اختر موقفًا واقعيًا أو موضوعًا...",
+  progressTitle: "ذاكرة التمرين",
+  progressFocus: "التركيز الآن",
+  progressPhrases: "عبارات مفيدة",
+  progressPronunciation: "النطق",
+  habitsTitle: "إيقاع التمرين",
+  habitsCurrentStreak: "السلسلة الحالية",
+  habitsLongestStreak: "أفضل سلسلة",
+  habitsWeeklyGoal: "الهدف الأسبوعي",
+  habitsWeeklyProgress: "التقدم الأسبوعي",
+  habitsWeeklyHint:
+    "يأخذ المخطط في الاعتبار السلسلة والهدف الأسبوعي، وليس الأخطاء والدرجات فقط.",
+  habitsGoalOption: "{count} دروس",
+  habitsWeeklyProgressValue: "{completed}/{target} دروس هذا الأسبوع",
+  summaryTitle: "ملخص الدرس",
+  summaryStrengths: "ما سار جيدًا",
+  summaryFocus: "ما الذي يحتاج إلى تحسين",
+  summaryPhrases: "عبارات جديدة",
+  summaryHomework: "الخطوة التالية",
+  recentSessionsTitle: "الدروس الأخيرة",
+  recentSessionsEmpty: "ستظهر هنا جلسات التمرين المحفوظة.",
+  lessonTemplatesTitle: "مسار الدرس",
+  lessonTemplatesHint:
+    "ابدأ درسًا جاهزًا وأنهه بدرجة تدريب بعد عدة ردود من المتعلم.",
+  lessonStart: "ابدأ الدرس",
+  lessonRestart: "أعد الدرس",
+  lessonActiveTitle: "الدرس الحالي",
+  lessonProgress: "تقدم الدرس {progress}",
+  lessonGoalLabel: "هدف الدرس",
+  lessonTurnsLabel: "{count} أدوار",
+  lessonScoreTitle: "درجة الدرس",
+  lessonScoreFluency: "الطلاقة",
+  lessonScoreAccuracy: "الدقة",
+  lessonScoreVocabulary: "المفردات",
+  lessonScorePronunciation: "النطق",
+  lessonScoreGoal: "تحقيق الهدف",
+  lessonScoreFeedback: "ملاحظات المدرب",
+  lessonReviewTitle: "مراجعة بعد الدرس",
+  lessonReviewHint:
+    "استخدم هذه المراجعة المركزة لتكرار نقاط الضعف فقط من آخر درس.",
+  lessonReviewGrammar: "القواعد",
+  lessonReviewVocabulary: "المفردات",
+  lessonReviewPronunciation: "النطق",
+  lessonReviewRepeat: "كرّر نقاط الضعف فقط",
+  lessonPlannerTitle: "الدرس المقترح التالي",
+  lessonPlannerHint:
+    "يختار هذا المخطط أفضل درس تالي بناءً على درجاتك وبطاقات المراجعة وذاكرة التمرين.",
+  lessonPlannerReason: "سبب اختيار هذا الدرس",
+  lessonPlannerFocus: "نقاط التركيز",
+  lessonPlannerDifficulty: "الصعوبة",
+  lessonPlannerStart: "ابدأ الدرس المقترح",
+  lessonDifficultyLabel: "وضع الصعوبة",
+  lessonRepeatTitle: "مراجعة: {title}",
+  lessonRepeatDescription: "تدريب قصير يركز فقط على نقاط ضعفك من آخر درس.",
+  lessonRepeatTopicFallback: "تدريب نقاط الضعف",
+  lessonRepeatGoal: "عالج نقاط الضعف التالية: {points}.",
+  lessonRepeatFallbackGoal:
+    "أعد الدرس الأخير وركز فقط على الدقة والمفردات والنطق.",
+  lessonFallbackFeedback:
+    'عمل جيد في "{title}". أعد الدرس مرة أخرى وحاول أن تبدو أكثر طبيعية في العبارات الأساسية.',
+  coachCorrection: "تصحيح سريع",
+  coachBetterVersion: "صياغة أفضل",
+  coachNextQuestion: "السؤال التالي",
+  coachPronunciation: "ملاحظة نطق",
+  nativeHelpLabel: "مساعدة باللغة الأم ({language})",
+  nativeHelpHint:
+    "تبقى المحادثة الأساسية بلغة التعلّم. وقد يضيف الذكاء الاصطناعي شرحًا قصيرًا بلغتك الأم عند الحاجة.",
+  nativeHelpUnavailable:
+    "المساعدة باللغة الأم غير متاحة عندما تكون لغة المحادثة هي نفسها لغتك الأم.",
+  inputLabel: "الرسالة",
+  inputPlaceholder: "اكتب رسالة أو استخدم الميكروفون...",
+  holdToTalk: "اضغط للتحدث",
+  releaseToSend: "اترك للإرسال",
+  send: "إرسال",
+  clear: "مسح الدردشة",
+  stopAudio: "إيقاف الصوت",
+  listening: "جارٍ الاستماع...",
+  thinking: "الذكاء الاصطناعي يرد...",
+  speaking: "جارٍ تشغيل الرد الصوتي...",
+  idle: "جاهز",
+  empty: "ستظهر هنا محادثتك.",
+  emptyPrompt: "قل شيئًا أو اكتبه أولًا.",
+  roleUser: "أنت",
+  roleAssistant: "AI",
+  voicePlaybackFailed: "فشل تشغيل الرد الصوتي.",
+  practiceProgressSyncUnavailable: "تعذر مزامنة تقدم التمرين حاليًا.",
+  practiceGoalSyncUnavailable: "تعذر مزامنة هدف التمرين حاليًا.",
+  emptyResponse: "أعاد الذكاء الاصطناعي ردًا فارغًا.",
+  aiRequestFailed: "فشل طلب الذكاء الاصطناعي.",
+  speechRecognitionFailed: "فشل التعرف على الكلام.",
+  difficultySupportive: "مدعوم",
+  difficultyBalanced: "متوازن",
+  difficultyStretch: "متقدم",
+  adaptiveReasonPronunciation:
+    "يُظهر الدرس الأخير أن النطق ما زال يحتاج إلى تكرار تحت ضغط المحادثة.",
+  adaptiveReasonGrammar:
+    "ينبغي أن يشدّد الدرس التالي على دقة القواعد في الردود القصيرة الواقعية.",
+  adaptiveReasonVocabulary:
+    "أنت جاهز لدرس يوسع المفردات ويدفعك إلى تعبير أكثر طبيعية.",
+  adaptiveReasonFluency:
+    "درجاتك جيدة، لذا فإن أفضل خطوة تالية هي تحسين السلاسة والعفوية.",
+  adaptiveReasonStrong:
+    "أديت الدرس الأخير جيدًا، لذلك ينقلك المخطط إلى مهمة كلامية أغنى قليلًا.",
+  adaptiveReasonMemoryPronunciation:
+    "ما زالت ذاكرة التمرين تظهر أهدافًا في النطق ينبغي إعادة استخدامها في سيناريو جديد.",
+  adaptiveReasonMemoryGrammar:
+    "تشير ذاكرة التمرين إلى أن بعض أنماط القواعد تحتاج إلى درس منظم إضافي.",
+  adaptiveReasonMemoryVocabulary:
+    "يعيد المخطط استخدام عباراتك المحفوظة لتحويل المفردات السلبية إلى مفردات منطوقة.",
+  adaptiveReasonConsistency:
+    "أنت أيضًا متأخر عن هدفك الأسبوعي، لذلك يختار المخطط فوزًا قصيرًا لإعادة الانتظام.",
+  adaptiveReasonStreak:
+    "سلسلتك قوية، لذا يمكن للدرس التالي أن يدفعك بأمان إلى الحد الأعلى من نطاقك المختار.",
+  adaptiveFocusTargets: "ركز بشكل خاص على: {points}.",
+  adaptiveFocusDefault: "أبقِ الدرس مركزًا على هدف كلامي واحد واضح.",
+  difficultyNoteSupportive:
+    "اجعل الدرس عند الحد الأدنى من نطاق CEFR المختار، مع أسئلة أقصر ودعم أكثر وأسئلة متابعة أسهل.",
+  difficultyNoteBalanced:
+    "اجعل الدرس في منتصف نطاق CEFR المختار مع دعم عادي وإيقاع طبيعي.",
+  difficultyNoteStretch:
+    "ابق داخل نطاق CEFR المختار، لكن استخدم حدّه الأعلى مع مفردات أغنى ودعم أقل وأسئلة متابعة أقل توقعًا.",
+};
+
 const PRACTICE_TOPICS: Record<PracticeTopicId, Record<SupportedLocale, string>> = {
-  cafe: { en: "At the cafe", de: "Im Café", ru: "В кафе" },
-  job: { en: "Job interview", de: "Vorstellungsgespräch", ru: "Собеседование" },
-  travel: { en: "Travel", de: "Reise", ru: "Путешествие" },
-  smallTalk: { en: "Small talk", de: "Small Talk", ru: "Небольшой разговор" },
-  doctor: { en: "Doctor visit", de: "Arztbesuch", ru: "Визит к врачу" },
-  presentation: { en: "Presentation", de: "Präsentation", ru: "Презентация" },
+  cafe: { en: "At the cafe", de: "Im Café", ru: "В кафе", ar: "في المقهى" },
+  job: { en: "Job interview", de: "Vorstellungsgespräch", ru: "Собеседование", ar: "مقابلة عمل" },
+  travel: { en: "Travel", de: "Reise", ru: "Путешествие", ar: "السفر" },
+  smallTalk: { en: "Small talk", de: "Small Talk", ru: "Небольшой разговор", ar: "حديث قصير" },
+  doctor: { en: "Doctor visit", de: "Arztbesuch", ru: "Визит к врачу", ar: "زيارة طبيب" },
+  presentation: { en: "Presentation", de: "Präsentation", ru: "Презентация", ar: "عرض تقديمي" },
 };
 
 const PRACTICE_TOPIC_ORDER: PracticeTopicId[] = [
@@ -618,86 +762,98 @@ const LESSON_TEMPLATE_TEXT: Record<
 > = {
   "small-talk-loop": {
     topic: "smallTalk",
-    title: { en: "Small talk loop", de: "Small-Talk-Runde", ru: "Цикл small talk" },
+    title: { en: "Small talk loop", de: "Small-Talk-Runde", ru: "Цикл small talk", ar: "حلقة حديث قصير" },
     description: {
       en: "Practice friendly small talk, react naturally, and keep the exchange moving.",
       de: "Übe freundlichen Small Talk, reagiere natürlich und halte das Gespräch in Gang.",
       ru: "Тренируйте дружелюбный small talk, реагируйте естественно и поддерживайте диалог.",
+      ar: "تدرّب على الحديث القصير الودي، واستجب بشكل طبيعي، وحافظ على سير الحوار.",
     },
     goal: {
       en: "Keep a casual conversation going for several short turns.",
       de: "Halte ein lockeres Gespräch über mehrere kurze Züge am Laufen.",
       ru: "Поддерживайте непринужденный разговор в нескольких коротких репликах.",
+      ar: "حافظ على محادثة خفيفة عبر عدة أدوار قصيرة.",
     },
   },
   "cafe-order": {
     topic: "cafe",
-    title: { en: "Cafe order", de: "Bestellung im Café", ru: "Заказ в кафе" },
+    title: { en: "Cafe order", de: "Bestellung im Café", ru: "Заказ в кафе", ar: "طلب في المقهى" },
     description: {
       en: "Order a drink, answer one follow-up question, and pay politely.",
       de: "Bestelle ein Getränk, beantworte eine Rückfrage und bezahle höflich.",
       ru: "Закажите напиток, ответьте на один уточняющий вопрос и вежливо оплатите.",
+      ar: "اطلب مشروبًا، وأجب عن سؤال متابعة واحد، وادفع بأدب.",
     },
     goal: {
       en: "Order confidently and handle one simple follow-up question.",
       de: "Bestelle sicher und beantworte eine einfache Rückfrage.",
       ru: "Уверенно сделайте заказ и справьтесь с одним простым уточняющим вопросом.",
+      ar: "اطلب بثقة وتعامل مع سؤال متابعة بسيط واحد.",
     },
   },
   "job-intro": {
     topic: "job",
-    title: { en: "Job interview intro", de: "Einstieg ins Vorstellungsgespräch", ru: "Начало собеседования" },
+    title: { en: "Job interview intro", de: "Einstieg ins Vorstellungsgespräch", ru: "Начало собеседования", ar: "مقدمة مقابلة العمل" },
     description: {
       en: "Introduce yourself, explain your background, and answer why you want the role.",
       de: "Stelle dich vor, erkläre deinen Hintergrund und beantworte, warum du die Stelle willst.",
       ru: "Представьтесь, расскажите о своем опыте и ответьте, почему хотите эту роль.",
+      ar: "قدّم نفسك، واشرح خلفيتك، وأجب لماذا تريد هذا الدور.",
     },
     goal: {
       en: "Introduce yourself clearly and answer one motivation question.",
       de: "Stelle dich klar vor und beantworte eine Motivationsfrage.",
       ru: "Четко представьтесь и ответьте на один вопрос о мотивации.",
+      ar: "قدّم نفسك بوضوح وأجب عن سؤال واحد عن الدافع.",
     },
   },
   "travel-checkin": {
     topic: "travel",
-    title: { en: "Travel check-in", de: "Check-in auf Reisen", ru: "Заселение в поездке" },
+    title: { en: "Travel check-in", de: "Check-in auf Reisen", ru: "Заселение в поездке", ar: "تسجيل الوصول في السفر" },
     description: {
       en: "Check into a hotel and answer a practical travel question.",
       de: "Checke in ein Hotel ein und beantworte eine praktische Reisefrage.",
       ru: "Заселитесь в отель и ответьте на практический вопрос о поездке.",
+      ar: "قم بتسجيل الدخول في فندق وأجب عن سؤال عملي متعلق بالسفر.",
     },
     goal: {
       en: "Handle a hotel check-in with clear, practical language.",
       de: "Bewältige einen Hotel-Check-in mit klarer, praktischer Sprache.",
       ru: "Справьтесь с заселением в отель с помощью четкой практической речи.",
+      ar: "أدر تسجيل الدخول في الفندق بلغة واضحة وعملية.",
     },
   },
   "doctor-visit": {
     topic: "doctor",
-    title: { en: "Doctor visit", de: "Arztbesuch", ru: "Визит к врачу" },
+    title: { en: "Doctor visit", de: "Arztbesuch", ru: "Визит к врачу", ar: "زيارة طبيب" },
     description: {
       en: "Describe symptoms and answer basic follow-up questions.",
       de: "Beschreibe Symptome und beantworte einfache Rückfragen.",
       ru: "Опишите симптомы и ответьте на базовые уточняющие вопросы.",
+      ar: "اشرح الأعراض وأجب عن أسئلة متابعة أساسية.",
     },
     goal: {
       en: "Explain symptoms simply and answer one or two health questions.",
       de: "Erkläre Symptome einfach und beantworte ein oder zwei Gesundheitsfragen.",
       ru: "Просто объясните симптомы и ответьте на один-два вопроса о здоровье.",
+      ar: "اشرح الأعراض ببساطة وأجب عن سؤال أو سؤالين صحيين.",
     },
   },
   "presentation-opening": {
     topic: "presentation",
-    title: { en: "Presentation opening", de: "Start einer Präsentation", ru: "Открытие презентации" },
+    title: { en: "Presentation opening", de: "Start einer Präsentation", ru: "Открытие презентации", ar: "افتتاح العرض التقديمي" },
     description: {
       en: "Open a presentation, explain the topic, and guide the listener into the talk.",
       de: "Eröffne eine Präsentation, erkläre das Thema und führe die Zuhörer in den Vortrag ein.",
       ru: "Начните презентацию, объясните тему и введите слушателя в выступление.",
+      ar: "ابدأ عرضًا تقديميًا، واشرح الموضوع، وادخل المستمع في العرض.",
     },
     goal: {
       en: "Open a short presentation with structure and confidence.",
       de: "Eröffne eine kurze Präsentation strukturiert und sicher.",
       ru: "Откройте короткую презентацию структурно и уверенно.",
+      ar: "ابدأ عرضًا قصيرًا بشكل منظم وواثق.",
     },
   },
 };
@@ -709,6 +865,9 @@ export function getVoiceAssistantText(locale: string): VoiceAssistantText {
   }
   if (normalized === "ru") {
     return { ...ENGLISH_TEXT, ...RUSSIAN_OVERRIDES };
+  }
+  if (normalized === "ar") {
+    return { ...ENGLISH_TEXT, ...ARABIC_OVERRIDES };
   }
   return ENGLISH_TEXT;
 }
