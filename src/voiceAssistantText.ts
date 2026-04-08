@@ -26,6 +26,8 @@ export type VoiceAssistantText = {
   habitsWeeklyGoal: string;
   habitsWeeklyProgress: string;
   habitsWeeklyHint: string;
+  habitsGoalOption: string;
+  habitsWeeklyProgressValue: string;
   summaryTitle: string;
   summaryStrengths: string;
   summaryFocus: string;
@@ -40,6 +42,7 @@ export type VoiceAssistantText = {
   lessonActiveTitle: string;
   lessonProgress: string;
   lessonGoalLabel: string;
+  lessonTurnsLabel: string;
   lessonScoreTitle: string;
   lessonScoreFluency: string;
   lessonScoreAccuracy: string;
@@ -60,6 +63,12 @@ export type VoiceAssistantText = {
   lessonPlannerDifficulty: string;
   lessonPlannerStart: string;
   lessonDifficultyLabel: string;
+  lessonRepeatTitle: string;
+  lessonRepeatDescription: string;
+  lessonRepeatTopicFallback: string;
+  lessonRepeatGoal: string;
+  lessonRepeatFallbackGoal: string;
+  lessonFallbackFeedback: string;
   coachCorrection: string;
   coachBetterVersion: string;
   coachNextQuestion: string;
@@ -80,13 +89,76 @@ export type VoiceAssistantText = {
   idle: string;
   empty: string;
   emptyPrompt: string;
+  roleUser: string;
+  roleAssistant: string;
+  voicePlaybackFailed: string;
+  practiceProgressSyncUnavailable: string;
+  practiceGoalSyncUnavailable: string;
+  emptyResponse: string;
+  aiRequestFailed: string;
+  speechRecognitionFailed: string;
+  difficultySupportive: string;
+  difficultyBalanced: string;
+  difficultyStretch: string;
+  adaptiveReasonPronunciation: string;
+  adaptiveReasonGrammar: string;
+  adaptiveReasonVocabulary: string;
+  adaptiveReasonFluency: string;
+  adaptiveReasonStrong: string;
+  adaptiveReasonMemoryPronunciation: string;
+  adaptiveReasonMemoryGrammar: string;
+  adaptiveReasonMemoryVocabulary: string;
+  adaptiveReasonConsistency: string;
+  adaptiveReasonStreak: string;
+  adaptiveFocusTargets: string;
+  adaptiveFocusDefault: string;
+  difficultyNoteSupportive: string;
+  difficultyNoteBalanced: string;
+  difficultyNoteStretch: string;
 };
 
-const VOICE_ASSISTANT_TEXT: VoiceAssistantText = {
+type SupportedLocale = "en" | "de" | "ru";
+type PracticeTopicId =
+  | "cafe"
+  | "job"
+  | "travel"
+  | "smallTalk"
+  | "doctor"
+  | "presentation";
+type LessonTemplateId =
+  | "small-talk-loop"
+  | "cafe-order"
+  | "job-intro"
+  | "travel-checkin"
+  | "doctor-visit"
+  | "presentation-opening";
+
+export type LocalizedLessonTemplateText = {
+  title: string;
+  description: string;
+  topic: string;
+  goal: string;
+};
+
+function normalizeLocale(locale: string): SupportedLocale {
+  const normalized = locale.trim().toLowerCase();
+  if (normalized.startsWith("de")) return "de";
+  if (normalized.startsWith("ru")) return "ru";
+  return "en";
+}
+
+function fillTemplate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
+    template
+  );
+}
+
+const ENGLISH_TEXT: VoiceAssistantText = {
   navLabel: "AI Practice",
   title: "AI Practice",
   subtitle: "Speak, get coached, and keep the conversation going.",
-  signInHint: "Sign in to use the AI voice assistant.",
+  signInHint: "Sign in to use AI Practice.",
   unsupportedBrowser:
     "Speech recognition is available in supported browsers such as Chrome or Edge.",
   languageLabel: "Conversation language",
@@ -116,6 +188,8 @@ const VOICE_ASSISTANT_TEXT: VoiceAssistantText = {
   habitsWeeklyProgress: "Weekly progress",
   habitsWeeklyHint:
     "The planner also looks at your streak and weekly goal, not only mistakes and scores.",
+  habitsGoalOption: "{count} lessons",
+  habitsWeeklyProgressValue: "{completed}/{target} lessons this week",
   summaryTitle: "Lesson summary",
   summaryStrengths: "What went well",
   summaryFocus: "What to improve",
@@ -131,6 +205,7 @@ const VOICE_ASSISTANT_TEXT: VoiceAssistantText = {
   lessonActiveTitle: "Active lesson",
   lessonProgress: "Lesson progress {progress}",
   lessonGoalLabel: "Lesson goal",
+  lessonTurnsLabel: "{count} turns",
   lessonScoreTitle: "Lesson score",
   lessonScoreFluency: "Fluency",
   lessonScoreAccuracy: "Accuracy",
@@ -153,6 +228,14 @@ const VOICE_ASSISTANT_TEXT: VoiceAssistantText = {
   lessonPlannerDifficulty: "Difficulty",
   lessonPlannerStart: "Start recommended lesson",
   lessonDifficultyLabel: "Difficulty mode",
+  lessonRepeatTitle: "{title} review",
+  lessonRepeatDescription: "Short drill focused only on your weak points from the last lesson.",
+  lessonRepeatTopicFallback: "Weak-point drill",
+  lessonRepeatGoal: "Fix these weak points: {points}.",
+  lessonRepeatFallbackGoal:
+    "Repeat the last lesson and focus only on accuracy, vocabulary, and pronunciation.",
+  lessonFallbackFeedback:
+    'Good work in "{title}". Repeat the lesson once more and try to sound more natural on the key phrases.',
   coachCorrection: "Quick correction",
   coachBetterVersion: "Better version",
   coachNextQuestion: "Next question",
@@ -175,9 +258,501 @@ const VOICE_ASSISTANT_TEXT: VoiceAssistantText = {
   idle: "Ready",
   empty: "Your conversation will appear here.",
   emptyPrompt: "Say or type something first.",
+  roleUser: "You",
+  roleAssistant: "AI",
+  voicePlaybackFailed: "Voice playback failed.",
+  practiceProgressSyncUnavailable: "Practice progress sync is temporarily unavailable.",
+  practiceGoalSyncUnavailable: "Practice goal sync is temporarily unavailable.",
+  emptyResponse: "AI returned an empty response.",
+  aiRequestFailed: "AI request failed.",
+  speechRecognitionFailed: "Speech recognition failed.",
+  difficultySupportive: "Supportive",
+  difficultyBalanced: "Balanced",
+  difficultyStretch: "Stretch",
+  adaptiveReasonPronunciation:
+    "Your last lesson shows pronunciation still needs repetition under speaking pressure.",
+  adaptiveReasonGrammar:
+    "Your next best lesson should tighten grammar accuracy in short real-life replies.",
+  adaptiveReasonVocabulary:
+    "You are ready for a lesson that pushes vocabulary range and more natural phrasing.",
+  adaptiveReasonFluency:
+    "Your scores are solid, so the best next step is a lesson that improves flow and spontaneity.",
+  adaptiveReasonStrong:
+    "You handled the last lesson well, so the planner is moving you to a slightly richer speaking task.",
+  adaptiveReasonMemoryPronunciation:
+    "Your practice memory still shows pronunciation targets that should be recycled in a fresh scenario.",
+  adaptiveReasonMemoryGrammar:
+    "Your practice memory points to grammar patterns that need one more structured lesson.",
+  adaptiveReasonMemoryVocabulary:
+    "The planner is reusing your saved phrases to turn passive vocabulary into spoken vocabulary.",
+  adaptiveReasonConsistency:
+    "You are also behind your weekly goal, so the planner is choosing a shorter win to rebuild consistency.",
+  adaptiveReasonStreak:
+    "Your streak is strong, so the next lesson can safely push the upper edge of your selected range.",
+  adaptiveFocusTargets: "Pay special attention to: {points}.",
+  adaptiveFocusDefault: "Keep the lesson focused on one clear speaking objective.",
+  difficultyNoteSupportive:
+    "Keep the lesson at the lower edge of the selected CEFR range, with shorter questions, more scaffolding, and easier follow-up prompts.",
+  difficultyNoteBalanced:
+    "Keep the lesson in the middle of the selected CEFR range with normal support and natural pacing.",
+  difficultyNoteStretch:
+    "Keep the lesson inside the selected CEFR range but use the upper edge with richer vocabulary, less scaffolding, and slightly less predictable follow-up questions.",
+};
+
+const GERMAN_OVERRIDES: Partial<VoiceAssistantText> = {
+  navLabel: "KI-Training",
+  title: "KI-Training",
+  subtitle: "Sprich, bekomme Coaching und halte das Gespräch am Laufen.",
+  signInHint: "Melde dich an, um KI-Training zu nutzen.",
+  unsupportedBrowser:
+    "Spracherkennung ist in unterstützten Browsern wie Chrome oder Edge verfügbar.",
+  languageLabel: "Gesprächssprache",
+  languageHint:
+    "Hier erscheinen nur deine Lernsprache und Muttersprache, maximal drei Optionen.",
+  levelLabel: "Gesprächsniveau",
+  levelHint:
+    "Wähle ein Niveau oder einen CEFR-Bereich wie A1-A2 oder A2-B1. Die KI bleibt auf diesem Niveau.",
+  practiceModeLabel: "Übungsmodus",
+  practiceModeHint:
+    "Nutze den Übungsmodus, damit die KI wie ein Sprechcoach und nicht wie ein allgemeiner Chatbot reagiert.",
+  practiceModeDaily: "Alltagsgespräch",
+  practiceModeRoleplay: "Rollenspiel",
+  practiceModeTopic: "Themenübung",
+  practiceTopicLabel: "Szenario oder Thema",
+  practiceTopicHint:
+    "Beispiele: im Café, Vorstellungsgespräch, Small Talk, Reise, Präsentation, Arztbesuch.",
+  practiceTopicPlaceholder: "Wähle eine Alltagssituation oder ein Thema...",
+  progressTitle: "Trainingsspeicher",
+  progressFocus: "Fokus jetzt",
+  progressPhrases: "Nützliche Redemittel",
+  progressPronunciation: "Aussprache",
+  habitsTitle: "Übungsrhythmus",
+  habitsCurrentStreak: "Aktuelle Serie",
+  habitsLongestStreak: "Beste Serie",
+  habitsWeeklyGoal: "Wochenziel",
+  habitsWeeklyProgress: "Wochenfortschritt",
+  habitsWeeklyHint:
+    "Der Planer berücksichtigt nicht nur Fehler und Punkte, sondern auch deine Serie und dein Wochenziel.",
+  habitsGoalOption: "{count} Lektionen",
+  habitsWeeklyProgressValue: "{completed}/{target} Lektionen diese Woche",
+  summaryTitle: "Lektionszusammenfassung",
+  summaryStrengths: "Das lief gut",
+  summaryFocus: "Das solltest du verbessern",
+  summaryPhrases: "Neue Redemittel",
+  summaryHomework: "Nächster Schritt",
+  recentSessionsTitle: "Letzte Lektionen",
+  recentSessionsEmpty: "Deine gespeicherten Übungssitzungen erscheinen hier.",
+  lessonTemplatesTitle: "Lektionsablauf",
+  lessonTemplatesHint:
+    "Starte eine vorbereitete Lektion und beende sie nach einigen Lernzügen mit einem Coaching-Score.",
+  lessonStart: "Lektion starten",
+  lessonRestart: "Lektion neu starten",
+  lessonActiveTitle: "Aktive Lektion",
+  lessonProgress: "Lektionsfortschritt {progress}",
+  lessonGoalLabel: "Lektionsziel",
+  lessonTurnsLabel: "{count} Züge",
+  lessonScoreTitle: "Lektionsscore",
+  lessonScoreFluency: "Flüssigkeit",
+  lessonScoreAccuracy: "Genauigkeit",
+  lessonScoreVocabulary: "Wortschatz",
+  lessonScorePronunciation: "Aussprache",
+  lessonScoreGoal: "Zielerfüllung",
+  lessonScoreFeedback: "Coach-Feedback",
+  lessonReviewTitle: "Nachbesprechung",
+  lessonReviewHint:
+    "Nutze diese gezielte Wiederholung, um nur die Schwachstellen der letzten Lektion zu trainieren.",
+  lessonReviewGrammar: "Grammatik",
+  lessonReviewVocabulary: "Wortschatz",
+  lessonReviewPronunciation: "Aussprache",
+  lessonReviewRepeat: "Nur Schwachstellen wiederholen",
+  lessonPlannerTitle: "Empfohlene nächste Lektion",
+  lessonPlannerHint:
+    "Dieser Planer wählt die beste nächste Lektion anhand deiner Punkte, Review-Karten und deines Trainingsspeichers.",
+  lessonPlannerReason: "Warum diese Lektion",
+  lessonPlannerFocus: "Fokuspunkte",
+  lessonPlannerDifficulty: "Schwierigkeit",
+  lessonPlannerStart: "Empfohlene Lektion starten",
+  lessonDifficultyLabel: "Schwierigkeitsmodus",
+  lessonRepeatTitle: "{title} Wiederholung",
+  lessonRepeatDescription:
+    "Kurzer Drill, der sich nur auf deine Schwachstellen aus der letzten Lektion konzentriert.",
+  lessonRepeatTopicFallback: "Schwachstellen-Drill",
+  lessonRepeatGoal: "Arbeite an diesen Schwachstellen: {points}.",
+  lessonRepeatFallbackGoal:
+    "Wiederhole die letzte Lektion und achte nur auf Genauigkeit, Wortschatz und Aussprache.",
+  lessonFallbackFeedback:
+    'Gute Arbeit in "{title}". Wiederhole die Lektion noch einmal und versuche bei den Schlüsselsätzen natürlicher zu klingen.',
+  coachCorrection: "Schnelle Korrektur",
+  coachBetterVersion: "Bessere Formulierung",
+  coachNextQuestion: "Nächste Frage",
+  coachPronunciation: "Aussprache-Tipp",
+  nativeHelpLabel: "Muttersprachliche Hilfe ({language})",
+  nativeHelpHint:
+    "Das Hauptgespräch bleibt in deiner Lernsprache. Die KI kann bei Bedarf kurze Erklärungen in deiner Muttersprache geben.",
+  nativeHelpUnavailable:
+    "Muttersprachliche Hilfe ist nicht verfügbar, wenn die Gesprächssprache deiner Muttersprache entspricht.",
+  inputLabel: "Nachricht",
+  inputPlaceholder: "Schreibe eine Nachricht oder nutze das Mikrofon...",
+  holdToTalk: "Gedrückt halten",
+  releaseToSend: "Loslassen zum Senden",
+  send: "Senden",
+  clear: "Chat leeren",
+  stopAudio: "Audio stoppen",
+  listening: "Hört zu...",
+  thinking: "KI antwortet...",
+  speaking: "Sprachantwort wird abgespielt...",
+  idle: "Bereit",
+  empty: "Dein Gespräch erscheint hier.",
+  emptyPrompt: "Sag oder tippe zuerst etwas.",
+  roleUser: "Du",
+  voicePlaybackFailed: "Sprachausgabe konnte nicht abgespielt werden.",
+  practiceProgressSyncUnavailable: "Der Trainingsfortschritt kann gerade nicht synchronisiert werden.",
+  practiceGoalSyncUnavailable: "Das Übungsziel kann gerade nicht synchronisiert werden.",
+  emptyResponse: "Die KI hat leer geantwortet.",
+  aiRequestFailed: "Die KI-Anfrage ist fehlgeschlagen.",
+  speechRecognitionFailed: "Spracherkennung fehlgeschlagen.",
+  difficultySupportive: "Unterstützend",
+  difficultyBalanced: "Ausgeglichen",
+  difficultyStretch: "Anspruchsvoll",
+  adaptiveReasonPronunciation:
+    "Die letzte Lektion zeigt, dass die Aussprache unter Sprechdruck weiter wiederholt werden sollte.",
+  adaptiveReasonGrammar:
+    "Die nächste sinnvolle Lektion sollte die grammatische Genauigkeit in kurzen echten Antworten festigen.",
+  adaptiveReasonVocabulary:
+    "Du bist bereit für eine Lektion, die den Wortschatz erweitert und natürlichere Formulierungen trainiert.",
+  adaptiveReasonFluency:
+    "Deine Punkte sind solide, daher verbessert der nächste Schritt am besten Spontaneität und Gesprächsfluss.",
+  adaptiveReasonStrong:
+    "Du hast die letzte Lektion gut gemeistert, deshalb geht der Planer zu einer etwas reicheren Sprechaufgabe über.",
+  adaptiveReasonMemoryPronunciation:
+    "Dein Trainingsspeicher zeigt noch Ausspracheziele, die in einem neuen Szenario wiederholt werden sollten.",
+  adaptiveReasonMemoryGrammar:
+    "Dein Trainingsspeicher zeigt Grammatikmuster, die noch eine strukturierte Lektion brauchen.",
+  adaptiveReasonMemoryVocabulary:
+    "Der Planer nutzt deine gespeicherten Redemittel, um passiven Wortschatz in gesprochenen Wortschatz zu verwandeln.",
+  adaptiveReasonConsistency:
+    "Du liegst auch hinter deinem Wochenziel, deshalb wählt der Planer eine kürzere Lektion, um die Regelmäßigkeit wieder aufzubauen.",
+  adaptiveReasonStreak:
+    "Deine Serie ist stark, deshalb kann die nächste Lektion sicher an die obere Grenze deines gewählten Bereichs gehen.",
+  adaptiveFocusTargets: "Achte besonders auf: {points}.",
+  adaptiveFocusDefault: "Halte die Lektion auf ein klares Sprechziel fokussiert.",
+  difficultyNoteSupportive:
+    "Halte die Lektion am unteren Rand des gewählten CEFR-Bereichs, mit kürzeren Fragen, mehr Hilfestellung und einfacheren Anschlussfragen.",
+  difficultyNoteBalanced:
+    "Halte die Lektion in der Mitte des gewählten CEFR-Bereichs mit normaler Unterstützung und natürlichem Tempo.",
+  difficultyNoteStretch:
+    "Bleibe im gewählten CEFR-Bereich, nutze aber die obere Grenze mit reicherem Wortschatz, weniger Hilfen und etwas weniger vorhersehbaren Anschlussfragen.",
+};
+
+const RUSSIAN_OVERRIDES: Partial<VoiceAssistantText> = {
+  navLabel: "AI Практика",
+  title: "AI Практика",
+  subtitle: "Говорите, получайте коучинг и поддерживайте разговор.",
+  signInHint: "Войдите, чтобы пользоваться AI Practice.",
+  unsupportedBrowser:
+    "Распознавание речи доступно в поддерживаемых браузерах, например Chrome или Edge.",
+  languageLabel: "Язык разговора",
+  languageHint:
+    "Здесь показываются только язык обучения и родной язык, максимум три варианта.",
+  levelLabel: "Уровень разговора",
+  levelHint:
+    "Выберите один уровень или диапазон CEFR, например A1-A2 или A2-B1. Ответы ИИ будут оставаться на этом уровне.",
+  practiceModeLabel: "Режим практики",
+  practiceModeHint:
+    "Используйте режим практики, чтобы ИИ вел себя как разговорный коуч, а не как обычный чат-бот.",
+  practiceModeDaily: "Повседневный разговор",
+  practiceModeRoleplay: "Ролевая ситуация",
+  practiceModeTopic: "Разговор по теме",
+  practiceTopicLabel: "Сценарий или тема",
+  practiceTopicHint:
+    "Примеры: в кафе, собеседование, small talk, путешествие, презентация, визит к врачу.",
+  practiceTopicPlaceholder: "Выберите жизненную ситуацию или тему...",
+  progressTitle: "Память практики",
+  progressFocus: "Текущий фокус",
+  progressPhrases: "Полезные фразы",
+  progressPronunciation: "Произношение",
+  habitsTitle: "Ритм практики",
+  habitsCurrentStreak: "Текущая серия",
+  habitsLongestStreak: "Лучшая серия",
+  habitsWeeklyGoal: "Цель на неделю",
+  habitsWeeklyProgress: "Прогресс за неделю",
+  habitsWeeklyHint:
+    "Планировщик смотрит не только на ошибки и баллы, но и на вашу серию и недельную цель.",
+  habitsGoalOption: "{count} занятий",
+  habitsWeeklyProgressValue: "{completed}/{target} занятий на этой неделе",
+  summaryTitle: "Итог урока",
+  summaryStrengths: "Что получилось хорошо",
+  summaryFocus: "Что улучшить",
+  summaryPhrases: "Новые фразы",
+  summaryHomework: "Следующий шаг",
+  recentSessionsTitle: "Недавние уроки",
+  recentSessionsEmpty: "Здесь появятся сохраненные занятия.",
+  lessonTemplatesTitle: "Сценарии уроков",
+  lessonTemplatesHint:
+    "Запустите готовый урок и получите итоговую оценку после нескольких реплик ученика.",
+  lessonStart: "Начать урок",
+  lessonRestart: "Начать заново",
+  lessonActiveTitle: "Текущий урок",
+  lessonProgress: "Прогресс урока {progress}",
+  lessonGoalLabel: "Цель урока",
+  lessonTurnsLabel: "{count} реплики",
+  lessonScoreTitle: "Оценка урока",
+  lessonScoreFluency: "Беглость",
+  lessonScoreAccuracy: "Точность",
+  lessonScoreVocabulary: "Словарь",
+  lessonScorePronunciation: "Произношение",
+  lessonScoreGoal: "Достижение цели",
+  lessonScoreFeedback: "Комментарий коуча",
+  lessonReviewTitle: "Разбор после урока",
+  lessonReviewHint:
+    "Используйте этот целевой разбор, чтобы повторить только слабые места из последнего урока.",
+  lessonReviewGrammar: "Грамматика",
+  lessonReviewVocabulary: "Словарь",
+  lessonReviewPronunciation: "Произношение",
+  lessonReviewRepeat: "Повторить только слабые места",
+  lessonPlannerTitle: "Рекомендованный следующий урок",
+  lessonPlannerHint:
+    "Этот планировщик выбирает лучший следующий урок по вашим баллам, карточкам разбора и памяти практики.",
+  lessonPlannerReason: "Почему этот урок",
+  lessonPlannerFocus: "Точки внимания",
+  lessonPlannerDifficulty: "Сложность",
+  lessonPlannerStart: "Начать рекомендованный урок",
+  lessonDifficultyLabel: "Режим сложности",
+  lessonRepeatTitle: "Разбор: {title}",
+  lessonRepeatDescription:
+    "Короткая тренировка, которая фокусируется только на слабых местах последнего урока.",
+  lessonRepeatTopicFallback: "Тренировка слабых мест",
+  lessonRepeatGoal: "Исправьте эти слабые места: {points}.",
+  lessonRepeatFallbackGoal:
+    "Повторите последний урок и сосредоточьтесь только на точности, словаре и произношении.",
+  lessonFallbackFeedback:
+    'Хорошая работа в уроке "{title}". Повторите его еще раз и постарайтесь звучать естественнее в ключевых фразах.',
+  coachCorrection: "Быстрая коррекция",
+  coachBetterVersion: "Лучший вариант",
+  coachNextQuestion: "Следующий вопрос",
+  coachPronunciation: "Подсказка по произношению",
+  nativeHelpLabel: "Подсказки на родном языке ({language})",
+  nativeHelpHint:
+    "Основной разговор остается на языке обучения. При необходимости ИИ может дать короткие пояснения на родном языке.",
+  nativeHelpUnavailable:
+    "Подсказки на родном языке недоступны, если язык разговора совпадает с родным языком.",
+  inputLabel: "Сообщение",
+  inputPlaceholder: "Напишите сообщение или используйте микрофон...",
+  holdToTalk: "Удерживать для речи",
+  releaseToSend: "Отпустите, чтобы отправить",
+  send: "Отправить",
+  clear: "Очистить чат",
+  stopAudio: "Остановить аудио",
+  listening: "Слушаю...",
+  thinking: "ИИ отвечает...",
+  speaking: "Воспроизводится голосовой ответ...",
+  idle: "Готово",
+  empty: "Здесь появится ваш разговор.",
+  emptyPrompt: "Сначала скажите или напишите что-нибудь.",
+  roleUser: "Вы",
+  voicePlaybackFailed: "Не удалось воспроизвести голосовой ответ.",
+  practiceProgressSyncUnavailable: "Сейчас недоступна синхронизация прогресса практики.",
+  practiceGoalSyncUnavailable: "Сейчас недоступна синхронизация цели практики.",
+  emptyResponse: "ИИ вернул пустой ответ.",
+  aiRequestFailed: "Запрос к ИИ не выполнен.",
+  speechRecognitionFailed: "Не удалось распознать речь.",
+  difficultySupportive: "Поддерживающий",
+  difficultyBalanced: "Сбалансированный",
+  difficultyStretch: "Продвинутый",
+  adaptiveReasonPronunciation:
+    "Последний урок показывает, что произношение еще нужно повторять под разговорной нагрузкой.",
+  adaptiveReasonGrammar:
+    "Следующий лучший урок должен укрепить грамматическую точность в коротких реальных ответах.",
+  adaptiveReasonVocabulary:
+    "Вы готовы к уроку, который расширит словарь и сделает формулировки естественнее.",
+  adaptiveReasonFluency:
+    "Ваши баллы уже хорошие, поэтому лучший следующий шаг — усилить спонтанность и плавность речи.",
+  adaptiveReasonStrong:
+    "Вы хорошо справились с прошлым уроком, поэтому планировщик предлагает чуть более богатую разговорную задачу.",
+  adaptiveReasonMemoryPronunciation:
+    "Память практики все еще показывает цели по произношению, которые стоит повторить в новом сценарии.",
+  adaptiveReasonMemoryGrammar:
+    "Память практики указывает на грамматические шаблоны, которым нужен еще один структурированный урок.",
+  adaptiveReasonMemoryVocabulary:
+    "Планировщик снова использует ваши сохраненные фразы, чтобы превратить пассивный словарь в активную речь.",
+  adaptiveReasonConsistency:
+    "Вы также отстаете от недельной цели, поэтому планировщик выбирает более короткий урок, чтобы восстановить регулярность.",
+  adaptiveReasonStreak:
+    "У вас сильная серия, поэтому следующий урок может безопасно выйти к верхней границе выбранного диапазона.",
+  adaptiveFocusTargets: "Обратите особое внимание на: {points}.",
+  adaptiveFocusDefault: "Сделайте урок сфокусированным на одной четкой разговорной цели.",
+  difficultyNoteSupportive:
+    "Держите урок у нижней границы выбранного диапазона CEFR: более короткие вопросы, больше опоры и более простые уточнения.",
+  difficultyNoteBalanced:
+    "Держите урок в середине выбранного диапазона CEFR с обычной поддержкой и естественным темпом.",
+  difficultyNoteStretch:
+    "Оставайтесь в выбранном диапазоне CEFR, но используйте его верхнюю границу: более богатый словарь, меньше опоры и чуть менее предсказуемые уточняющие вопросы.",
+};
+
+const PRACTICE_TOPICS: Record<PracticeTopicId, Record<SupportedLocale, string>> = {
+  cafe: { en: "At the cafe", de: "Im Café", ru: "В кафе" },
+  job: { en: "Job interview", de: "Vorstellungsgespräch", ru: "Собеседование" },
+  travel: { en: "Travel", de: "Reise", ru: "Путешествие" },
+  smallTalk: { en: "Small talk", de: "Small Talk", ru: "Небольшой разговор" },
+  doctor: { en: "Doctor visit", de: "Arztbesuch", ru: "Визит к врачу" },
+  presentation: { en: "Presentation", de: "Präsentation", ru: "Презентация" },
+};
+
+const PRACTICE_TOPIC_ORDER: PracticeTopicId[] = [
+  "cafe",
+  "job",
+  "travel",
+  "smallTalk",
+  "doctor",
+  "presentation",
+];
+
+const LESSON_TEMPLATE_TEXT: Record<
+  LessonTemplateId,
+  {
+    topic: PracticeTopicId;
+    title: Record<SupportedLocale, string>;
+    description: Record<SupportedLocale, string>;
+    goal: Record<SupportedLocale, string>;
+  }
+> = {
+  "small-talk-loop": {
+    topic: "smallTalk",
+    title: { en: "Small talk loop", de: "Small-Talk-Runde", ru: "Цикл small talk" },
+    description: {
+      en: "Practice friendly small talk, react naturally, and keep the exchange moving.",
+      de: "Übe freundlichen Small Talk, reagiere natürlich und halte das Gespräch in Gang.",
+      ru: "Тренируйте дружелюбный small talk, реагируйте естественно и поддерживайте диалог.",
+    },
+    goal: {
+      en: "Keep a casual conversation going for several short turns.",
+      de: "Halte ein lockeres Gespräch über mehrere kurze Züge am Laufen.",
+      ru: "Поддерживайте непринужденный разговор в нескольких коротких репликах.",
+    },
+  },
+  "cafe-order": {
+    topic: "cafe",
+    title: { en: "Cafe order", de: "Bestellung im Café", ru: "Заказ в кафе" },
+    description: {
+      en: "Order a drink, answer one follow-up question, and pay politely.",
+      de: "Bestelle ein Getränk, beantworte eine Rückfrage und bezahle höflich.",
+      ru: "Закажите напиток, ответьте на один уточняющий вопрос и вежливо оплатите.",
+    },
+    goal: {
+      en: "Order confidently and handle one simple follow-up question.",
+      de: "Bestelle sicher und beantworte eine einfache Rückfrage.",
+      ru: "Уверенно сделайте заказ и справьтесь с одним простым уточняющим вопросом.",
+    },
+  },
+  "job-intro": {
+    topic: "job",
+    title: { en: "Job interview intro", de: "Einstieg ins Vorstellungsgespräch", ru: "Начало собеседования" },
+    description: {
+      en: "Introduce yourself, explain your background, and answer why you want the role.",
+      de: "Stelle dich vor, erkläre deinen Hintergrund und beantworte, warum du die Stelle willst.",
+      ru: "Представьтесь, расскажите о своем опыте и ответьте, почему хотите эту роль.",
+    },
+    goal: {
+      en: "Introduce yourself clearly and answer one motivation question.",
+      de: "Stelle dich klar vor und beantworte eine Motivationsfrage.",
+      ru: "Четко представьтесь и ответьте на один вопрос о мотивации.",
+    },
+  },
+  "travel-checkin": {
+    topic: "travel",
+    title: { en: "Travel check-in", de: "Check-in auf Reisen", ru: "Заселение в поездке" },
+    description: {
+      en: "Check into a hotel and answer a practical travel question.",
+      de: "Checke in ein Hotel ein und beantworte eine praktische Reisefrage.",
+      ru: "Заселитесь в отель и ответьте на практический вопрос о поездке.",
+    },
+    goal: {
+      en: "Handle a hotel check-in with clear, practical language.",
+      de: "Bewältige einen Hotel-Check-in mit klarer, praktischer Sprache.",
+      ru: "Справьтесь с заселением в отель с помощью четкой практической речи.",
+    },
+  },
+  "doctor-visit": {
+    topic: "doctor",
+    title: { en: "Doctor visit", de: "Arztbesuch", ru: "Визит к врачу" },
+    description: {
+      en: "Describe symptoms and answer basic follow-up questions.",
+      de: "Beschreibe Symptome und beantworte einfache Rückfragen.",
+      ru: "Опишите симптомы и ответьте на базовые уточняющие вопросы.",
+    },
+    goal: {
+      en: "Explain symptoms simply and answer one or two health questions.",
+      de: "Erkläre Symptome einfach und beantworte ein oder zwei Gesundheitsfragen.",
+      ru: "Просто объясните симптомы и ответьте на один-два вопроса о здоровье.",
+    },
+  },
+  "presentation-opening": {
+    topic: "presentation",
+    title: { en: "Presentation opening", de: "Start einer Präsentation", ru: "Открытие презентации" },
+    description: {
+      en: "Open a presentation, explain the topic, and guide the listener into the talk.",
+      de: "Eröffne eine Präsentation, erkläre das Thema und führe die Zuhörer in den Vortrag ein.",
+      ru: "Начните презентацию, объясните тему и введите слушателя в выступление.",
+    },
+    goal: {
+      en: "Open a short presentation with structure and confidence.",
+      de: "Eröffne eine kurze Präsentation strukturiert und sicher.",
+      ru: "Откройте короткую презентацию структурно и уверенно.",
+    },
+  },
 };
 
 export function getVoiceAssistantText(locale: string): VoiceAssistantText {
-  void locale;
-  return VOICE_ASSISTANT_TEXT;
+  const normalized = normalizeLocale(locale);
+  if (normalized === "de") {
+    return { ...ENGLISH_TEXT, ...GERMAN_OVERRIDES };
+  }
+  if (normalized === "ru") {
+    return { ...ENGLISH_TEXT, ...RUSSIAN_OVERRIDES };
+  }
+  return ENGLISH_TEXT;
+}
+
+export function getPracticeTopicSuggestions(locale: string) {
+  const normalized = normalizeLocale(locale);
+  return PRACTICE_TOPIC_ORDER.map((topicId) => PRACTICE_TOPICS[topicId][normalized]);
+}
+
+export function localizePracticeTopic(topic: string, locale: string) {
+  const trimmed = topic.trim();
+  if (!trimmed) return topic;
+  const normalized = normalizeLocale(locale);
+  const lower = trimmed.toLowerCase();
+  const match = PRACTICE_TOPIC_ORDER.find((topicId) =>
+    Object.values(PRACTICE_TOPICS[topicId]).some((value) => value.toLowerCase() === lower)
+  );
+  return match ? PRACTICE_TOPICS[match][normalized] : topic;
+}
+
+export function getPracticeModeLabel(mode: string, text: VoiceAssistantText) {
+  if (mode === "roleplay") return text.practiceModeRoleplay;
+  if (mode === "topic") return text.practiceModeTopic;
+  return text.practiceModeDaily;
+}
+
+export function getLocalizedLessonTemplateText(
+  templateId: string,
+  locale: string
+): LocalizedLessonTemplateText | null {
+  const entry = LESSON_TEMPLATE_TEXT[templateId as LessonTemplateId];
+  if (!entry) return null;
+  const normalized = normalizeLocale(locale);
+  return {
+    title: entry.title[normalized],
+    description: entry.description[normalized],
+    topic: PRACTICE_TOPICS[entry.topic][normalized],
+    goal: entry.goal[normalized],
+  };
+}
+
+export function formatVoiceAssistantText(
+  template: string,
+  values: Record<string, string | number>
+) {
+  return fillTemplate(template, values);
 }

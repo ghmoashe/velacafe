@@ -16,7 +16,15 @@ import {
   createOpenAiAssistantReply,
 } from "./openAiAssistant";
 import { getSupabaseClient } from "./supabaseClient";
-import { getVoiceAssistantText } from "./voiceAssistantText";
+import {
+  formatVoiceAssistantText,
+  getLocalizedLessonTemplateText,
+  getPracticeModeLabel,
+  getPracticeTopicSuggestions,
+  getVoiceAssistantText,
+  localizePracticeTopic,
+  type VoiceAssistantText,
+} from "./voiceAssistantText";
 
 type VoiceAssistantPageProps = {
   locale: string;
@@ -216,82 +224,69 @@ const CONVERSATION_LEVEL_OPTIONS = [
 type ConversationLevelOption = (typeof CONVERSATION_LEVEL_OPTIONS)[number];
 const PRACTICE_MODE_OPTIONS = ["daily", "roleplay", "topic"] as const;
 type PracticeModeOption = (typeof PRACTICE_MODE_OPTIONS)[number];
-const PRACTICE_TOPIC_SUGGESTIONS = [
-  "At the cafe",
-  "Job interview",
-  "Travel",
-  "Small talk",
-  "Doctor visit",
-  "Presentation",
-] as const;
-const LESSON_TEMPLATES: LessonTemplate[] = [
+const LESSON_TEMPLATE_DEFS: Array<
+  Pick<LessonTemplate, "id" | "mode" | "turnTarget" | "starterPrompt">
+> = [
   {
     id: "small-talk-loop",
-    title: "Small talk loop",
-    description: "Practice friendly small talk, react naturally, and keep the exchange moving.",
     mode: "daily",
-    topic: "Small talk",
-    goal: "Keep a casual conversation going for several short turns.",
     turnTarget: 4,
     starterPrompt:
       "Start a short small-talk lesson. Set a casual scene and ask the learner an easy everyday question.",
   },
   {
     id: "cafe-order",
-    title: "Cafe order",
-    description: "Order a drink, answer one follow-up question, and pay politely.",
     mode: "roleplay",
-    topic: "At the cafe",
-    goal: "Order confidently and handle one simple follow-up question.",
     turnTarget: 4,
     starterPrompt:
       "Start a short cafe role-play lesson. You are the barista. Set the scene briefly and ask for the learner's order.",
   },
   {
     id: "job-intro",
-    title: "Job interview intro",
-    description: "Introduce yourself, explain your background, and answer why you want the role.",
     mode: "roleplay",
-    topic: "Job interview",
-    goal: "Introduce yourself clearly and answer one motivation question.",
     turnTarget: 5,
     starterPrompt:
       "Start a short job interview lesson. You are the interviewer. Set the scene and ask the learner to introduce themselves.",
   },
   {
     id: "travel-checkin",
-    title: "Travel check-in",
-    description: "Check into a hotel and answer a practical travel question.",
     mode: "roleplay",
-    topic: "Travel",
-    goal: "Handle a hotel check-in with clear, practical language.",
     turnTarget: 4,
     starterPrompt:
       "Start a short hotel check-in lesson. You are the receptionist. Set the scene and ask for the learner's reservation details.",
   },
   {
     id: "doctor-visit",
-    title: "Doctor visit",
-    description: "Describe symptoms and answer basic follow-up questions.",
     mode: "roleplay",
-    topic: "Doctor visit",
-    goal: "Explain symptoms simply and answer one or two health questions.",
     turnTarget: 4,
     starterPrompt:
       "Start a short doctor visit lesson. You are the doctor. Set the scene and ask what problem the learner has today.",
   },
   {
     id: "presentation-opening",
-    title: "Presentation opening",
-    description: "Open a presentation, explain the topic, and guide the listener into the talk.",
     mode: "topic",
-    topic: "Presentation",
-    goal: "Open a short presentation with structure and confidence.",
     turnTarget: 5,
     starterPrompt:
       "Start a short presentation practice lesson. Set the context and ask the learner to open a presentation on their topic.",
   },
 ];
+
+function buildLocalizedLessonTemplates(locale: string): LessonTemplate[] {
+  return LESSON_TEMPLATE_DEFS.map((template) => {
+    const localized = getLocalizedLessonTemplateText(template.id, locale);
+    return {
+      ...template,
+      title: localized?.title ?? template.id,
+      description: localized?.description ?? "",
+      topic: localized?.topic ?? "",
+      goal: localized?.goal ?? "",
+    };
+  });
+}
+
+function normalizeTemplateId(templateId: string) {
+  return templateId.replace(/-(adaptive|review)$/u, "");
+}
 
 function buildId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -647,7 +642,8 @@ function clampLessonScore(value: number) {
 
 function buildFallbackLessonScore(
   coach: CoachFeedback | null,
-  lesson: ActiveLessonState
+  lesson: ActiveLessonState,
+  text: VoiceAssistantText
 ): LessonResult {
   const accuracy = clampLessonScore(coach?.quickCorrection ? 76 : 88);
   const vocabulary = clampLessonScore(coach?.betterVersion ? 82 : 90);
@@ -668,7 +664,7 @@ function buildFallbackLessonScore(
     finalFeedback:
       coach?.summary?.homework[0] ||
       coach?.summary?.focusNext[0] ||
-      `Good work in "${lesson.title}". Repeat the lesson once more and try to sound more natural on the key phrases.`,
+      formatVoiceAssistantText(text.lessonFallbackFeedback, { title: lesson.title }),
     templateId: lesson.templateId,
     title: lesson.title,
     turnTarget: lesson.turnTarget,
@@ -741,27 +737,32 @@ function buildLessonReviewFromSession(session: PracticeSessionHistoryRow): Lesso
   };
 }
 
-function findLessonTemplateById(templateId: string) {
-  return LESSON_TEMPLATES.find((template) => template.id === templateId) ?? null;
+function findLessonTemplateById(lessonTemplates: LessonTemplate[], templateId: string) {
+  const normalizedTemplateId = normalizeTemplateId(templateId);
+  return lessonTemplates.find((template) => template.id === normalizedTemplateId) ?? null;
 }
 
-function getDifficultyLabel(mode: CoachDifficultyMode) {
+function getDifficultyLabel(mode: CoachDifficultyMode, text: VoiceAssistantText) {
   switch (mode) {
     case "supportive":
-      return "Supportive";
+      return text.difficultySupportive;
     case "stretch":
-      return "Stretch";
+      return text.difficultyStretch;
     case "balanced":
     default:
-      return "Balanced";
+      return text.difficultyBalanced;
   }
 }
 
 function selectTemplateForAdaptivePlan(input: {
+  lessonTemplates: LessonTemplate[];
   dominantArea: "grammar" | "vocabulary" | "pronunciation" | "fluency";
   recentTemplateIds: string[];
   previousTemplateId?: string;
 }) {
+  const previousTemplateId = input.previousTemplateId
+    ? normalizeTemplateId(input.previousTemplateId)
+    : "";
   const candidateIds =
     input.dominantArea === "grammar"
       ? ["doctor-visit", "cafe-order", "job-intro", "small-talk-loop"]
@@ -772,24 +773,26 @@ function selectTemplateForAdaptivePlan(input: {
           : ["small-talk-loop", "travel-checkin", "cafe-order", "job-intro"];
 
   const preferredTemplate = candidateIds
-    .map((templateId) => findLessonTemplateById(templateId))
+    .map((templateId) => findLessonTemplateById(input.lessonTemplates, templateId))
     .find(
       (template) =>
         template &&
-        template.id !== input.previousTemplateId &&
+        template.id !== previousTemplateId &&
         !input.recentTemplateIds.includes(template.id)
     );
 
   return (
     preferredTemplate ??
     candidateIds
-      .map((templateId) => findLessonTemplateById(templateId))
-      .find((template) => template && template.id !== input.previousTemplateId) ??
-    LESSON_TEMPLATES[0]
+      .map((templateId) => findLessonTemplateById(input.lessonTemplates, templateId))
+      .find((template) => template && template.id !== previousTemplateId) ??
+    input.lessonTemplates[0]
   );
 }
 
 function buildAdaptiveLessonPlan(input: {
+  lessonTemplates: LessonTemplate[];
+  text: VoiceAssistantText;
   lessonResult: LessonResult | null;
   lessonReview: LessonReview | null;
   practiceProgress: PracticeProgress;
@@ -797,7 +800,7 @@ function buildAdaptiveLessonPlan(input: {
   recentSessions: PracticeSessionHistoryRow[];
 }): AdaptiveLessonPlan | null {
   const recentTemplateIds = input.recentSessions
-    .map((session) => session.lesson_template ?? "")
+    .map((session) => normalizeTemplateId(session.lesson_template ?? ""))
     .filter(Boolean)
     .slice(0, 3);
 
@@ -819,21 +822,21 @@ function buildAdaptiveLessonPlan(input: {
     focus = review?.pronunciation.length
       ? review.pronunciation
       : input.practiceProgress.pronunciationTips.slice(0, 2);
-    reason = "Your last lesson shows pronunciation still needs repetition under speaking pressure.";
+    reason = input.text.adaptiveReasonPronunciation;
   } else if (review?.grammar.length || (result && result.accuracy < 80)) {
     dominantArea = "grammar";
     difficultyMode = result && result.accuracy < 72 ? "supportive" : "balanced";
     focus = review?.grammar.length
       ? review.grammar
       : input.practiceProgress.focusAreas.slice(0, 3);
-    reason = "Your next best lesson should tighten grammar accuracy in short real-life replies.";
+    reason = input.text.adaptiveReasonGrammar;
   } else if (review?.vocabulary.length || (result && result.vocabulary < 82)) {
     dominantArea = "vocabulary";
     difficultyMode = result && result.vocabulary >= 78 ? "balanced" : "supportive";
     focus = review?.vocabulary.length
       ? review.vocabulary
       : input.practiceProgress.savedPhrases.slice(0, 3);
-    reason = "You are ready for a lesson that pushes vocabulary range and more natural phrasing.";
+    reason = input.text.adaptiveReasonVocabulary;
   } else if (result) {
     dominantArea = result.fluency < 85 ? "fluency" : "vocabulary";
     difficultyMode =
@@ -845,8 +848,8 @@ function buildAdaptiveLessonPlan(input: {
     focus = input.practiceProgress.savedPhrases.slice(0, 3);
     reason =
       result.fluency < 85
-        ? "Your scores are solid, so the best next step is a lesson that improves flow and spontaneity."
-        : "You handled the last lesson well, so the planner is moving you to a slightly richer speaking task.";
+        ? input.text.adaptiveReasonFluency
+        : input.text.adaptiveReasonStrong;
   } else if (
     input.practiceProgress.focusAreas.length ||
     input.practiceProgress.savedPhrases.length ||
@@ -856,17 +859,17 @@ function buildAdaptiveLessonPlan(input: {
       dominantArea = "pronunciation";
       difficultyMode = "supportive";
       focus = input.practiceProgress.pronunciationTips.slice(0, 2);
-      reason = "Your practice memory still shows pronunciation targets that should be recycled in a fresh scenario.";
+      reason = input.text.adaptiveReasonMemoryPronunciation;
     } else if (input.practiceProgress.focusAreas.length) {
       dominantArea = "grammar";
       difficultyMode = "supportive";
       focus = input.practiceProgress.focusAreas.slice(0, 3);
-      reason = "Your practice memory points to grammar patterns that need one more structured lesson.";
+      reason = input.text.adaptiveReasonMemoryGrammar;
     } else {
       dominantArea = "vocabulary";
       difficultyMode = "balanced";
       focus = input.practiceProgress.savedPhrases.slice(0, 3);
-      reason = "The planner is reusing your saved phrases to turn passive vocabulary into spoken vocabulary.";
+      reason = input.text.adaptiveReasonMemoryVocabulary;
     }
   } else {
     return null;
@@ -874,11 +877,13 @@ function buildAdaptiveLessonPlan(input: {
 
   const template = needsConsistencyPush
     ? selectTemplateForAdaptivePlan({
+        lessonTemplates: input.lessonTemplates,
         dominantArea: "fluency",
         recentTemplateIds,
         previousTemplateId: review?.templateId,
       })
     : selectTemplateForAdaptivePlan({
+        lessonTemplates: input.lessonTemplates,
         dominantArea,
         recentTemplateIds,
         previousTemplateId: review?.templateId,
@@ -886,28 +891,28 @@ function buildAdaptiveLessonPlan(input: {
 
   if (needsConsistencyPush) {
     difficultyMode = difficultyMode === "stretch" ? "balanced" : "supportive";
-    reason = `${reason} You are also behind your weekly goal, so the planner is choosing a shorter win to rebuild consistency.`;
+    reason = `${reason} ${input.text.adaptiveReasonConsistency}`.trim();
   } else if (input.practiceHabits.currentStreak >= 5 && result && result.overall >= 88) {
     difficultyMode = "stretch";
-    reason = `${reason} Your streak is strong, so the next lesson can safely push the upper edge of your selected range.`;
+    reason = `${reason} ${input.text.adaptiveReasonStreak}`.trim();
   }
 
   const focusText = focus.length
-    ? `Pay special attention to: ${focus.join("; ")}.`
-    : "Keep the lesson focused on one clear speaking objective.";
+    ? formatVoiceAssistantText(input.text.adaptiveFocusTargets, { points: focus.join("; ") })
+    : input.text.adaptiveFocusDefault;
   const difficultyNote =
     difficultyMode === "supportive"
-      ? "Keep the lesson at the lower edge of the selected CEFR range, with shorter questions, more scaffolding, and easier follow-up prompts."
+      ? input.text.difficultyNoteSupportive
       : difficultyMode === "stretch"
-        ? "Keep the lesson inside the selected CEFR range but use the upper edge with richer vocabulary, less scaffolding, and slightly less predictable follow-up questions."
-        : "Keep the lesson in the middle of the selected CEFR range with normal support and natural pacing.";
+        ? input.text.difficultyNoteStretch
+        : input.text.difficultyNoteBalanced;
 
   return {
     template,
     focus,
     reason,
     difficultyMode,
-    difficultyLabel: getDifficultyLabel(difficultyMode),
+    difficultyLabel: getDifficultyLabel(difficultyMode, input.text),
     difficultyNote,
     goal: `${template.goal} ${focusText}`.trim(),
     starterPrompt: [
@@ -964,6 +969,8 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     requireAuth,
   } = props;
   const text = useMemo(() => getVoiceAssistantText(locale), [locale]);
+  const lessonTemplates = useMemo(() => buildLocalizedLessonTemplates(locale), [locale]);
+  const practiceTopicSuggestions = useMemo(() => getPracticeTopicSuggestions(locale), [locale]);
   const defaultConversationLocale = useMemo(
     () => getPreferredConversationLocale(preferredInputLocales, locale),
     [locale, preferredInputLocales]
@@ -1227,15 +1234,17 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     nativeLocale && nativeLocale.trim() && nativeLocale !== selectedConversationLocale
   );
   const adaptiveLessonPlan = useMemo(
-    () =>
-      buildAdaptiveLessonPlan({
-        lessonResult,
-        lessonReview,
-        practiceProgress,
-        practiceHabits,
-        recentSessions,
-      }),
-    [lessonResult, lessonReview, practiceProgress, practiceHabits, recentSessions]
+      () =>
+        buildAdaptiveLessonPlan({
+          lessonTemplates,
+          text,
+          lessonResult,
+          lessonReview,
+          practiceProgress,
+          practiceHabits,
+          recentSessions,
+        }),
+    [lessonResult, lessonReview, practiceProgress, practiceHabits, recentSessions, lessonTemplates, text]
   );
 
   const updateMessage = useCallback(
@@ -1413,7 +1422,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           clearAudioUrl();
           setSpeaking(false);
           setStatusMessage(text.idle);
-          setErrorMessage("Voice playback failed.");
+          setErrorMessage(text.voicePlaybackFailed);
         };
         audio.src = objectUrl;
         audio.currentTime = 0;
@@ -1422,7 +1431,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       } catch (error) {
         setSpeaking(false);
         setStatusMessage(text.idle);
-        setErrorMessage(error instanceof Error ? error.message : "Voice playback failed.");
+        setErrorMessage(text.voicePlaybackFailed);
       }
     },
     [clearAudioUrl, getOrCreateAudioElement, stopAudioPlayback, text.idle, text.speaking]
@@ -1527,7 +1536,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           if (reply.coach?.lessonComplete) {
             lessonResultSnapshot = reply.coach.score
               ? createLessonResult(reply.coach.score, progressedLesson)
-              : buildFallbackLessonScore(reply.coach, progressedLesson);
+              : buildFallbackLessonScore(reply.coach, progressedLesson, text);
             lessonReviewSnapshot = buildLessonReviewFromCoach(reply.coach, progressedLesson);
             setLessonResult(lessonResultSnapshot);
             setLessonReview(lessonReviewSnapshot);
@@ -1610,14 +1619,14 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
                 throw historyResult.error;
               }
             })().catch(() => {
-              setErrorMessage("Practice progress sync is temporarily unavailable.");
+              setErrorMessage(text.practiceProgressSyncUnavailable);
             });
           }
         }
         if (spokenText) {
           void speakReply(spokenText, replyLocale);
         } else {
-          setErrorMessage("AI returned an empty response.");
+          setErrorMessage(text.emptyResponse);
         }
       };
 
@@ -1646,7 +1655,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         );
         setThinking(false);
         setStatusMessage(text.idle);
-        setErrorMessage(error instanceof Error ? error.message : "AI request failed.");
+        setErrorMessage(text.aiRequestFailed);
       }
     },
     [
@@ -1756,8 +1765,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         topic: template.topic,
         goal: template.goal,
         difficultyMode: "balanced",
-        difficultyNote:
-          "Keep the lesson in the middle of the selected CEFR range with normal support and natural pacing.",
+        difficultyNote: text.difficultyNoteBalanced,
         turnTarget: template.turnTarget,
         userTurnsCompleted: 0,
         startedAt: new Date().toISOString(),
@@ -1770,7 +1778,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         selectedTopic: template.topic,
       });
     },
-    [beginLessonSession]
+    [beginLessonSession, text.difficultyNoteBalanced]
   );
 
   const handleRepeatWeakPoints = useCallback(async () => {
@@ -1778,18 +1786,24 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       return;
     }
 
+    const reviewLessonTitle =
+      findLessonTemplateById(lessonTemplates, lessonReview.templateId)?.title ?? lessonReview.title;
+    const reviewTopic =
+      localizePracticeTopic(lessonReview.sourceTopic, locale) || text.lessonRepeatTopicFallback;
+
     const nextLesson: ActiveLessonState = {
       templateId: `${lessonReview.templateId}-review`,
-      title: `${lessonReview.title} review`,
-      description: "Short drill focused only on your weak points from the last lesson.",
+      title: formatVoiceAssistantText(text.lessonRepeatTitle, { title: reviewLessonTitle }),
+      description: text.lessonRepeatDescription,
       mode: lessonReview.sourceMode,
-      topic: lessonReview.sourceTopic || "Weak-point drill",
+      topic: reviewTopic,
       goal: lessonReview.weakPoints.length
-        ? `Fix these weak points: ${lessonReview.weakPoints.join("; ")}.`
-        : "Repeat the last lesson and focus only on accuracy, vocabulary, and pronunciation.",
+        ? formatVoiceAssistantText(text.lessonRepeatGoal, {
+            points: lessonReview.weakPoints.join("; "),
+          })
+        : text.lessonRepeatFallbackGoal,
       difficultyMode: "supportive",
-      difficultyNote:
-        "Keep the lesson at the lower edge of the selected CEFR range, with shorter questions, more scaffolding, and easier follow-up prompts.",
+      difficultyNote: text.difficultyNoteSupportive,
       turnTarget: 3,
       userTurnsCompleted: 0,
       startedAt: new Date().toISOString(),
@@ -1815,11 +1829,19 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       lesson: nextLesson,
       starterPrompt,
       selectedMode: lessonReview.sourceMode,
-      selectedTopic: lessonReview.sourceTopic,
+      selectedTopic: reviewTopic,
     });
   }, [
     beginLessonSession,
     lessonReview,
+    lessonTemplates,
+    locale,
+    text.difficultyNoteSupportive,
+    text.lessonRepeatDescription,
+    text.lessonRepeatFallbackGoal,
+    text.lessonRepeatGoal,
+    text.lessonRepeatTitle,
+    text.lessonRepeatTopicFallback,
   ]);
 
   const handleStartRecommendedLesson = useCallback(async () => {
@@ -1894,7 +1916,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       if (event.error === "aborted") {
         return;
       }
-      const speechError = event.error?.trim() ?? event.message?.trim() ?? "Speech recognition failed.";
+      const speechError = text.speechRecognitionFailed;
       setErrorMessage(speechError);
     };
     recognition.onresult = (event) => {
@@ -2055,7 +2077,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
             )
             .then(({ error }) => {
               if (error) {
-                setErrorMessage("Practice goal sync is temporarily unavailable.");
+                setErrorMessage(text.practiceGoalSyncUnavailable);
               }
             });
         }
@@ -2219,7 +2241,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           >
             {WEEKLY_GOAL_OPTIONS.map((goalValue) => (
               <option key={goalValue} value={goalValue}>
-                {`${goalValue} lessons`}
+                {formatVoiceAssistantText(text.habitsGoalOption, { count: goalValue })}
               </option>
             ))}
           </select>
@@ -2237,7 +2259,10 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
               />
             </div>
             <div className="muted">
-              {`${practiceHabits.weeklyGoalCompleted}/${practiceHabits.weeklyGoalTarget} lessons this week`}
+              {formatVoiceAssistantText(text.habitsWeeklyProgressValue, {
+                completed: practiceHabits.weeklyGoalCompleted,
+                target: practiceHabits.weeklyGoalTarget,
+              })}
             </div>
           </div>
           <div className="muted">{text.habitsWeeklyHint}</div>
@@ -2246,7 +2271,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           <div className="voiceAssistantCoachTitle">{text.lessonTemplatesTitle}</div>
           <div className="muted">{text.lessonTemplatesHint}</div>
           <div className="voiceAssistantLessonTemplates">
-            {LESSON_TEMPLATES.map((template) => {
+            {lessonTemplates.map((template) => {
               const isActive = activeLesson?.templateId === template.id;
               return (
                 <div
@@ -2260,9 +2285,13 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
                     {template.description}
                   </div>
                   <div className="voiceAssistantRecentSessionMeta">
-                    <span>{template.mode}</span>
+                    <span>{getPracticeModeLabel(template.mode, text)}</span>
                     <span>{template.topic}</span>
-                    <span>{`${template.turnTarget} turns`}</span>
+                    <span>
+                      {formatVoiceAssistantText(text.lessonTurnsLabel, {
+                        count: template.turnTarget,
+                      })}
+                    </span>
                   </div>
                   <div className="muted">{template.goal}</div>
                   <button
@@ -2294,7 +2323,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
                 )}
               </span>
               <span>{activeLesson.topic}</span>
-              <span>{getDifficultyLabel(activeLesson.difficultyMode)}</span>
+              <span>{getDifficultyLabel(activeLesson.difficultyMode, text)}</span>
             </div>
             <div className="voiceAssistantCoachSection">
               <div className="voiceAssistantCoachLabel">{text.lessonGoalLabel}</div>
@@ -2310,7 +2339,10 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         {lessonResult ? (
           <div className="voiceAssistantCoachPanel voiceAssistantLessonScore">
             <div className="voiceAssistantCoachTitle">{text.lessonScoreTitle}</div>
-            <div className="voiceAssistantLessonHeadline">{lessonResult.title}</div>
+            <div className="voiceAssistantLessonHeadline">
+              {findLessonTemplateById(lessonTemplates, lessonResult.templateId)?.title ??
+                lessonResult.title}
+            </div>
             <div className="voiceAssistantLessonOverall">
               <span className="voiceAssistantLessonOverallValue">
                 {lessonResult.overall}
@@ -2531,7 +2563,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         />
         <div className="muted">{text.practiceTopicHint}</div>
         <div className="voiceAssistantSuggestionRow">
-          {PRACTICE_TOPIC_SUGGESTIONS.map((suggestion) => (
+              {practiceTopicSuggestions.map((suggestion) => (
             <button
               key={suggestion}
               className="btn btnGhost voiceAssistantSuggestion"
@@ -2645,9 +2677,11 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
             {recentSessions.map((session) => (
               <div key={session.id} className="voiceAssistantRecentSession">
                 <div className="voiceAssistantRecentSessionMeta">
-                  <span>{session.practice_mode}</span>
+                  <span>{getPracticeModeLabel(session.practice_mode, text)}</span>
                   <span>{session.level_range}</span>
-                  {session.practice_topic ? <span>{session.practice_topic}</span> : null}
+                  {session.practice_topic ? (
+                    <span>{localizePracticeTopic(session.practice_topic, locale)}</span>
+                  ) : null}
                   {session.lesson_score ? <span>{`${session.lesson_score.overall}/100`}</span> : null}
                 </div>
                 <div className="voiceAssistantRecentSessionReply">{session.assistant_reply}</div>
@@ -2671,7 +2705,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
               }`}
             >
               <div className="voiceAssistantBubbleRole">
-                {message.role === "user" ? "You" : "AI"}
+                {message.role === "user" ? text.roleUser : text.roleAssistant}
               </div>
               <div>{message.text || (message.pending ? text.thinking : "")}</div>
               {message.role === "assistant" && message.coach ? (
