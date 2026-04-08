@@ -10,6 +10,8 @@ import {
 import { synthesizeElevenLabsSpeech } from "./elevenLabsTts";
 import {
   type CoachFeedback,
+  type CoachDifficultyMode,
+  type CoachLessonScore,
   type CoachPracticeSummary,
   createOpenAiAssistantReply,
 } from "./openAiAssistant";
@@ -45,6 +47,16 @@ type PracticeProgress = {
   updatedAt: string | null;
 };
 
+type PracticeHabitStats = {
+  currentStreak: number;
+  longestStreak: number;
+  weeklyGoalTarget: number;
+  weeklyGoalCompleted: number;
+  weeklyGoalWeekStart: string;
+  lastLessonDay: string | null;
+  updatedAt: string | null;
+};
+
 type PracticeUserStateRow = {
   user_id: string;
   locale: string;
@@ -55,6 +67,15 @@ type PracticeUserStateRow = {
   last_practice_mode: string | null;
   last_practice_topic: string | null;
   last_summary: CoachPracticeSummary | null;
+  last_lesson_result: LessonResult | null;
+  last_lesson_template: string | null;
+  last_lesson_completed_at: string | null;
+  current_streak: number | null;
+  longest_streak: number | null;
+  weekly_goal_target: number | null;
+  weekly_goal_completed: number | null;
+  weekly_goal_week_start: string | null;
+  last_lesson_day: string | null;
   updated_at: string | null;
 };
 
@@ -71,8 +92,69 @@ type PracticeSessionHistoryRow = {
   next_question: string | null;
   pronunciation_tip: string | null;
   summary: CoachPracticeSummary | null;
+  lesson_template: string | null;
+  lesson_turn_index: number | null;
+  lesson_turn_target: number | null;
+  lesson_score: LessonResult | null;
   created_at: string;
 };
+
+type LessonTemplate = {
+  id: string;
+  title: string;
+  description: string;
+  mode: PracticeModeOption;
+  topic: string;
+  goal: string;
+  turnTarget: number;
+  starterPrompt: string;
+};
+
+type ActiveLessonState = {
+  templateId: string;
+  title: string;
+  description: string;
+  mode: PracticeModeOption;
+  topic: string;
+  goal: string;
+  difficultyMode: CoachDifficultyMode;
+  difficultyNote: string;
+  turnTarget: number;
+  userTurnsCompleted: number;
+  startedAt: string;
+};
+
+type LessonResult = CoachLessonScore & {
+  templateId: string;
+  title: string;
+  turnTarget: number;
+  completedAt: string;
+};
+
+type LessonReview = {
+  templateId: string;
+  title: string;
+  sourceMode: PracticeModeOption;
+  sourceTopic: string;
+  turnTarget: number;
+  grammar: string[];
+  vocabulary: string[];
+  pronunciation: string[];
+  weakPoints: string[];
+};
+
+type AdaptiveLessonPlan = {
+  template: LessonTemplate;
+  goal: string;
+  reason: string;
+  focus: string[];
+  starterPrompt: string;
+  difficultyMode: CoachDifficultyMode;
+  difficultyLabel: string;
+  difficultyNote: string;
+};
+
+const WEEKLY_GOAL_OPTIONS = [3, 4, 5, 7] as const;
 
 type SpeechRecognitionAlternativeLike = {
   transcript: string;
@@ -142,6 +224,74 @@ const PRACTICE_TOPIC_SUGGESTIONS = [
   "Doctor visit",
   "Presentation",
 ] as const;
+const LESSON_TEMPLATES: LessonTemplate[] = [
+  {
+    id: "small-talk-loop",
+    title: "Small talk loop",
+    description: "Practice friendly small talk, react naturally, and keep the exchange moving.",
+    mode: "daily",
+    topic: "Small talk",
+    goal: "Keep a casual conversation going for several short turns.",
+    turnTarget: 4,
+    starterPrompt:
+      "Start a short small-talk lesson. Set a casual scene and ask the learner an easy everyday question.",
+  },
+  {
+    id: "cafe-order",
+    title: "Cafe order",
+    description: "Order a drink, answer one follow-up question, and pay politely.",
+    mode: "roleplay",
+    topic: "At the cafe",
+    goal: "Order confidently and handle one simple follow-up question.",
+    turnTarget: 4,
+    starterPrompt:
+      "Start a short cafe role-play lesson. You are the barista. Set the scene briefly and ask for the learner's order.",
+  },
+  {
+    id: "job-intro",
+    title: "Job interview intro",
+    description: "Introduce yourself, explain your background, and answer why you want the role.",
+    mode: "roleplay",
+    topic: "Job interview",
+    goal: "Introduce yourself clearly and answer one motivation question.",
+    turnTarget: 5,
+    starterPrompt:
+      "Start a short job interview lesson. You are the interviewer. Set the scene and ask the learner to introduce themselves.",
+  },
+  {
+    id: "travel-checkin",
+    title: "Travel check-in",
+    description: "Check into a hotel and answer a practical travel question.",
+    mode: "roleplay",
+    topic: "Travel",
+    goal: "Handle a hotel check-in with clear, practical language.",
+    turnTarget: 4,
+    starterPrompt:
+      "Start a short hotel check-in lesson. You are the receptionist. Set the scene and ask for the learner's reservation details.",
+  },
+  {
+    id: "doctor-visit",
+    title: "Doctor visit",
+    description: "Describe symptoms and answer basic follow-up questions.",
+    mode: "roleplay",
+    topic: "Doctor visit",
+    goal: "Explain symptoms simply and answer one or two health questions.",
+    turnTarget: 4,
+    starterPrompt:
+      "Start a short doctor visit lesson. You are the doctor. Set the scene and ask what problem the learner has today.",
+  },
+  {
+    id: "presentation-opening",
+    title: "Presentation opening",
+    description: "Open a presentation, explain the topic, and guide the listener into the talk.",
+    mode: "topic",
+    topic: "Presentation",
+    goal: "Open a short presentation with structure and confidence.",
+    turnTarget: 5,
+    starterPrompt:
+      "Start a short presentation practice lesson. Set the context and ask the learner to open a presentation on their topic.",
+  },
+];
 
 function buildId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -349,6 +499,120 @@ function getPracticeProgressStorageKey(userId: string | null | undefined, locale
   return `vela-ai-practice:${userId?.trim() || "guest"}:${locale}`;
 }
 
+function getPracticeHabitsStorageKey(userId: string | null | undefined, locale: string) {
+  return `vela-ai-practice-habits:${userId?.trim() || "guest"}:${locale}`;
+}
+
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getWeekStartKey(date: Date) {
+  const normalized = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = normalized.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  normalized.setDate(normalized.getDate() + diff);
+  return formatDateKey(normalized);
+}
+
+function createEmptyPracticeHabits(now = new Date()): PracticeHabitStats {
+  return {
+    currentStreak: 0,
+    longestStreak: 0,
+    weeklyGoalTarget: 4,
+    weeklyGoalCompleted: 0,
+    weeklyGoalWeekStart: getWeekStartKey(now),
+    lastLessonDay: null,
+    updatedAt: null,
+  };
+}
+
+function normalizePracticeHabits(
+  habits: Partial<PracticeHabitStats> | null | undefined,
+  now = new Date()
+): PracticeHabitStats {
+  const defaults = createEmptyPracticeHabits(now);
+  const weeklyGoalWeekStart =
+    typeof habits?.weeklyGoalWeekStart === "string" && habits.weeklyGoalWeekStart.trim()
+      ? habits.weeklyGoalWeekStart.trim()
+      : defaults.weeklyGoalWeekStart;
+  const currentWeekStart = getWeekStartKey(now);
+  const target =
+    typeof habits?.weeklyGoalTarget === "number" && habits.weeklyGoalTarget > 0
+      ? habits.weeklyGoalTarget
+      : defaults.weeklyGoalTarget;
+
+  return {
+    currentStreak:
+      typeof habits?.currentStreak === "number" && habits.currentStreak >= 0
+        ? habits.currentStreak
+        : defaults.currentStreak,
+    longestStreak:
+      typeof habits?.longestStreak === "number" && habits.longestStreak >= 0
+        ? habits.longestStreak
+        : defaults.longestStreak,
+    weeklyGoalTarget: target,
+    weeklyGoalCompleted:
+      weeklyGoalWeekStart === currentWeekStart &&
+      typeof habits?.weeklyGoalCompleted === "number" &&
+      habits.weeklyGoalCompleted >= 0
+        ? habits.weeklyGoalCompleted
+        : 0,
+    weeklyGoalWeekStart: currentWeekStart,
+    lastLessonDay:
+      typeof habits?.lastLessonDay === "string" && habits.lastLessonDay.trim()
+        ? habits.lastLessonDay.trim()
+        : null,
+    updatedAt:
+      typeof habits?.updatedAt === "string" && habits.updatedAt.trim()
+        ? habits.updatedAt
+        : defaults.updatedAt,
+  };
+}
+
+function advancePracticeHabits(previous: PracticeHabitStats, completedAt: Date) {
+  const normalized = normalizePracticeHabits(previous, completedAt);
+  const todayKey = formatDateKey(completedAt);
+  let nextCurrentStreak = normalized.currentStreak;
+  let nextLongestStreak = normalized.longestStreak;
+
+  if (normalized.lastLessonDay !== todayKey) {
+    const previousLessonDate = normalized.lastLessonDay
+      ? parseDateKey(normalized.lastLessonDay)
+      : null;
+    if (previousLessonDate) {
+      const daysBetween = Math.round(
+        (parseDateKey(todayKey)!.getTime() - previousLessonDate.getTime()) / 86400000
+      );
+      nextCurrentStreak = daysBetween === 1 ? normalized.currentStreak + 1 : 1;
+    } else {
+      nextCurrentStreak = 1;
+    }
+    nextLongestStreak = Math.max(normalized.longestStreak, nextCurrentStreak);
+  }
+
+  return {
+    ...normalized,
+    currentStreak: nextCurrentStreak,
+    longestStreak: nextLongestStreak,
+    weeklyGoalCompleted: normalized.weeklyGoalCompleted + 1,
+    weeklyGoalWeekStart: getWeekStartKey(completedAt),
+    lastLessonDay: todayKey,
+    updatedAt: completedAt.toISOString(),
+  };
+}
+
 function mergePracticeProgress(
   previous: PracticeProgress,
   coach: CoachFeedback | null
@@ -374,6 +638,287 @@ function mergePracticeProgress(
       coach.pronunciationTip,
     ]),
     updatedAt: new Date().toISOString(),
+  };
+}
+
+function clampLessonScore(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function buildFallbackLessonScore(
+  coach: CoachFeedback | null,
+  lesson: ActiveLessonState
+): LessonResult {
+  const accuracy = clampLessonScore(coach?.quickCorrection ? 76 : 88);
+  const vocabulary = clampLessonScore(coach?.betterVersion ? 82 : 90);
+  const pronunciation = clampLessonScore(coach?.pronunciationTip ? 78 : 87);
+  const fluency = clampLessonScore(84);
+  const goalCompletion = clampLessonScore(86);
+  const overall = clampLessonScore(
+    (accuracy + vocabulary + pronunciation + fluency + goalCompletion) / 5
+  );
+
+  return {
+    overall,
+    fluency,
+    accuracy,
+    vocabulary,
+    pronunciation,
+    goalCompletion,
+    finalFeedback:
+      coach?.summary?.homework[0] ||
+      coach?.summary?.focusNext[0] ||
+      `Good work in "${lesson.title}". Repeat the lesson once more and try to sound more natural on the key phrases.`,
+    templateId: lesson.templateId,
+    title: lesson.title,
+    turnTarget: lesson.turnTarget,
+    completedAt: new Date().toISOString(),
+  };
+}
+
+function createLessonResult(score: CoachLessonScore, lesson: ActiveLessonState): LessonResult {
+  return {
+    ...score,
+    templateId: lesson.templateId,
+    title: lesson.title,
+    turnTarget: lesson.turnTarget,
+    completedAt: new Date().toISOString(),
+  };
+}
+
+function buildLessonReviewFromCoach(
+  coach: CoachFeedback | null,
+  lesson: ActiveLessonState
+): LessonReview {
+  const grammar = normalizeUniqueItems(
+    [coach?.quickCorrection ?? "", ...(coach?.summary?.focusNext ?? [])],
+    3
+  );
+  const vocabulary = normalizeUniqueItems(
+    [coach?.betterVersion ?? "", ...(coach?.summary?.newPhrases ?? [])],
+    4
+  );
+  const pronunciation = normalizeUniqueItems([coach?.pronunciationTip ?? ""], 2);
+
+  return {
+    templateId: lesson.templateId,
+    title: lesson.title,
+    sourceMode: lesson.mode,
+    sourceTopic: lesson.topic,
+    turnTarget: lesson.turnTarget,
+    grammar,
+    vocabulary,
+    pronunciation,
+    weakPoints: normalizeUniqueItems([...grammar, ...vocabulary, ...pronunciation], 6),
+  };
+}
+
+function buildLessonReviewFromSession(session: PracticeSessionHistoryRow): LessonReview | null {
+  if (!session.lesson_score || !session.lesson_template) {
+    return null;
+  }
+
+  const grammar = normalizeUniqueItems(
+    [session.quick_correction ?? "", ...(session.summary?.focusNext ?? [])],
+    3
+  );
+  const vocabulary = normalizeUniqueItems(
+    [session.better_version ?? "", ...(session.summary?.newPhrases ?? [])],
+    4
+  );
+  const pronunciation = normalizeUniqueItems([session.pronunciation_tip ?? ""], 2);
+
+  return {
+    templateId: session.lesson_template,
+    title: session.lesson_template,
+    sourceMode: isPracticeModeOption(session.practice_mode) ? session.practice_mode : "daily",
+    sourceTopic: session.practice_topic ?? "",
+    turnTarget: session.lesson_turn_target ?? 3,
+    grammar,
+    vocabulary,
+    pronunciation,
+    weakPoints: normalizeUniqueItems([...grammar, ...vocabulary, ...pronunciation], 6),
+  };
+}
+
+function findLessonTemplateById(templateId: string) {
+  return LESSON_TEMPLATES.find((template) => template.id === templateId) ?? null;
+}
+
+function getDifficultyLabel(mode: CoachDifficultyMode) {
+  switch (mode) {
+    case "supportive":
+      return "Supportive";
+    case "stretch":
+      return "Stretch";
+    case "balanced":
+    default:
+      return "Balanced";
+  }
+}
+
+function selectTemplateForAdaptivePlan(input: {
+  dominantArea: "grammar" | "vocabulary" | "pronunciation" | "fluency";
+  recentTemplateIds: string[];
+  previousTemplateId?: string;
+}) {
+  const candidateIds =
+    input.dominantArea === "grammar"
+      ? ["doctor-visit", "cafe-order", "job-intro", "small-talk-loop"]
+      : input.dominantArea === "vocabulary"
+        ? ["presentation-opening", "job-intro", "travel-checkin", "small-talk-loop"]
+        : input.dominantArea === "pronunciation"
+          ? ["small-talk-loop", "travel-checkin", "cafe-order", "doctor-visit"]
+          : ["small-talk-loop", "travel-checkin", "cafe-order", "job-intro"];
+
+  const preferredTemplate = candidateIds
+    .map((templateId) => findLessonTemplateById(templateId))
+    .find(
+      (template) =>
+        template &&
+        template.id !== input.previousTemplateId &&
+        !input.recentTemplateIds.includes(template.id)
+    );
+
+  return (
+    preferredTemplate ??
+    candidateIds
+      .map((templateId) => findLessonTemplateById(templateId))
+      .find((template) => template && template.id !== input.previousTemplateId) ??
+    LESSON_TEMPLATES[0]
+  );
+}
+
+function buildAdaptiveLessonPlan(input: {
+  lessonResult: LessonResult | null;
+  lessonReview: LessonReview | null;
+  practiceProgress: PracticeProgress;
+  practiceHabits: PracticeHabitStats;
+  recentSessions: PracticeSessionHistoryRow[];
+}): AdaptiveLessonPlan | null {
+  const recentTemplateIds = input.recentSessions
+    .map((session) => session.lesson_template ?? "")
+    .filter(Boolean)
+    .slice(0, 3);
+
+  const review = input.lessonReview;
+  const result = input.lessonResult;
+  const isBehindWeeklyGoal =
+    input.practiceHabits.weeklyGoalCompleted < input.practiceHabits.weeklyGoalTarget;
+  const needsConsistencyPush =
+    input.practiceHabits.currentStreak <= 1 && isBehindWeeklyGoal;
+
+  let dominantArea: "grammar" | "vocabulary" | "pronunciation" | "fluency" = "fluency";
+  let difficultyMode: CoachDifficultyMode = "balanced";
+  let focus: string[] = [];
+  let reason = "";
+
+  if (review?.pronunciation.length || (result && result.pronunciation < 80)) {
+    dominantArea = "pronunciation";
+    difficultyMode = result && result.pronunciation < 72 ? "supportive" : "balanced";
+    focus = review?.pronunciation.length
+      ? review.pronunciation
+      : input.practiceProgress.pronunciationTips.slice(0, 2);
+    reason = "Your last lesson shows pronunciation still needs repetition under speaking pressure.";
+  } else if (review?.grammar.length || (result && result.accuracy < 80)) {
+    dominantArea = "grammar";
+    difficultyMode = result && result.accuracy < 72 ? "supportive" : "balanced";
+    focus = review?.grammar.length
+      ? review.grammar
+      : input.practiceProgress.focusAreas.slice(0, 3);
+    reason = "Your next best lesson should tighten grammar accuracy in short real-life replies.";
+  } else if (review?.vocabulary.length || (result && result.vocabulary < 82)) {
+    dominantArea = "vocabulary";
+    difficultyMode = result && result.vocabulary >= 78 ? "balanced" : "supportive";
+    focus = review?.vocabulary.length
+      ? review.vocabulary
+      : input.practiceProgress.savedPhrases.slice(0, 3);
+    reason = "You are ready for a lesson that pushes vocabulary range and more natural phrasing.";
+  } else if (result) {
+    dominantArea = result.fluency < 85 ? "fluency" : "vocabulary";
+    difficultyMode =
+      result.overall >= 90 && result.fluency >= 88 && result.accuracy >= 86
+        ? "stretch"
+        : result.overall >= 80
+          ? "balanced"
+          : "supportive";
+    focus = input.practiceProgress.savedPhrases.slice(0, 3);
+    reason =
+      result.fluency < 85
+        ? "Your scores are solid, so the best next step is a lesson that improves flow and spontaneity."
+        : "You handled the last lesson well, so the planner is moving you to a slightly richer speaking task.";
+  } else if (
+    input.practiceProgress.focusAreas.length ||
+    input.practiceProgress.savedPhrases.length ||
+    input.practiceProgress.pronunciationTips.length
+  ) {
+    if (input.practiceProgress.pronunciationTips.length) {
+      dominantArea = "pronunciation";
+      difficultyMode = "supportive";
+      focus = input.practiceProgress.pronunciationTips.slice(0, 2);
+      reason = "Your practice memory still shows pronunciation targets that should be recycled in a fresh scenario.";
+    } else if (input.practiceProgress.focusAreas.length) {
+      dominantArea = "grammar";
+      difficultyMode = "supportive";
+      focus = input.practiceProgress.focusAreas.slice(0, 3);
+      reason = "Your practice memory points to grammar patterns that need one more structured lesson.";
+    } else {
+      dominantArea = "vocabulary";
+      difficultyMode = "balanced";
+      focus = input.practiceProgress.savedPhrases.slice(0, 3);
+      reason = "The planner is reusing your saved phrases to turn passive vocabulary into spoken vocabulary.";
+    }
+  } else {
+    return null;
+  }
+
+  const template = needsConsistencyPush
+    ? selectTemplateForAdaptivePlan({
+        dominantArea: "fluency",
+        recentTemplateIds,
+        previousTemplateId: review?.templateId,
+      })
+    : selectTemplateForAdaptivePlan({
+        dominantArea,
+        recentTemplateIds,
+        previousTemplateId: review?.templateId,
+      });
+
+  if (needsConsistencyPush) {
+    difficultyMode = difficultyMode === "stretch" ? "balanced" : "supportive";
+    reason = `${reason} You are also behind your weekly goal, so the planner is choosing a shorter win to rebuild consistency.`;
+  } else if (input.practiceHabits.currentStreak >= 5 && result && result.overall >= 88) {
+    difficultyMode = "stretch";
+    reason = `${reason} Your streak is strong, so the next lesson can safely push the upper edge of your selected range.`;
+  }
+
+  const focusText = focus.length
+    ? `Pay special attention to: ${focus.join("; ")}.`
+    : "Keep the lesson focused on one clear speaking objective.";
+  const difficultyNote =
+    difficultyMode === "supportive"
+      ? "Keep the lesson at the lower edge of the selected CEFR range, with shorter questions, more scaffolding, and easier follow-up prompts."
+      : difficultyMode === "stretch"
+        ? "Keep the lesson inside the selected CEFR range but use the upper edge with richer vocabulary, less scaffolding, and slightly less predictable follow-up questions."
+        : "Keep the lesson in the middle of the selected CEFR range with normal support and natural pacing.";
+
+  return {
+    template,
+    focus,
+    reason,
+    difficultyMode,
+    difficultyLabel: getDifficultyLabel(difficultyMode),
+    difficultyNote,
+    goal: `${template.goal} ${focusText}`.trim(),
+    starterPrompt: [
+      `Start the recommended next lesson "${template.title}".`,
+      `Focus area: ${dominantArea}.`,
+      `Difficulty mode: ${difficultyMode}.`,
+      focus.length ? `Targets: ${focus.join("; ")}.` : "",
+      "Set the scene briefly and ask the learner the first question right away.",
+    ]
+      .filter(Boolean)
+      .join(" "),
   };
 }
 
@@ -452,9 +997,15 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   );
   const [selectedPracticeMode, setSelectedPracticeMode] = useState<PracticeModeOption>("daily");
   const [practiceTopic, setPracticeTopic] = useState("");
+  const [activeLesson, setActiveLesson] = useState<ActiveLessonState | null>(null);
+  const [lessonResult, setLessonResult] = useState<LessonResult | null>(null);
+  const [lessonReview, setLessonReview] = useState<LessonReview | null>(null);
   const [practiceSummary, setPracticeSummary] = useState<CoachPracticeSummary | null>(null);
   const [practiceProgress, setPracticeProgress] = useState<PracticeProgress>(
     createEmptyPracticeProgress()
+  );
+  const [practiceHabits, setPracticeHabits] = useState<PracticeHabitStats>(
+    createEmptyPracticeHabits()
   );
   const [recentSessions, setRecentSessions] = useState<PracticeSessionHistoryRow[]>([]);
   const [nativeHelpEnabled, setNativeHelpEnabled] = useState(
@@ -532,6 +1083,31 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       return;
     }
 
+    try {
+      const stored = window.localStorage.getItem(
+        getPracticeHabitsStorageKey(sessionUserId, selectedConversationLocale)
+      );
+      if (!stored) {
+        setPracticeHabits(createEmptyPracticeHabits());
+        return;
+      }
+
+      const parsed = JSON.parse(stored) as Partial<PracticeHabitStats>;
+      setPracticeHabits(normalizePracticeHabits(parsed));
+    } catch {
+      setPracticeHabits(createEmptyPracticeHabits());
+    }
+  }, [selectedConversationLocale, sessionUserId]);
+
+  useEffect(() => {
+    if (sessionUserId) {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
     window.localStorage.setItem(
       getPracticeProgressStorageKey(sessionUserId, selectedConversationLocale),
       JSON.stringify(practiceProgress)
@@ -539,8 +1115,26 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
   }, [practiceProgress, selectedConversationLocale, sessionUserId]);
 
   useEffect(() => {
+    if (sessionUserId) {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(
+      getPracticeHabitsStorageKey(sessionUserId, selectedConversationLocale),
+      JSON.stringify(practiceHabits)
+    );
+  }, [practiceHabits, selectedConversationLocale, sessionUserId]);
+
+  useEffect(() => {
     if (!sessionUserId) {
       setRecentSessions([]);
+      setLessonResult(null);
+      setLessonReview(null);
+      setPracticeHabits(createEmptyPracticeHabits());
       return;
     }
 
@@ -556,7 +1150,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           supabase
             .from("ai_practice_user_state")
             .select(
-              "user_id,locale,turns_completed,focus_areas,saved_phrases,pronunciation_tips,last_practice_mode,last_practice_topic,last_summary,updated_at"
+              "user_id,locale,turns_completed,focus_areas,saved_phrases,pronunciation_tips,last_practice_mode,last_practice_topic,last_summary,last_lesson_result,last_lesson_template,last_lesson_completed_at,current_streak,longest_streak,weekly_goal_target,weekly_goal_completed,weekly_goal_week_start,last_lesson_day,updated_at"
             )
             .eq("user_id", sessionUserId)
             .eq("locale", selectedConversationLocale)
@@ -564,7 +1158,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           supabase
             .from("ai_practice_session_history")
             .select(
-              "id,locale,level_range,practice_mode,practice_topic,user_message,assistant_reply,quick_correction,better_version,next_question,pronunciation_tip,summary,created_at"
+              "id,locale,level_range,practice_mode,practice_topic,user_message,assistant_reply,quick_correction,better_version,next_question,pronunciation_tip,summary,lesson_template,lesson_turn_index,lesson_turn_target,lesson_score,created_at"
             )
             .eq("user_id", sessionUserId)
             .eq("locale", selectedConversationLocale)
@@ -580,6 +1174,8 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         }
 
         const stateRow = stateResult.data as PracticeUserStateRow | null;
+        const loadedSessions = (sessionsResult.data ?? []) as PracticeSessionHistoryRow[];
+        const latestScoredSession = loadedSessions.find((session) => Boolean(session.lesson_score));
         setPracticeProgress(
           stateRow
             ? {
@@ -592,12 +1188,32 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
             : createEmptyPracticeProgress()
         );
         setPracticeSummary((stateRow?.last_summary as CoachPracticeSummary | null) ?? null);
-        setRecentSessions((sessionsResult.data ?? []) as PracticeSessionHistoryRow[]);
+        setLessonResult((stateRow?.last_lesson_result as LessonResult | null) ?? null);
+        setLessonReview(latestScoredSession ? buildLessonReviewFromSession(latestScoredSession) : null);
+        setPracticeHabits(
+          normalizePracticeHabits(
+            stateRow
+              ? {
+                  currentStreak: stateRow.current_streak ?? 0,
+                  longestStreak: stateRow.longest_streak ?? 0,
+                  weeklyGoalTarget: stateRow.weekly_goal_target ?? 4,
+                  weeklyGoalCompleted: stateRow.weekly_goal_completed ?? 0,
+                  weeklyGoalWeekStart: stateRow.weekly_goal_week_start ?? "",
+                  lastLessonDay: stateRow.last_lesson_day ?? null,
+                  updatedAt: stateRow.updated_at ?? null,
+                }
+              : null
+          )
+        );
+        setRecentSessions(loadedSessions);
       } catch {
         if (!active) {
           return;
         }
         setPracticeProgress(createEmptyPracticeProgress());
+        setPracticeHabits(createEmptyPracticeHabits());
+        setLessonResult(null);
+        setLessonReview(null);
         setRecentSessions([]);
       }
     })();
@@ -609,6 +1225,17 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
 
   const canUseNativeHelp = Boolean(
     nativeLocale && nativeLocale.trim() && nativeLocale !== selectedConversationLocale
+  );
+  const adaptiveLessonPlan = useMemo(
+    () =>
+      buildAdaptiveLessonPlan({
+        lessonResult,
+        lessonReview,
+        practiceProgress,
+        practiceHabits,
+        recentSessions,
+      }),
+    [lessonResult, lessonReview, practiceProgress, practiceHabits, recentSessions]
   );
 
   const updateMessage = useCallback(
@@ -801,11 +1428,16 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     [clearAudioUrl, getOrCreateAudioElement, stopAudioPlayback, text.idle, text.speaking]
   );
 
-  const sendPrompt = useCallback(
-    async (rawValue: string, inputSource: "text" | "speech" = "text") => {
-      const trimmedValue = rawValue.trim();
-      if (!trimmedValue) {
-        setErrorMessage(text.emptyPrompt);
+  const runAssistantRequest = useCallback(
+    async (options: {
+      assistantInput: string;
+      displayUserText: string | null;
+      inputSource: "text" | "speech";
+      lessonState?: ActiveLessonState | null;
+      lessonTurnIndex?: number;
+    }) => {
+      const trimmedAssistantInput = options.assistantInput.trim();
+      if (!trimmedAssistantInput) {
         return;
       }
       if (guestMode) {
@@ -826,24 +1458,33 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       const selectedLocale =
         conversationLocaleRef.current ?? selectedConversationLocale ?? defaultConversationLocale;
       const replyLocale = selectedLocale;
+      const lessonState = options.lessonState ?? activeLesson;
+      const lessonTurnIndex = lessonState ? options.lessonTurnIndex ?? 0 : 0;
       conversationLocaleRef.current = replyLocale;
-      lastInputSourceRef.current = inputSource;
-      const assistantInput = buildConversationInput(messages, trimmedValue);
+      lastInputSourceRef.current = options.inputSource;
 
       const assistantMessageId = buildId();
       setMessages((prev) => [
         ...prev,
-        { id: buildId(), role: "user", text: trimmedValue },
+        ...(options.displayUserText
+          ? [{ id: buildId(), role: "user" as const, text: options.displayUserText }]
+          : []),
         { id: assistantMessageId, role: "assistant", text: "", pending: true },
       ]);
 
       const assistantRequest = {
-        text: assistantInput,
+        text: trimmedAssistantInput,
         conversationId: conversationIdRef.current,
         locale: replyLocale,
         levelRange: selectedConversationLevel,
-        practiceMode: selectedPracticeMode,
-        practiceTopic: practiceTopic.trim() || undefined,
+        practiceMode: lessonState?.mode ?? selectedPracticeMode,
+        practiceTopic: lessonState?.topic || practiceTopic.trim() || undefined,
+        lessonTemplate: lessonState?.title || undefined,
+        lessonGoal: lessonState?.goal || undefined,
+        lessonTurnIndex,
+        lessonTurnTarget: lessonState?.turnTarget ?? 0,
+        difficultyMode: lessonState?.difficultyMode ?? "balanced",
+        difficultyNote: lessonState?.difficultyNote || undefined,
         nativeHelp:
           canUseNativeHelp && nativeHelpEnabled && Boolean(nativeLocale?.trim()),
         nativeLocale: nativeLocale?.trim() || undefined,
@@ -855,7 +1496,11 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         const spokenText = reply.text.trim();
         const displayText = reply.coach?.assistantReply?.trim() || spokenText;
         conversationIdRef.current = reply.conversationId;
-        let nextProgressSnapshot = createEmptyPracticeProgress();
+
+        let nextProgressSnapshot = practiceProgress;
+        let nextHabitSnapshot = practiceHabits;
+        let lessonResultSnapshot: LessonResult | null = null;
+        let lessonReviewSnapshot: LessonReview | null = null;
         updateMessage(assistantMessageId, (message) => ({
           ...message,
           text: displayText,
@@ -865,29 +1510,60 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
         }));
         setThinking(false);
         setStatusMessage(text.idle);
-        setPracticeSummary(reply.coach?.summary ?? null);
-        setPracticeProgress((prev) => {
-          nextProgressSnapshot = mergePracticeProgress(prev, reply.coach);
-          return nextProgressSnapshot;
-        });
+
+        if (options.displayUserText) {
+          setPracticeSummary(reply.coach?.summary ?? null);
+          setPracticeProgress((prev) => {
+            nextProgressSnapshot = mergePracticeProgress(prev, reply.coach);
+            return nextProgressSnapshot;
+          });
+        }
+
+        if (lessonState) {
+          const progressedLesson =
+            options.displayUserText && lessonTurnIndex > 0
+              ? { ...lessonState, userTurnsCompleted: lessonTurnIndex }
+              : lessonState;
+          if (reply.coach?.lessonComplete) {
+            lessonResultSnapshot = reply.coach.score
+              ? createLessonResult(reply.coach.score, progressedLesson)
+              : buildFallbackLessonScore(reply.coach, progressedLesson);
+            lessonReviewSnapshot = buildLessonReviewFromCoach(reply.coach, progressedLesson);
+            setLessonResult(lessonResultSnapshot);
+            setLessonReview(lessonReviewSnapshot);
+            setPracticeHabits((prev) => {
+              nextHabitSnapshot = advancePracticeHabits(prev, new Date());
+              return nextHabitSnapshot;
+            });
+            setActiveLesson(null);
+          } else {
+            setActiveLesson(progressedLesson);
+          }
+        }
+
         if (sessionUserId) {
           const supabase = getSupabaseClient();
           if (supabase) {
             const nowIso = new Date().toISOString();
-            const practiceTopicValue = practiceTopic.trim() || null;
+            const practiceTopicValue = (lessonState?.topic || practiceTopic.trim()) || null;
             const historyRow: Omit<PracticeSessionHistoryRow, "id"> & { user_id: string } = {
               user_id: sessionUserId,
               locale: replyLocale,
               level_range: selectedConversationLevel,
-              practice_mode: selectedPracticeMode,
+              practice_mode: lessonState?.mode ?? selectedPracticeMode,
               practice_topic: practiceTopicValue,
-              user_message: trimmedValue,
+              user_message: options.displayUserText ?? "",
               assistant_reply: displayText,
               quick_correction: reply.coach?.quickCorrection || null,
               better_version: reply.coach?.betterVersion || null,
               next_question: reply.coach?.nextQuestion || null,
               pronunciation_tip: reply.coach?.pronunciationTip || null,
               summary: reply.coach?.summary ?? null,
+              lesson_template: lessonState?.title ?? null,
+              lesson_turn_index:
+                lessonState && options.displayUserText ? lessonTurnIndex : null,
+              lesson_turn_target: lessonState?.turnTarget ?? null,
+              lesson_score: lessonResultSnapshot,
               created_at: nowIso,
             };
             const recentHistoryRow: PracticeSessionHistoryRow = {
@@ -896,21 +1572,34 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
             };
             setRecentSessions((prev) => [recentHistoryRow, ...prev].slice(0, 5));
             void (async () => {
-              const stateResult = await supabase.from("ai_practice_user_state").upsert(
-                {
-                  user_id: sessionUserId,
-                  locale: replyLocale,
-                  turns_completed: nextProgressSnapshot.turnsCompleted,
-                  focus_areas: nextProgressSnapshot.focusAreas,
-                  saved_phrases: nextProgressSnapshot.savedPhrases,
-                  pronunciation_tips: nextProgressSnapshot.pronunciationTips,
-                  last_practice_mode: selectedPracticeMode,
-                  last_practice_topic: practiceTopicValue,
-                  last_summary: reply.coach?.summary ?? null,
-                  updated_at: nowIso,
-                },
-                { onConflict: "user_id,locale" }
-              );
+              const statePayload: Record<string, unknown> = {
+                user_id: sessionUserId,
+                locale: replyLocale,
+                turns_completed: nextProgressSnapshot.turnsCompleted,
+                focus_areas: nextProgressSnapshot.focusAreas,
+                saved_phrases: nextProgressSnapshot.savedPhrases,
+                pronunciation_tips: nextProgressSnapshot.pronunciationTips,
+                current_streak: nextHabitSnapshot.currentStreak,
+                longest_streak: nextHabitSnapshot.longestStreak,
+                weekly_goal_target: nextHabitSnapshot.weeklyGoalTarget,
+                weekly_goal_completed: nextHabitSnapshot.weeklyGoalCompleted,
+                weekly_goal_week_start: nextHabitSnapshot.weeklyGoalWeekStart,
+                last_lesson_day: nextHabitSnapshot.lastLessonDay,
+                last_practice_mode: lessonState?.mode ?? selectedPracticeMode,
+                last_practice_topic: practiceTopicValue,
+                last_summary:
+                  options.displayUserText ? reply.coach?.summary ?? null : practiceSummary,
+                updated_at: nowIso,
+              };
+              if (lessonResultSnapshot) {
+                statePayload.last_lesson_result = lessonResultSnapshot;
+                statePayload.last_lesson_template = lessonResultSnapshot.title;
+                statePayload.last_lesson_completed_at = lessonResultSnapshot.completedAt;
+              }
+
+              const stateResult = await supabase
+                .from("ai_practice_user_state")
+                .upsert(statePayload, { onConflict: "user_id,locale" });
               if (stateResult.error) {
                 throw stateResult.error;
               }
@@ -961,6 +1650,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       }
     },
     [
+      activeLesson,
       guestMode,
       unlockAudioPlayback,
       requireAuth,
@@ -971,18 +1661,193 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
       selectedConversationLocale,
       selectedConversationLevel,
       selectedPracticeMode,
+      practiceHabits,
+      practiceProgress,
+      practiceSummary,
       practiceTopic,
       canUseNativeHelp,
       nativeHelpEnabled,
       nativeLocale,
       sessionUserId,
-      text.emptyPrompt,
       text.idle,
       text.thinking,
       updateMessage,
-      messages,
     ]
   );
+
+  const sendPrompt = useCallback(
+    async (rawValue: string, inputSource: "text" | "speech" = "text") => {
+      const trimmedValue = rawValue.trim();
+      if (!trimmedValue) {
+        setErrorMessage(text.emptyPrompt);
+        return;
+      }
+
+      const lessonTurnIndex = activeLesson ? activeLesson.userTurnsCompleted + 1 : 0;
+      await runAssistantRequest({
+        assistantInput: buildConversationInput(messages, trimmedValue),
+        displayUserText: trimmedValue,
+        inputSource,
+        lessonState: activeLesson,
+        lessonTurnIndex,
+      });
+    },
+    [activeLesson, messages, runAssistantRequest, text.emptyPrompt]
+  );
+
+  const beginLessonSession = useCallback(
+    async (input: {
+      lesson: ActiveLessonState;
+      starterPrompt: string;
+      selectedMode: PracticeModeOption;
+      selectedTopic: string;
+    }) => {
+      if (guestMode) {
+        requireAuth();
+        return;
+      }
+
+      stopReplyStream();
+      stopAudioPlayback();
+      shouldSubmitSpeechRef.current = false;
+      recognitionRef.current?.stop();
+      setListening(false);
+      setMessages([]);
+      setDraft("");
+      setInterimTranscript("");
+      setErrorMessage("");
+      setPracticeSummary(null);
+      setLessonResult(null);
+      setLessonReview(null);
+      setSelectedPracticeMode(input.selectedMode);
+      setPracticeTopic(input.selectedTopic);
+      setActiveLesson(input.lesson);
+      conversationIdRef.current = null;
+      finalTranscriptRef.current = "";
+      interimTranscriptRef.current = "";
+      shouldSubmitSpeechRef.current = false;
+      setStatusMessage(text.thinking);
+
+      await runAssistantRequest({
+        assistantInput: input.starterPrompt,
+        displayUserText: null,
+        inputSource: "text",
+        lessonState: input.lesson,
+        lessonTurnIndex: 0,
+      });
+    },
+    [
+      guestMode,
+      requireAuth,
+      runAssistantRequest,
+      stopAudioPlayback,
+      stopReplyStream,
+      text.thinking,
+    ]
+  );
+
+  const handleLessonStart = useCallback(
+    async (template: LessonTemplate) => {
+      const nextLesson: ActiveLessonState = {
+        templateId: template.id,
+        title: template.title,
+        description: template.description,
+        mode: template.mode,
+        topic: template.topic,
+        goal: template.goal,
+        difficultyMode: "balanced",
+        difficultyNote:
+          "Keep the lesson in the middle of the selected CEFR range with normal support and natural pacing.",
+        turnTarget: template.turnTarget,
+        userTurnsCompleted: 0,
+        startedAt: new Date().toISOString(),
+      };
+
+      await beginLessonSession({
+        lesson: nextLesson,
+        starterPrompt: template.starterPrompt,
+        selectedMode: template.mode,
+        selectedTopic: template.topic,
+      });
+    },
+    [beginLessonSession]
+  );
+
+  const handleRepeatWeakPoints = useCallback(async () => {
+    if (!lessonReview) {
+      return;
+    }
+
+    const nextLesson: ActiveLessonState = {
+      templateId: `${lessonReview.templateId}-review`,
+      title: `${lessonReview.title} review`,
+      description: "Short drill focused only on your weak points from the last lesson.",
+      mode: lessonReview.sourceMode,
+      topic: lessonReview.sourceTopic || "Weak-point drill",
+      goal: lessonReview.weakPoints.length
+        ? `Fix these weak points: ${lessonReview.weakPoints.join("; ")}.`
+        : "Repeat the last lesson and focus only on accuracy, vocabulary, and pronunciation.",
+      difficultyMode: "supportive",
+      difficultyNote:
+        "Keep the lesson at the lower edge of the selected CEFR range, with shorter questions, more scaffolding, and easier follow-up prompts.",
+      turnTarget: 3,
+      userTurnsCompleted: 0,
+      startedAt: new Date().toISOString(),
+    };
+
+    const starterPrompt = [
+      `Start a focused weak-point drill lesson based on "${lessonReview.title}".`,
+      lessonReview.grammar.length
+        ? `Grammar weak points: ${lessonReview.grammar.join("; ")}.`
+        : "",
+      lessonReview.vocabulary.length
+        ? `Vocabulary targets: ${lessonReview.vocabulary.join("; ")}.`
+        : "",
+      lessonReview.pronunciation.length
+        ? `Pronunciation targets: ${lessonReview.pronunciation.join("; ")}.`
+        : "",
+      "Set the scene in one short sentence and ask the learner a short practice question.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    await beginLessonSession({
+      lesson: nextLesson,
+      starterPrompt,
+      selectedMode: lessonReview.sourceMode,
+      selectedTopic: lessonReview.sourceTopic,
+    });
+  }, [
+    beginLessonSession,
+    lessonReview,
+  ]);
+
+  const handleStartRecommendedLesson = useCallback(async () => {
+    if (!adaptiveLessonPlan) {
+      return;
+    }
+
+    const nextLesson: ActiveLessonState = {
+      templateId: `${adaptiveLessonPlan.template.id}-adaptive`,
+      title: adaptiveLessonPlan.template.title,
+      description: adaptiveLessonPlan.template.description,
+      mode: adaptiveLessonPlan.template.mode,
+      topic: adaptiveLessonPlan.template.topic,
+      goal: adaptiveLessonPlan.goal,
+      difficultyMode: adaptiveLessonPlan.difficultyMode,
+      difficultyNote: adaptiveLessonPlan.difficultyNote,
+      turnTarget: adaptiveLessonPlan.template.turnTarget,
+      userTurnsCompleted: 0,
+      startedAt: new Date().toISOString(),
+    };
+
+    await beginLessonSession({
+      lesson: nextLesson,
+      starterPrompt: adaptiveLessonPlan.starterPrompt,
+      selectedMode: adaptiveLessonPlan.template.mode,
+      selectedTopic: adaptiveLessonPlan.template.topic,
+    });
+  }, [adaptiveLessonPlan, beginLessonSession]);
 
   const stopListening = useCallback(
     (shouldSubmit: boolean) => {
@@ -1160,6 +2025,45 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     setNativeHelpEnabled(event.target.checked);
   }, []);
 
+  const handleWeeklyGoalTargetChange = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      const nextTarget = Number(event.target.value);
+      if (!WEEKLY_GOAL_OPTIONS.includes(nextTarget as (typeof WEEKLY_GOAL_OPTIONS)[number])) {
+        return;
+      }
+
+      setPracticeHabits((prev) =>
+        normalizePracticeHabits({
+          ...prev,
+          weeklyGoalTarget: nextTarget,
+        })
+      );
+
+      if (sessionUserId) {
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          void supabase
+            .from("ai_practice_user_state")
+            .upsert(
+              {
+                user_id: sessionUserId,
+                locale: selectedConversationLocale,
+                weekly_goal_target: nextTarget,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "user_id,locale" }
+            )
+            .then(({ error }) => {
+              if (error) {
+                setErrorMessage("Practice goal sync is temporarily unavailable.");
+              }
+            });
+        }
+      }
+    },
+    [selectedConversationLocale, sessionUserId]
+  );
+
   const handleClearConversation = useCallback(() => {
     stopReplyStream();
     setMessages([]);
@@ -1167,6 +2071,9 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
     setInterimTranscript("");
     setErrorMessage("");
     setPracticeSummary(null);
+    setLessonResult(null);
+    setLessonReview(null);
+    setActiveLesson(null);
     conversationIdRef.current = null;
     conversationLocaleRef.current = selectedConversationLocale;
     lastInputSourceRef.current = "text";
@@ -1288,6 +2195,242 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
             ) : null}
           </div>
         ) : null}
+        <div className="voiceAssistantCoachPanel voiceAssistantHabitsPanel">
+          <div className="voiceAssistantCoachTitle">{text.habitsTitle}</div>
+          <div className="voiceAssistantHabitStats">
+            <div className="voiceAssistantHabitStat">
+              <div className="voiceAssistantCoachLabel">{text.habitsCurrentStreak}</div>
+              <div className="voiceAssistantHabitValue">{practiceHabits.currentStreak}</div>
+            </div>
+            <div className="voiceAssistantHabitStat">
+              <div className="voiceAssistantCoachLabel">{text.habitsLongestStreak}</div>
+              <div className="voiceAssistantHabitValue">{practiceHabits.longestStreak}</div>
+            </div>
+          </div>
+          <label className="label" htmlFor="voiceAssistantWeeklyGoal">
+            {text.habitsWeeklyGoal}
+          </label>
+          <select
+            className="input"
+            id="voiceAssistantWeeklyGoal"
+            value={practiceHabits.weeklyGoalTarget}
+            onChange={handleWeeklyGoalTargetChange}
+            disabled={thinking || listening || Boolean(activeLesson)}
+          >
+            {WEEKLY_GOAL_OPTIONS.map((goalValue) => (
+              <option key={goalValue} value={goalValue}>
+                {`${goalValue} lessons`}
+              </option>
+            ))}
+          </select>
+          <div className="voiceAssistantCoachSection">
+            <div className="voiceAssistantCoachLabel">{text.habitsWeeklyProgress}</div>
+            <div className="voiceAssistantLessonScoreBar">
+              <span
+                style={{
+                  width: `${Math.min(
+                    100,
+                    (practiceHabits.weeklyGoalCompleted / Math.max(practiceHabits.weeklyGoalTarget, 1)) *
+                      100
+                  )}%`,
+                }}
+              />
+            </div>
+            <div className="muted">
+              {`${practiceHabits.weeklyGoalCompleted}/${practiceHabits.weeklyGoalTarget} lessons this week`}
+            </div>
+          </div>
+          <div className="muted">{text.habitsWeeklyHint}</div>
+        </div>
+        <div className="voiceAssistantCoachPanel">
+          <div className="voiceAssistantCoachTitle">{text.lessonTemplatesTitle}</div>
+          <div className="muted">{text.lessonTemplatesHint}</div>
+          <div className="voiceAssistantLessonTemplates">
+            {LESSON_TEMPLATES.map((template) => {
+              const isActive = activeLesson?.templateId === template.id;
+              return (
+                <div
+                  key={template.id}
+                  className={`voiceAssistantLessonTemplate${
+                    isActive ? " voiceAssistantLessonTemplate--active" : ""
+                  }`}
+                >
+                  <div className="voiceAssistantLessonTemplateTitle">{template.title}</div>
+                  <div className="voiceAssistantLessonTemplateDescription">
+                    {template.description}
+                  </div>
+                  <div className="voiceAssistantRecentSessionMeta">
+                    <span>{template.mode}</span>
+                    <span>{template.topic}</span>
+                    <span>{`${template.turnTarget} turns`}</span>
+                  </div>
+                  <div className="muted">{template.goal}</div>
+                  <button
+                    className="btn btnGhost"
+                    type="button"
+                    onClick={() => void handleLessonStart(template)}
+                    disabled={thinking || listening}
+                  >
+                    {activeLesson?.templateId === template.id
+                      ? text.lessonRestart
+                      : text.lessonStart}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {activeLesson ? (
+          <div className="voiceAssistantCoachPanel voiceAssistantLessonStatus">
+            <div className="voiceAssistantCoachTitle">{text.lessonActiveTitle}</div>
+            <div className="voiceAssistantLessonHeadline">{activeLesson.title}</div>
+            <div className="muted">{activeLesson.description}</div>
+            <div className="voiceAssistantRecentSessionMeta">
+              <span>
+                {text.lessonProgress.replace(
+                  "{progress}",
+                  `${activeLesson.userTurnsCompleted}/${activeLesson.turnTarget}`
+                )}
+              </span>
+              <span>{activeLesson.topic}</span>
+              <span>{getDifficultyLabel(activeLesson.difficultyMode)}</span>
+            </div>
+            <div className="voiceAssistantCoachSection">
+              <div className="voiceAssistantCoachLabel">{text.lessonGoalLabel}</div>
+              <div>{activeLesson.goal}</div>
+            </div>
+            <div className="voiceAssistantCoachSection">
+              <div className="voiceAssistantCoachLabel">{text.lessonDifficultyLabel}</div>
+              <div>{activeLesson.difficultyNote}</div>
+            </div>
+          </div>
+        ) : null}
+
+        {lessonResult ? (
+          <div className="voiceAssistantCoachPanel voiceAssistantLessonScore">
+            <div className="voiceAssistantCoachTitle">{text.lessonScoreTitle}</div>
+            <div className="voiceAssistantLessonHeadline">{lessonResult.title}</div>
+            <div className="voiceAssistantLessonOverall">
+              <span className="voiceAssistantLessonOverallValue">
+                {lessonResult.overall}
+              </span>
+              <span>/100</span>
+            </div>
+            <div className="voiceAssistantLessonScoreGrid">
+              {[
+                [text.lessonScoreFluency, lessonResult.fluency],
+                [text.lessonScoreAccuracy, lessonResult.accuracy],
+                [text.lessonScoreVocabulary, lessonResult.vocabulary],
+                [text.lessonScorePronunciation, lessonResult.pronunciation],
+                [text.lessonScoreGoal, lessonResult.goalCompletion],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="voiceAssistantLessonScoreItem">
+                  <div className="voiceAssistantCoachLabel">{label}</div>
+                  <div className="voiceAssistantLessonScoreBar">
+                    <span style={{ width: `${Number(value)}%` }} />
+                  </div>
+                  <div>{value}</div>
+                </div>
+              ))}
+            </div>
+            <div className="voiceAssistantCoachSection">
+              <div className="voiceAssistantCoachLabel">{text.lessonScoreFeedback}</div>
+              <div>{lessonResult.finalFeedback}</div>
+            </div>
+          </div>
+        ) : null}
+
+        {lessonReview ? (
+          <div className="voiceAssistantCoachPanel voiceAssistantLessonReview">
+            <div className="voiceAssistantCoachTitle">{text.lessonReviewTitle}</div>
+            <div className="muted">{text.lessonReviewHint}</div>
+            <div className="voiceAssistantCoachGrid">
+              {lessonReview.grammar.length ? (
+                <div className="voiceAssistantCoachCard">
+                  <div className="voiceAssistantCoachLabel">{text.lessonReviewGrammar}</div>
+                  <ul className="voiceAssistantCoachList">
+                    {lessonReview.grammar.map((item) => (
+                      <li key={`review-grammar-${item}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {lessonReview.vocabulary.length ? (
+                <div className="voiceAssistantCoachCard">
+                  <div className="voiceAssistantCoachLabel">{text.lessonReviewVocabulary}</div>
+                  <ul className="voiceAssistantCoachList">
+                    {lessonReview.vocabulary.map((item) => (
+                      <li key={`review-vocab-${item}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {lessonReview.pronunciation.length ? (
+                <div className="voiceAssistantCoachCard">
+                  <div className="voiceAssistantCoachLabel">{text.lessonReviewPronunciation}</div>
+                  <ul className="voiceAssistantCoachList">
+                    {lessonReview.pronunciation.map((item) => (
+                      <li key={`review-pron-${item}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+            <div className="voiceAssistantLessonActionRow">
+              <button
+                className="btn"
+                type="button"
+                onClick={() => void handleRepeatWeakPoints()}
+                disabled={thinking || listening}
+              >
+                {text.lessonReviewRepeat}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {adaptiveLessonPlan && !activeLesson ? (
+          <div className="voiceAssistantCoachPanel voiceAssistantLessonPlanner">
+            <div className="voiceAssistantCoachTitle">{text.lessonPlannerTitle}</div>
+            <div className="muted">{text.lessonPlannerHint}</div>
+            <div className="voiceAssistantLessonHeadline">{adaptiveLessonPlan.template.title}</div>
+            <div className="voiceAssistantLessonTemplateDescription">
+              {adaptiveLessonPlan.template.description}
+            </div>
+            <div className="voiceAssistantCoachSection">
+              <div className="voiceAssistantCoachLabel">{text.lessonPlannerReason}</div>
+              <div>{adaptiveLessonPlan.reason}</div>
+            </div>
+            <div className="voiceAssistantCoachSection">
+              <div className="voiceAssistantCoachLabel">{text.lessonPlannerDifficulty}</div>
+              <div>{`${adaptiveLessonPlan.difficultyLabel}. ${adaptiveLessonPlan.difficultyNote}`}</div>
+            </div>
+            {adaptiveLessonPlan.focus.length ? (
+              <div className="voiceAssistantCoachSection">
+                <div className="voiceAssistantCoachLabel">{text.lessonPlannerFocus}</div>
+                <div className="voiceAssistantCoachChips">
+                  {adaptiveLessonPlan.focus.map((item) => (
+                    <span key={`adaptive-focus-${item}`} className="voiceAssistantCoachChip">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="voiceAssistantLessonActionRow">
+              <button
+                className="btn"
+                type="button"
+                onClick={() => void handleStartRecommendedLesson()}
+                disabled={thinking || listening}
+              >
+                {text.lessonPlannerStart}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="voiceAssistantControls">
           <button
             className={`btn voiceAssistantHoldButton${listening ? " btnActive" : ""}`}
@@ -1330,7 +2473,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           id="voiceAssistantLocale"
           value={selectedConversationLocale}
           onChange={handleConversationLocaleChange}
-          disabled={thinking || listening}
+          disabled={thinking || listening || Boolean(activeLesson)}
         >
           {languageOptions.map((option) => (
             <option key={option.locale} value={option.locale}>
@@ -1348,7 +2491,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           id="voiceAssistantLevel"
           value={selectedConversationLevel}
           onChange={handleConversationLevelChange}
-          disabled={thinking || listening}
+          disabled={thinking || listening || Boolean(activeLesson)}
         >
           {CONVERSATION_LEVEL_OPTIONS.map((levelOption) => (
             <option key={levelOption} value={levelOption}>
@@ -1366,7 +2509,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           id="voiceAssistantPracticeMode"
           value={selectedPracticeMode}
           onChange={handlePracticeModeChange}
-          disabled={thinking || listening}
+          disabled={thinking || listening || Boolean(activeLesson)}
         >
           <option value="daily">{text.practiceModeDaily}</option>
           <option value="roleplay">{text.practiceModeRoleplay}</option>
@@ -1384,7 +2527,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
           value={practiceTopic}
           onChange={handlePracticeTopicChange}
           placeholder={text.practiceTopicPlaceholder}
-          disabled={thinking || listening}
+          disabled={thinking || listening || Boolean(activeLesson)}
         />
         <div className="muted">{text.practiceTopicHint}</div>
         <div className="voiceAssistantSuggestionRow">
@@ -1394,7 +2537,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
               className="btn btnGhost voiceAssistantSuggestion"
               type="button"
               onClick={() => setPracticeTopic(suggestion)}
-              disabled={thinking || listening}
+              disabled={thinking || listening || Boolean(activeLesson)}
             >
               {suggestion}
             </button>
@@ -1407,7 +2550,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
               type="checkbox"
               checked={canUseNativeHelp && nativeHelpEnabled}
               onChange={handleNativeHelpChange}
-              disabled={!canUseNativeHelp || thinking || listening}
+              disabled={!canUseNativeHelp || thinking || listening || Boolean(activeLesson)}
             />
             <span>
               {text.nativeHelpLabel.replace(
@@ -1505,6 +2648,7 @@ export default function VoiceAssistantPage(props: VoiceAssistantPageProps) {
                   <span>{session.practice_mode}</span>
                   <span>{session.level_range}</span>
                   {session.practice_topic ? <span>{session.practice_topic}</span> : null}
+                  {session.lesson_score ? <span>{`${session.lesson_score.overall}/100`}</span> : null}
                 </div>
                 <div className="voiceAssistantRecentSessionReply">{session.assistant_reply}</div>
               </div>

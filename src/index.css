@@ -6341,6 +6341,119 @@ button:focus-visible {
   color: #4d3526;
 }
 
+.voiceAssistantLessonTemplates {
+  display: grid;
+  gap: 12px;
+}
+
+.voiceAssistantLessonTemplate {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(234, 222, 211, 0.92);
+  background: rgba(255, 249, 242, 0.82);
+}
+
+.voiceAssistantLessonTemplate--active {
+  border-color: rgba(200, 106, 59, 0.34);
+  box-shadow: 0 0 0 1px rgba(200, 106, 59, 0.08);
+}
+
+.voiceAssistantLessonTemplateTitle,
+.voiceAssistantLessonHeadline {
+  font-size: 18px;
+  font-weight: 700;
+  color: #4d3526;
+}
+
+.voiceAssistantLessonTemplateDescription {
+  color: #5f4638;
+  line-height: 1.5;
+}
+
+.voiceAssistantLessonStatus,
+.voiceAssistantLessonScore {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 247, 239, 0.86));
+}
+
+.voiceAssistantLessonOverall {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: #6f2f12;
+}
+
+.voiceAssistantLessonOverallValue {
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.voiceAssistantLessonScoreGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.voiceAssistantLessonScoreItem {
+  display: grid;
+  gap: 6px;
+}
+
+.voiceAssistantLessonScoreBar {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(234, 222, 211, 0.92);
+}
+
+.voiceAssistantLessonScoreBar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(200, 106, 59, 0.86), rgba(240, 180, 132, 0.92));
+}
+
+.voiceAssistantLessonReview {
+  background: linear-gradient(180deg, rgba(255, 252, 248, 0.92), rgba(255, 246, 236, 0.9));
+}
+
+.voiceAssistantLessonPlanner {
+  background: linear-gradient(180deg, rgba(255, 253, 249, 0.95), rgba(248, 239, 228, 0.94));
+  border-color: rgba(200, 106, 59, 0.24);
+}
+
+.voiceAssistantHabitsPanel {
+  background: linear-gradient(180deg, rgba(255, 253, 249, 0.92), rgba(255, 248, 240, 0.9));
+}
+
+.voiceAssistantHabitStats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.voiceAssistantHabitStat {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(248, 239, 228, 0.72);
+  border: 1px solid rgba(200, 106, 59, 0.14);
+}
+
+.voiceAssistantHabitValue {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  color: #6f2f12;
+}
+
+.voiceAssistantLessonActionRow {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .voiceAssistantRecentSessions {
   display: grid;
   gap: 10px;

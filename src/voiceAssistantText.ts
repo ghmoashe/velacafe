@@ -20,6 +20,12 @@ export type VoiceAssistantText = {
   progressFocus: string;
   progressPhrases: string;
   progressPronunciation: string;
+  habitsTitle: string;
+  habitsCurrentStreak: string;
+  habitsLongestStreak: string;
+  habitsWeeklyGoal: string;
+  habitsWeeklyProgress: string;
+  habitsWeeklyHint: string;
   summaryTitle: string;
   summaryStrengths: string;
   summaryFocus: string;
@@ -27,6 +33,33 @@ export type VoiceAssistantText = {
   summaryHomework: string;
   recentSessionsTitle: string;
   recentSessionsEmpty: string;
+  lessonTemplatesTitle: string;
+  lessonTemplatesHint: string;
+  lessonStart: string;
+  lessonRestart: string;
+  lessonActiveTitle: string;
+  lessonProgress: string;
+  lessonGoalLabel: string;
+  lessonScoreTitle: string;
+  lessonScoreFluency: string;
+  lessonScoreAccuracy: string;
+  lessonScoreVocabulary: string;
+  lessonScorePronunciation: string;
+  lessonScoreGoal: string;
+  lessonScoreFeedback: string;
+  lessonReviewTitle: string;
+  lessonReviewHint: string;
+  lessonReviewGrammar: string;
+  lessonReviewVocabulary: string;
+  lessonReviewPronunciation: string;
+  lessonReviewRepeat: string;
+  lessonPlannerTitle: string;
+  lessonPlannerHint: string;
+  lessonPlannerReason: string;
+  lessonPlannerFocus: string;
+  lessonPlannerDifficulty: string;
+  lessonPlannerStart: string;
+  lessonDifficultyLabel: string;
   coachCorrection: string;
   coachBetterVersion: string;
   coachNextQuestion: string;
@@ -76,6 +109,13 @@ const VOICE_ASSISTANT_TEXT: VoiceAssistantText = {
   progressFocus: "Focus now",
   progressPhrases: "Useful phrases",
   progressPronunciation: "Pronunciation",
+  habitsTitle: "Practice rhythm",
+  habitsCurrentStreak: "Current streak",
+  habitsLongestStreak: "Best streak",
+  habitsWeeklyGoal: "Weekly goal",
+  habitsWeeklyProgress: "Weekly progress",
+  habitsWeeklyHint:
+    "The planner also looks at your streak and weekly goal, not only mistakes and scores.",
   summaryTitle: "Lesson summary",
   summaryStrengths: "What went well",
   summaryFocus: "What to improve",
@@ -83,6 +123,36 @@ const VOICE_ASSISTANT_TEXT: VoiceAssistantText = {
   summaryHomework: "Next step",
   recentSessionsTitle: "Recent lessons",
   recentSessionsEmpty: "Your saved practice sessions will appear here.",
+  lessonTemplatesTitle: "Lesson flow",
+  lessonTemplatesHint:
+    "Start a ready-made lesson and finish with a coaching score after a few learner turns.",
+  lessonStart: "Start lesson",
+  lessonRestart: "Restart lesson",
+  lessonActiveTitle: "Active lesson",
+  lessonProgress: "Lesson progress {progress}",
+  lessonGoalLabel: "Lesson goal",
+  lessonScoreTitle: "Lesson score",
+  lessonScoreFluency: "Fluency",
+  lessonScoreAccuracy: "Accuracy",
+  lessonScoreVocabulary: "Vocabulary",
+  lessonScorePronunciation: "Pronunciation",
+  lessonScoreGoal: "Goal completion",
+  lessonScoreFeedback: "Coach feedback",
+  lessonReviewTitle: "Post-lesson review",
+  lessonReviewHint:
+    "Use this targeted review to repeat only the weak points from the last lesson.",
+  lessonReviewGrammar: "Grammar",
+  lessonReviewVocabulary: "Vocabulary",
+  lessonReviewPronunciation: "Pronunciation",
+  lessonReviewRepeat: "Repeat weak points only",
+  lessonPlannerTitle: "Recommended next lesson",
+  lessonPlannerHint:
+    "This planner picks the next best lesson from your scores, review cards, and saved practice memory.",
+  lessonPlannerReason: "Why this lesson",
+  lessonPlannerFocus: "Focus points",
+  lessonPlannerDifficulty: "Difficulty",
+  lessonPlannerStart: "Start recommended lesson",
+  lessonDifficultyLabel: "Difficulty mode",
   coachCorrection: "Quick correction",
   coachBetterVersion: "Better version",
   coachNextQuestion: "Next question",

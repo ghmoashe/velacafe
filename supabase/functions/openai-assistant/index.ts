@@ -23,6 +23,15 @@ type CoachPracticeSummary = {
   newPhrases: string[];
   homework: string[];
 };
+type CoachLessonScore = {
+  overall: number;
+  fluency: number;
+  accuracy: number;
+  vocabulary: number;
+  pronunciation: number;
+  goalCompletion: number;
+  finalFeedback: string;
+};
 type CoachFeedback = {
   assistantReply: string;
   quickCorrection: string;
@@ -30,6 +39,8 @@ type CoachFeedback = {
   nextQuestion: string;
   pronunciationTip: string;
   summary: CoachPracticeSummary | null;
+  lessonComplete: boolean;
+  score: CoachLessonScore | null;
 };
 
 function json(status: number, body: unknown) {
@@ -333,6 +344,21 @@ function normalizeCoachList(value: unknown, maxItems = 3) {
     .slice(0, maxItems);
 }
 
+function normalizeScoreValue(value: unknown) {
+  const numericValue =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : NaN;
+
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(numericValue)));
+}
+
 function parseCoachFeedback(text: string): CoachFeedback | null {
   const normalized = text.trim();
   if (!normalized) {
@@ -351,6 +377,10 @@ function parseCoachFeedback(text: string): CoachFeedback | null {
       payload.summary && typeof payload.summary === "object"
         ? (payload.summary as JsonRecord)
         : null;
+    const score =
+      payload.score && typeof payload.score === "object"
+        ? (payload.score as JsonRecord)
+        : null;
 
     return {
       assistantReply: extractTextValue(payload.assistant_reply),
@@ -366,6 +396,18 @@ function parseCoachFeedback(text: string): CoachFeedback | null {
             homework: normalizeCoachList(summary.homework),
           }
         : null,
+      lessonComplete: payload.lesson_complete === true,
+      score: score
+        ? {
+            overall: normalizeScoreValue(score.overall),
+            fluency: normalizeScoreValue(score.fluency),
+            accuracy: normalizeScoreValue(score.accuracy),
+            vocabulary: normalizeScoreValue(score.vocabulary),
+            pronunciation: normalizeScoreValue(score.pronunciation),
+            goalCompletion: normalizeScoreValue(score.goal_completion),
+            finalFeedback: extractTextValue(score.final_feedback),
+          }
+        : null,
     };
   } catch {
     return {
@@ -375,6 +417,8 @@ function parseCoachFeedback(text: string): CoachFeedback | null {
       nextQuestion: "",
       pronunciationTip: "",
       summary: null,
+      lessonComplete: false,
+      score: null,
     };
   }
 }
@@ -543,6 +587,39 @@ function buildLevelInstruction(levelRange: string) {
   return `Keep the reply within CEFR ${normalizedLevelRange}. Use vocabulary and grammar that fit this level, and avoid going above it.`;
 }
 
+function buildDifficultyInstruction(difficultyMode: string, difficultyNote: string) {
+  const normalizedMode = difficultyMode.trim().toLowerCase();
+  const note = difficultyNote.trim();
+
+  if (normalizedMode === "supportive") {
+    return [
+      "Use a supportive difficulty mode inside the selected CEFR range.",
+      "Stay near the lower edge of the range, use shorter questions, more predictable follow-ups, and gentle scaffolding.",
+      note,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  if (normalizedMode === "stretch") {
+    return [
+      "Use a stretch difficulty mode inside the selected CEFR range.",
+      "Stay inside the CEFR range but move toward the upper edge with richer vocabulary, less scaffolding, and slightly more open follow-up questions.",
+      note,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return [
+    "Use a balanced difficulty mode inside the selected CEFR range.",
+    "Stay around the middle of the range with natural pacing and normal support.",
+    note,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function buildNativeHelpInstruction(nativeHelp: boolean, nativeLocale: string) {
   if (!nativeHelp || !nativeLocale.trim()) {
     return "Do not switch away from the selected learning language unless the user explicitly requests it.";
@@ -583,11 +660,73 @@ function buildPracticeModeInstruction(practiceMode: string, practiceTopic: strin
   }
 }
 
+function buildLessonFlowInstruction(input: {
+  lessonTemplate: string;
+  lessonGoal: string;
+  lessonTurnIndex: number;
+  lessonTurnTarget: number;
+}) {
+  const template = input.lessonTemplate.trim();
+  const goal = input.lessonGoal.trim();
+  const turnTarget = Math.max(1, input.lessonTurnTarget);
+  const turnIndex = Math.max(0, input.lessonTurnIndex);
+
+  if (!template && !goal && turnIndex === 0 && turnTarget === 0) {
+    return "";
+  }
+
+  const lessonIdentity = template
+    ? `You are running a structured lesson called "${template}".`
+    : "You are running a structured speaking lesson.";
+  const goalInstruction = goal
+    ? `The lesson goal is: ${goal}.`
+    : "The lesson goal is to keep the learner speaking confidently in a realistic scenario.";
+
+  if (turnIndex <= 0) {
+    return [
+      lessonIdentity,
+      goalInstruction,
+      `This is the lesson kickoff before learner turn 1 of ${turnTarget}.`,
+      "In assistant_reply, set the scene in one or two short sentences.",
+      "Put the first learner prompt in next_question.",
+      "Leave quick_correction, better_version, pronunciation_tip, and score empty at kickoff.",
+      "Set lesson_complete to false at kickoff.",
+    ].join(" ");
+  }
+
+  if (turnIndex >= turnTarget) {
+    return [
+      lessonIdentity,
+      goalInstruction,
+      `This learner has just completed turn ${turnIndex} of ${turnTarget}, which is the final turn.`,
+      "Do not ask another follow-up question.",
+      "Use assistant_reply for a brief encouraging wrap-up.",
+      "Set lesson_complete to true.",
+      "Fill the score object with overall, fluency, accuracy, vocabulary, pronunciation, goal_completion, and final_feedback.",
+      "The score should be fair for the selected CEFR level, not native-speaker standards.",
+    ].join(" ");
+  }
+
+  return [
+    lessonIdentity,
+    goalInstruction,
+    `The learner has completed ${turnIndex} of ${turnTarget} lesson turns.`,
+    "Continue the lesson naturally and ask exactly one short next question.",
+    "Set lesson_complete to false and leave score empty until the final learner turn.",
+  ].join(" ");
+}
+
 function buildInstructions(
   locale: string,
   levelRange: string,
   practiceMode: string,
   practiceTopic: string,
+  lessonTemplate: string,
+  lessonGoal: string,
+  lessonTurnIndex: number,
+  lessonTurnTarget: number,
+  difficultyMode: string,
+  difficultyNote: string,
   nativeHelp: boolean,
   nativeLocale: string
 ) {
@@ -597,13 +736,21 @@ function buildInstructions(
     `Reply only in ${getLanguageName(locale)} unless the user explicitly asks to switch the conversation language.`,
     "Treat the selected conversation language as the active learning language for this chat.",
     buildLevelInstruction(levelRange),
+    buildDifficultyInstruction(difficultyMode, difficultyNote),
     buildPracticeModeInstruction(practiceMode, practiceTopic),
+    buildLessonFlowInstruction({
+      lessonTemplate,
+      lessonGoal,
+      lessonTurnIndex,
+      lessonTurnTarget,
+    }),
     buildNativeHelpInstruction(nativeHelp, nativeLocale),
     "After the learner speaks, do three things in one compact reply when useful: acknowledge, lightly correct or reformulate one key mistake, then continue the conversation.",
     "Ask one short follow-up question at a time so the learner keeps speaking.",
     "Keep replies natural for speech and short enough for voice playback.",
-    "Return valid JSON only with these keys: assistant_reply, quick_correction, better_version, next_question, pronunciation_tip, summary.",
+    "Return valid JSON only with these keys: assistant_reply, quick_correction, better_version, next_question, pronunciation_tip, summary, lesson_complete, score.",
     "The summary object must contain arrays named strengths, focus_next, new_phrases, homework.",
+    "The score object must contain overall, fluency, accuracy, vocabulary, pronunciation, goal_completion, final_feedback.",
     "If a field is not needed, return an empty string or an empty array.",
   ].join(" ");
 }
@@ -647,6 +794,12 @@ function buildOpenAiRequestBody(input: {
   levelRange: string;
   practiceMode: string;
   practiceTopic: string;
+  lessonTemplate: string;
+  lessonGoal: string;
+  lessonTurnIndex: number;
+  lessonTurnTarget: number;
+  difficultyMode: string;
+  difficultyNote: string;
   nativeHelp: boolean;
   nativeLocale: string;
   stream?: boolean;
@@ -659,11 +812,17 @@ function buildOpenAiRequestBody(input: {
       input.levelRange,
       input.practiceMode,
       input.practiceTopic,
+      input.lessonTemplate,
+      input.lessonGoal,
+      input.lessonTurnIndex,
+      input.lessonTurnTarget,
+      input.difficultyMode,
+      input.difficultyNote,
       input.nativeHelp,
       input.nativeLocale
     ),
     conversation: input.conversationId ?? undefined,
-    max_output_tokens: 180,
+    max_output_tokens: 260,
     store: true,
     stream: input.stream === true ? true : undefined,
   };
@@ -676,6 +835,12 @@ async function createOpenAiResponse(input: {
   levelRange: string;
   practiceMode: string;
   practiceTopic: string;
+  lessonTemplate: string;
+  lessonGoal: string;
+  lessonTurnIndex: number;
+  lessonTurnTarget: number;
+  difficultyMode: string;
+  difficultyNote: string;
   nativeHelp: boolean;
   nativeLocale: string;
   signal?: AbortSignal;
@@ -732,6 +897,12 @@ async function createOpenAiChatCompletion(input: {
   levelRange: string;
   practiceMode: string;
   practiceTopic: string;
+  lessonTemplate: string;
+  lessonGoal: string;
+  lessonTurnIndex: number;
+  lessonTurnTarget: number;
+  difficultyMode: string;
+  difficultyNote: string;
   nativeHelp: boolean;
   nativeLocale: string;
 }) {
@@ -751,6 +922,12 @@ async function createOpenAiChatCompletion(input: {
             input.levelRange,
             input.practiceMode,
             input.practiceTopic,
+            input.lessonTemplate,
+            input.lessonGoal,
+            input.lessonTurnIndex,
+            input.lessonTurnTarget,
+            input.difficultyMode,
+            input.difficultyNote,
             input.nativeHelp,
             input.nativeLocale
           ),
@@ -761,7 +938,7 @@ async function createOpenAiChatCompletion(input: {
         },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 180,
+      max_tokens: 260,
     }),
   });
 }
@@ -773,6 +950,12 @@ async function handleJsonResponse(input: {
   levelRange: string;
   practiceMode: string;
   practiceTopic: string;
+  lessonTemplate: string;
+  lessonGoal: string;
+  lessonTurnIndex: number;
+  lessonTurnTarget: number;
+  difficultyMode: string;
+  difficultyNote: string;
   nativeHelp: boolean;
   nativeLocale: string;
   userId: string;
@@ -783,6 +966,12 @@ async function handleJsonResponse(input: {
     levelRange: input.levelRange,
     practiceMode: input.practiceMode,
     practiceTopic: input.practiceTopic,
+    lessonTemplate: input.lessonTemplate,
+    lessonGoal: input.lessonGoal,
+    lessonTurnIndex: input.lessonTurnIndex,
+    lessonTurnTarget: input.lessonTurnTarget,
+    difficultyMode: input.difficultyMode,
+    difficultyNote: input.difficultyNote,
     nativeHelp: input.nativeHelp,
     nativeLocale: input.nativeLocale,
   });
@@ -855,6 +1044,12 @@ async function handleStreamingResponse(req: Request, input: {
   levelRange: string;
   practiceMode: string;
   practiceTopic: string;
+  lessonTemplate: string;
+  lessonGoal: string;
+  lessonTurnIndex: number;
+  lessonTurnTarget: number;
+  difficultyMode: string;
+  difficultyNote: string;
   nativeHelp: boolean;
   nativeLocale: string;
   userId: string;
@@ -889,6 +1084,12 @@ async function handleStreamingResponse(req: Request, input: {
             levelRange: input.levelRange,
             practiceMode: input.practiceMode,
             practiceTopic: input.practiceTopic,
+            lessonTemplate: input.lessonTemplate,
+            lessonGoal: input.lessonGoal,
+            lessonTurnIndex: input.lessonTurnIndex,
+            lessonTurnTarget: input.lessonTurnTarget,
+            difficultyMode: input.difficultyMode,
+            difficultyNote: input.difficultyNote,
             nativeHelp: input.nativeHelp,
             nativeLocale: input.nativeLocale,
           });
@@ -1015,6 +1216,30 @@ Deno.serve(async (req) => {
       typeof body.practiceTopic === "string" && body.practiceTopic.trim()
         ? body.practiceTopic.trim()
         : "";
+    const lessonTemplate =
+      typeof body.lessonTemplate === "string" && body.lessonTemplate.trim()
+        ? body.lessonTemplate.trim()
+        : "";
+    const lessonGoal =
+      typeof body.lessonGoal === "string" && body.lessonGoal.trim()
+        ? body.lessonGoal.trim()
+        : "";
+    const lessonTurnIndex =
+      typeof body.lessonTurnIndex === "number" && Number.isFinite(body.lessonTurnIndex)
+        ? Math.max(0, Math.round(body.lessonTurnIndex))
+        : 0;
+    const lessonTurnTarget =
+      typeof body.lessonTurnTarget === "number" && Number.isFinite(body.lessonTurnTarget)
+        ? Math.max(0, Math.round(body.lessonTurnTarget))
+        : 0;
+    const difficultyMode =
+      typeof body.difficultyMode === "string" && body.difficultyMode.trim()
+        ? body.difficultyMode.trim().toLowerCase()
+        : "balanced";
+    const difficultyNote =
+      typeof body.difficultyNote === "string" && body.difficultyNote.trim()
+        ? body.difficultyNote.trim()
+        : "";
     const nativeHelp = body.nativeHelp === true;
     const nativeLocale =
       typeof body.nativeLocale === "string" && body.nativeLocale.trim()
@@ -1033,6 +1258,12 @@ Deno.serve(async (req) => {
         levelRange,
         practiceMode,
         practiceTopic,
+        lessonTemplate,
+        lessonGoal,
+        lessonTurnIndex,
+        lessonTurnTarget,
+        difficultyMode,
+        difficultyNote,
         nativeHelp,
         nativeLocale,
         userId: user.id,
@@ -1046,6 +1277,12 @@ Deno.serve(async (req) => {
       levelRange,
       practiceMode,
       practiceTopic,
+      lessonTemplate,
+      lessonGoal,
+      lessonTurnIndex,
+      lessonTurnTarget,
+      difficultyMode,
+      difficultyNote,
       nativeHelp,
       nativeLocale,
       userId: user.id,

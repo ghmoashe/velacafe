@@ -13,11 +13,23 @@ export type OpenAiAssistantReply = {
   coach: CoachFeedback | null;
 };
 
+export type CoachDifficultyMode = "supportive" | "balanced" | "stretch";
+
 export type CoachPracticeSummary = {
   strengths: string[];
   focusNext: string[];
   newPhrases: string[];
   homework: string[];
+};
+
+export type CoachLessonScore = {
+  overall: number;
+  fluency: number;
+  accuracy: number;
+  vocabulary: number;
+  pronunciation: number;
+  goalCompletion: number;
+  finalFeedback: string;
 };
 
 export type CoachFeedback = {
@@ -27,6 +39,8 @@ export type CoachFeedback = {
   nextQuestion: string;
   pronunciationTip: string;
   summary: CoachPracticeSummary | null;
+  lessonComplete: boolean;
+  score: CoachLessonScore | null;
 };
 
 type StreamEventPayload = Record<string, unknown>;
@@ -138,6 +152,12 @@ export async function createOpenAiAssistantReply(input: {
   levelRange?: string;
   practiceMode?: string;
   practiceTopic?: string;
+  lessonTemplate?: string;
+  lessonGoal?: string;
+  lessonTurnIndex?: number;
+  lessonTurnTarget?: number;
+  difficultyMode?: CoachDifficultyMode;
+  difficultyNote?: string;
   nativeHelp?: boolean;
   nativeLocale?: string;
   signal?: AbortSignal;
@@ -161,6 +181,12 @@ export async function createOpenAiAssistantReply(input: {
       levelRange: input.levelRange,
       practiceMode: input.practiceMode,
       practiceTopic: input.practiceTopic,
+      lessonTemplate: input.lessonTemplate,
+      lessonGoal: input.lessonGoal,
+      lessonTurnIndex: input.lessonTurnIndex,
+      lessonTurnTarget: input.lessonTurnTarget,
+      difficultyMode: input.difficultyMode,
+      difficultyNote: input.difficultyNote,
       nativeHelp: input.nativeHelp,
       nativeLocale: input.nativeLocale,
     }),
